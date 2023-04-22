@@ -1,4 +1,5 @@
 [workspace]
 members = [
     "jgnes-core",
+    "jgnes-cli",
 ]

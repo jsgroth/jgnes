@@ -1,0 +1,69 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+  # Force on Cargo's sparse protocol for crates.io, set to become default behavior in Rust 1.70
+  CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install latest stable Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+
+    - name: Check formatting
+      uses: actions-rs/cargo@v1
+      with:
+        command: fmt
+        args: --check
+
+    - name: Install libsdl2
+      run: |
+        sudo apt-get update && sudo apt-get install -y libsdl2-dev
+
+    - name: Build
+      uses: actions-rs/cargo@v1
+      with:
+        command: build
+
+    - name: Get latest cranky version
+      id: get-cranky-version
+      run: |
+        cargo search cargo-cranky | head -1 | cut -d' ' -f3 | sed -re 's/"(.*)"/version=\1/g' >> $GITHUB_OUTPUT
+
+    - name: Cache cranky binary
+      id: cranky-cache
+      uses: actions/cache@v3
+      with:
+        path: ~/.cargo/bin/cargo-cranky
+        key: ${{ runner.os }}-${{ steps.get-cranky-version.outputs.version }}
+
+    - name: Install cranky
+      if: steps.cranky-cache.outputs.cache-hit != 'true'
+      uses: actions-rs/cargo@v1
+      with:
+        command: install
+        args: cargo-cranky --version ${{ steps.get-cranky-version.outputs.version }}
+
+    - name: Check Clippy warnings
+      uses: actions-rs/cargo@v1
+      with:
+        command: cranky
+        args: -- -D warnings
+
+    - name: Run tests
+      uses: actions-rs/cargo@v1
+      with:
+        command: test

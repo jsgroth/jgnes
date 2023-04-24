@@ -39,7 +39,6 @@ jobs:
         command: build
 
     - name: Install cranky
-      if: steps.cranky-cache.outputs.cache-hit != 'true'
       uses: actions-rs/cargo@v1
       with:
         command: install

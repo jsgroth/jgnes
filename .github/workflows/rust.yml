@@ -38,24 +38,12 @@ jobs:
       with:
         command: build
 
-    - name: Get latest cranky version
-      id: get-cranky-version
-      run: |
-        cargo search cargo-cranky | head -1 | cut -d' ' -f3 | sed -re 's/"(.*)"/version=\1/g' >> $GITHUB_OUTPUT
-
-    - name: Cache cranky binary
-      id: cranky-cache
-      uses: actions/cache@v3
-      with:
-        path: ~/.cargo/bin/cargo-cranky
-        key: ${{ runner.os }}-${{ steps.get-cranky-version.outputs.version }}
-
     - name: Install cranky
       if: steps.cranky-cache.outputs.cache-hit != 'true'
       uses: actions-rs/cargo@v1
       with:
         command: install
-        args: cargo-cranky --version ${{ steps.get-cranky-version.outputs.version }}
+        args: cargo-cranky
 
     - name: Check Clippy warnings
       uses: actions-rs/cargo@v1

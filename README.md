@@ -5,6 +5,7 @@ The early stages of what might some day be a functional NES emulator
 Implemented:
 * Cycle-based 6502 CPU emulation
 * Cycle-based PPU emulation (graphics)
+  * NMI timing is not completely accurate which may cause issues in games that require extremely accurate CPU/PPU timing (e.g. Battletoads)
 * Cycle-based APU emulation (audio)
   * Still a few audible issues; the square wave and delta modulation channels occasionally pop, triangle wave and pseudo-random noise channels seem ok
 * A few mappers

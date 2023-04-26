@@ -10,9 +10,10 @@ Implemented:
   * Still a few audible issues; the square wave and delta modulation channels occasionally pop, triangle wave and pseudo-random noise channels seem ok
 * A few mappers
   * NROM
-  * MMC1
   * UxROM
   * CNROM
+  * AxROM
+  * MMC1
   * MMC3
     * MMC3 IRQs are implemented but have some timing issues, some games may have (even more) visual glitches than they do on actual hardware
 * P1 input with hardcoded keys

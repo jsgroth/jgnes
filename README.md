@@ -6,7 +6,7 @@ Implemented:
 * Cycle-based 6502 CPU emulation
 * Cycle-based PPU emulation (graphics)
 * Cycle-based APU emulation (audio)
-  * The mixer seems to have some issues
+  * Still a few audible issues; the square wave and delta modulation channels occasionally pop, triangle wave and pseudo-random noise channels seem ok
 * A few mappers
   * NROM
   * MMC1

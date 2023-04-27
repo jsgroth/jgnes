@@ -60,7 +60,7 @@ Not Implemented:
 | blargg_apu_2005.07.30/06.len_timing_mode1.nes | ✅ | |
 | blargg_apu_2005.07.30/07.irq_flag_timing.nes | ✅ | |
 | blargg_apu_2005.07.30/08.irq_timing.nes | ✅ | |
-| blargg_apu_2005.07.30/09.reset_timing.nes | ❌ | #4: Fourth step occurs too late |
+| blargg_apu_2005.07.30/09.reset_timing.nes | ✅ | |
 | blargg_apu_2005.07.30/10.len_halt_timing.nes | ✅ | |
 | blargg_apu_2005.07.30/11.len_reload_timing.nes | ❌ | #5: Reload during length clock when ctr > 0 should be ignored |
 | dmc_dma_during_read4/dma_2007_read.nes | ❌ | Unknown |

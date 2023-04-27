@@ -23,6 +23,7 @@ Not Implemented:
 * Lots of mappers, including commonly used mappers such as the later MMCs
 * P2 input and input configuration
 * Save file persistence for cartridges with both PRG RAM and a battery
+* RESET button functionality
 * A GUI
 
 ## Test ROM Results

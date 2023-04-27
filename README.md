@@ -5,8 +5,10 @@ The early stages of what might some day be a functional NES emulator
 Implemented:
 * Cycle-based 6502 CPU emulation
   * Unofficial opcodes not implemented
+  * Open bus is not implemented; open bus reads always return $FF
 * Cycle-based PPU emulation (graphics)
   * Rendering effects of mid-scanline writes may not be cycle-accurate based on non-binary test ROMs (nmi_sync / scanline)
+  * Open bus is not implemented
 * Cycle-based APU emulation (audio)
   * DMC DMA cycle stealing is not implemented
   * DMC IRQ timing may not be cycle-accurate based on non-binary test ROMs (dpcmletterbox). This might also just be related to DMC DMA cycle stealing not being implemented

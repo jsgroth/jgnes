@@ -46,6 +46,7 @@ Not Implemented:
 | cpu_timing_test6/cpu_timing_test.nes | ✅ | |
 | instr_test-v5/all_instrs.nes | ❌ | Panic due to unofficial opcodes |
 | instr_test-v5/official_only.nes | ✅ | |
+| instr_timing/instr_timing.nes | ❌ | Panic due to unofficial opcodes |
 
 ### APU Test ROMs
 

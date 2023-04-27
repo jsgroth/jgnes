@@ -47,7 +47,7 @@ Not Implemented:
 | cpu_dummy_writes/cpu_dummy_writes_oam.nes | ❌ | Panic due to unofficial opcodes |
 | cpu_dummy_writes/cpu_dummy_writes_ppumem.nes | ❌ | Panic due to unofficial opcodes |
 | cpu_exec_space/test_cpu_exec_space_apu.nes | ❌ | Panic due to CPU open bus not being implemented, leading to invalid opcode execution |
-| cpu_exec_space/test_cpu_exec_space_ppuio.nes |  | ✅ |
+| cpu_exec_space/test_cpu_exec_space_ppuio.nes | ✅ | |
 | cpu_interrupts_v2/cpu_interrupts.nes | ✅ | |
 | cpu_timing_test6/cpu_timing_test.nes | ✅ | |
 | instr_test-v5/all_instrs.nes | ❌ | Panic due to unofficial opcodes |

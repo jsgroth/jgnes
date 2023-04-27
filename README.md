@@ -4,6 +4,7 @@ The early stages of what might some day be a functional NES emulator
 
 Implemented:
 * Cycle-based 6502 CPU emulation
+  * Unofficial opcodes not implemented
 * Cycle-based PPU emulation (graphics)
   * Rendering effects of mid-scanline writes may not be cycle-accurate based on non-binary test ROMs (nmi_sync / scanline)
 * Cycle-based APU emulation (audio)

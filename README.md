@@ -8,7 +8,6 @@ Implemented:
   * Open bus is not implemented; open bus reads always return $FF
 * Cycle-based PPU emulation (graphics)
   * Rendering effects of mid-scanline writes may not be cycle-accurate based on non-binary test ROMs (nmi_sync / scanline)
-  * Open bus is not implemented (OAMDATA / PPUDATA registers)
 * Cycle-based APU emulation (audio)
   * DMC DMA cycle stealing is not accurate; currently always steals 4 cycles when in reality it can sometimes steal less depending on the current CPU state
 * The most commonly used mappers

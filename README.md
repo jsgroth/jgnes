@@ -10,8 +10,7 @@ Implemented:
   * Rendering effects of mid-scanline writes may not be cycle-accurate based on non-binary test ROMs (nmi_sync / scanline)
   * Open bus is not implemented (OAMDATA / PPUDATA registers)
 * Cycle-based APU emulation (audio)
-  * DMC DMA cycle stealing is not implemented
-  * DMC IRQ timing may not be cycle-accurate based on non-binary test ROMs (dpcmletterbox). This might also just be related to DMC DMA cycle stealing not being implemented
+  * DMC DMA cycle stealing is not accurate; currently always steals 4 cycles when in reality it can sometimes steal less depending on the current CPU state
 * The most commonly used mappers
   * NROM
   * UxROM
@@ -79,8 +78,8 @@ Not Implemented:
 | dmc_tests/latency.nes | ✅ | |
 | dmc_tests/status_irq.nes | ✅ | |
 | dmc_tests/status.nes | ✅ | |
-| sprdma_and_dmc_dma/sprdma_and_dmc_dma.nes | ❌ | DMC DMA cycle stealing not implemented |
-| sprdma_and_dmc_dma/sprdma_and_dmc_dma_512.nes | ❌ | DMC DMA cycle stealing not implemented |
+| sprdma_and_dmc_dma/sprdma_and_dmc_dma.nes | ❌ | DMC DMA cycle stealing not implemented accurately |
+| sprdma_and_dmc_dma/sprdma_and_dmc_dma_512.nes | ❌ | DMC DMA cycle stealing not implemented accurately |
 
 ### PPU Test ROMS
 

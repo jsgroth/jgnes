@@ -22,4 +22,91 @@ Not Implemented:
 * Overscan customization; some games look really bad without cropping ~8 columns of pixels off each side of the screen
 * Lots of mappers, including commonly used mappers such as the later MMCs
 * P2 input and input configuration
+* Save file persistence for cartridges with both PRG RAM and a battery
 * A GUI
+
+## Test ROM Results
+
+### CPU Test ROMs
+
+| Test | Result | Failure Reason |
+| --- | --- | --- |
+| blargg_nes_cpu_test5/cpu.nes | ❌ | Panic due to unofficial opcodes |
+| blargg_nes_cpu_test5/official.nes | ✅ | |
+| branch_timing_tests/1.Branch_Basics.nes | ✅ | |
+| branch_timing_tests/2.Backward_Branch.nes | ✅ | |
+| branch_timing_tests/3.Forward_Branch.nes | ✅ | |
+| cpu_dummy_reads/cpu_dummy_reads.nes | ✅ | |
+| cpu_dummy_writes/cpu_dummy_writes_oam.nes | ❌ | Panic due to unofficial opcodes |
+| cpu_dummy_writes/cpu_dummy_writes_ppumem.nes | ❌ | Panic due to unoffical opcodes |
+| cpu_exec_space/test_cpu_exec_space_apu.nes | ❌ | Panic due to CPU open bus not being implemented, leading to invalid opcode execution |
+| cpu_exec_space/test_cpu_exec_space_ppuio.nes | ❌ | #3: A write to $2003, followed by a read to $2001 should return the same value as was written |
+| cpu_interrupts_v2/cpu_interrupts.nes | ✅ | |
+| cpu_timing_test6/cpu_timing_test.nes | ✅ | |
+| instr_test-v5/all_instrs.nes | ❌ | Panic due to unofficial opcodes |
+| instr_test-v5/official_only.nes | ✅ | |
+
+### APU Test ROMs
+
+| Test | Result | Failure Reason |
+| --- | --- | --- |
+| apu_test/apu_test.nes | ✅ | |
+| blargg_apu_2005.07.30/01.len_ctr.nes | ✅ | |
+| blargg_apu_2005.07.30/02.len_table.nes | ✅ | |
+| blargg_apu_2005.07.30/03.irq_flag.nes | ✅ | |
+| blargg_apu_2005.07.30/04.clock_jitter.nes | ✅ | |
+| blargg_apu_2005.07.30/05.len_timing_mode0.nes | ✅ | |
+| blargg_apu_2005.07.30/06.len_timing_mode1.nes | ✅ | |
+| blargg_apu_2005.07.30/07.irq_flag_timing.nes | ✅ | |
+| blargg_apu_2005.07.30/08.irq_timing.nes | ✅ | |
+| blargg_apu_2005.07.30/09.reset_timing.nes | ❌ | #4: Fourth step occurs too late |
+| blargg_apu_2005.07.30/10.len_halt_timing.nes | ✅ | |
+| blargg_apu_2005.07.30/11.len_reload_timing.nes | ❌ | #5: Reload during length clock when ctr > 0 should be ignored |
+| dmc_dma_during_read4/dma_2007_read.nes | ❌ | Unknown |
+| dmc_dma_during_read4/dma_2007_write.nes | ✅ | |
+| dmc_dma_during_read4/dma_4016_read.nes | ❌ | Unknown |
+| dmc_dma_during_read4/double_2007_read.nes | ❌ | Unknown |
+| dmc_dma_during_read4/read_write_2007.nes | ✅ | |
+| dmc_tests/buffer_retained.nes | ✅ | |
+| dmc_tests/latency.nes | ✅ | |
+| dmc_tests/status_irq.nes | ✅ | |
+| dmc_tests/status.nes | ✅ | |
+| sprdma_and_dmc_dma/sprdma_and_dmc_dma.nes | ❌ | DMC DMA cycle stealing not implemented |
+| sprdma_and_dmc_dma/sprdma_and_dmc_dma_512.nes | ❌ | DMC DMA cycle stealing not implemented |
+
+### PPU Test ROMS
+
+| Test | Result | Failure Reason |
+| --- | --- | --- |
+| blargg_ppu_tests_2005.09.15b/palette_ram.nes | ✅ | |
+| blargg_ppu_tests_2005.09.15b/power_up_palette.nes | ❌ | #2: Palette differs from table |
+| blargg_ppu_tests_2005.09.15b/sprite_ram.nes | ✅ | |
+| blargg_ppu_tests_2005.09.15b/vbl_clear_time.nes | ✅ | |
+| blargg_ppu_tests_2005.09.15b/vram_access.nes | ✅ | |
+| oam_read/oam_read.nes | ✅ | |
+| ppu_open_bus/ppu_open_bus.nes | ❌ | #2: Write to any PPU register should set decay value |
+| ppu_read_buffer/test_ppu_read_buffer.nes | ❌ | #17: Any data that is transferred through PPU I/O should linger and be readable for a while in any PPU register that does not have a read function |
+| ppu_vbl_nmi/ppu_vbl_nmi.nes | ✅ | |
+| sprite_hit_tests_2005.10.05/01.basics.nes | ✅ | |
+| sprite_hit_tests_2005.10.05/02.alignment.nes | ✅ | |
+| sprite_hit_tests_2005.10.05/03.corners.nes | ✅ | |
+| sprite_hit_tests_2005.10.05/04.flip.nes | ✅ | |
+| sprite_hit_tests_2005.10.05/05.left_clip.nes | ✅ | |
+| sprite_hit_tests_2005.10.05/06.right_edge.nes | ✅ | |
+| sprite_hit_tests_2005.10.05/07.screen_bottom.nes | ✅ | |
+| sprite_hit_tests_2005.10.05/08.double_height.nes | ✅ | |
+| sprite_hit_tests_2005.10.05/09.timing_basics.nes | ✅ | |
+| sprite_hit_tests_2005.10.05/10.timing_order.nes | ✅ | |
+| sprite_hit_tests_2005.10.05/11.edge_timing.nes | ✅ | |
+| sprite_overflow_tests/1.Basics.nes | ✅ | |
+| sprite_overflow_tests/2.Details.nes | ✅ | |
+| sprite_overflow_tests/3.Timing.nes | ✅ | |
+| sprite_overflow_tests/4.Obscure.nes | ✅ | |
+| sprite_overflow_tests/5.Emulator.nes | ✅ | |
+| vbl_nmi_timing/1.frame_basics.nes | ✅ | |
+| vbl_nmi_timing/2.vbl_timing.nes | ✅ | |
+| vbl_nmi_timing/3.even_odd_frames.nes | ✅ | |
+| vbl_nmi_timing/4.vbl_clear_timing.nes | ✅ | |
+| vbl_nmi_timing/5.nmi_suppression.nes | ✅ | |
+| vbl_nmi_timing/6.nmi_disable.nes | ✅ | |
+| vbl_nmi_timing/7.nmi_timing.nes | ✅ | |

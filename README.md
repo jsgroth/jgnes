@@ -39,7 +39,7 @@ Not Implemented:
 | branch_timing_tests/3.Forward_Branch.nes | ✅ | |
 | cpu_dummy_reads/cpu_dummy_reads.nes | ✅ | |
 | cpu_dummy_writes/cpu_dummy_writes_oam.nes | ❌ | Panic due to unofficial opcodes |
-| cpu_dummy_writes/cpu_dummy_writes_ppumem.nes | ❌ | Panic due to unoffical opcodes |
+| cpu_dummy_writes/cpu_dummy_writes_ppumem.nes | ❌ | Panic due to unofficial opcodes |
 | cpu_exec_space/test_cpu_exec_space_apu.nes | ❌ | Panic due to CPU open bus not being implemented, leading to invalid opcode execution |
 | cpu_exec_space/test_cpu_exec_space_ppuio.nes | ❌ | #3: A write to $2003, followed by a read to $2001 should return the same value as was written |
 | cpu_interrupts_v2/cpu_interrupts.nes | ✅ | |

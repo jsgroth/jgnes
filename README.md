@@ -92,7 +92,7 @@ Not Implemented:
 | blargg_ppu_tests_2005.09.15b/vram_access.nes | ✅ | |
 | oam_read/oam_read.nes | ✅ | |
 | ppu_open_bus/ppu_open_bus.nes | ❌ | #3: Decay value should become zero by one second |
-| ppu_read_buffer/test_ppu_read_buffer.nes | ❌ | #67: Sprite 0 hit test using DMA ($4014) using PPU I/O bus as source |
+| ppu_read_buffer/test_ppu_read_buffer.nes | ✅ | |
 | ppu_vbl_nmi/ppu_vbl_nmi.nes | ✅ | |
 | sprite_hit_tests_2005.10.05/01.basics.nes | ✅ | |
 | sprite_hit_tests_2005.10.05/02.alignment.nes | ✅ | |

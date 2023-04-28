@@ -17,15 +17,15 @@ Implemented:
   * CNROM
   * AxROM
   * MMC1
-  * MMC3
-    * MMC3 IRQs are implemented but have some timing issues, some games may have (even more) visual glitches than they do on actual hardware
+  * MMC3/MMC6
+    * MMC3 IRQs are implemented but have some timing issues, some games may have (even more) visual glitches than they do on actual hardware. StarTropics 1 & 2 in particular don't render their status bars correctly
 * P1 input with hardcoded keys
 
 Not Implemented:
 * An option to scale the native 8:7 NES output to 4:3, as TVs would have done back in the 1980s
 * A smarter way of mapping NES colors to RGB colors; currently using a hardcoded palette that looks kind of ok, color emphasis is not currently implemented
 * Overscan customization; some games look really bad without cropping ~8 columns of pixels off each side of the screen
-* Lots of mappers, most notably MMC2 (Punch-Out!!), MMC5 (e.g. Castlevania 3), MMC6 (StarTropics 1 & 2), and Konami's VRC mappers
+* Lots of mappers, most notably MMC2 (Punch-Out!!), MMC5 (e.g. Castlevania 3), and Konami's VRC mappers
 * P2 input and input configuration (or any configuration really)
 * Save file persistence for cartridges with both PRG RAM and a battery
 * RESET button functionality

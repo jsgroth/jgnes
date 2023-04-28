@@ -114,7 +114,7 @@ Not Implemented:
 | vbl_nmi_timing/6.nmi_disable.nes | ✅ | |
 | vbl_nmi_timing/7.nmi_timing.nes | ✅ | |
 
-### MMC3 Test ROMs
+### Mapper-Specific Test ROMs
 
 | Test | Result | Failure Reason |
 | --- | --- | --- |

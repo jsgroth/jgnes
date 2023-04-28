@@ -120,7 +120,7 @@ Not Implemented:
 | --- | --- | --- |
 | mmc3_test_2/1-clocking.nes | ✅ | |
 | mmc3_test_2/2-details.nes | ✅ | |
-| mmc3_test_2/3-A12_clocking.nes | ❌ | #5: Should be clocked when A12 changes to 1 via PPUDATA read |
+| mmc3_test_2/3-A12_clocking.nes | ✅ | |
 | mmc3_test_2/4-scanline_timing.nes | ❌ | #3: Scanline 0 IRQ should occur sooner when $2000=$08 |
 | mmc3_test_2/5-MMC3.nes | ✅ | |
 | mmc3_test_2/6-MMC3_alt.nes | ❌ | #2: IRQ shouldn't be set when reloading to 0 due to counter naturally reaching 0 previously |

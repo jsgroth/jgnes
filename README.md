@@ -18,7 +18,7 @@ Implemented:
   * AxROM
   * MMC1
   * MMC3/MMC6
-    * MMC3 IRQs are implemented but have some timing issues, some games may have (even more) visual glitches than they do on actual hardware. StarTropics 1 & 2 in particular don't render their status bars correctly
+    * MMC3 IRQs are implemented but timing is not perfect, some games may have (even more) visual glitches than they do on actual hardware
 * P1 input with hardcoded keys
 
 Not Implemented:

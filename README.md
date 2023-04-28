@@ -10,7 +10,7 @@ Implemented:
   * Rendering effects of mid-scanline writes may not be cycle-accurate based on non-binary test ROMs (nmi_sync / scanline)
 * Cycle-based APU emulation (audio)
   * DMC DMA cycle stealing is not implemented
-  * DMC IRQ timing may not be cycle-accurate based on non-binary test ROMs (dpcmletterbox). This might also just be related to DMC DMA cycle stealing not being implemented
+  * DMC IRQ timing is slightly off based on non-binary test ROMs (dpcmletterbox), almost certainly due to lack of DMC DMA cycle stealing
 * The most commonly used mappers
   * NROM
   * UxROM

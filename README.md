@@ -74,10 +74,6 @@ Not Implemented:
 | dmc_dma_during_read4/dma_4016_read.nes | ❌ | Unknown |
 | dmc_dma_during_read4/double_2007_read.nes | ❌ | Unknown |
 | dmc_dma_during_read4/read_write_2007.nes | ✅ | |
-| dmc_tests/buffer_retained.nes | ✅ | |
-| dmc_tests/latency.nes | ✅ | |
-| dmc_tests/status_irq.nes | ✅ | |
-| dmc_tests/status.nes | ✅ | |
 | sprdma_and_dmc_dma/sprdma_and_dmc_dma.nes | ❌ | DMC DMA cycle stealing not implemented |
 | sprdma_and_dmc_dma/sprdma_and_dmc_dma_512.nes | ❌ | DMC DMA cycle stealing not implemented |
 

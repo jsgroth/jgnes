@@ -118,7 +118,7 @@ Not Implemented:
 
 | Test | Result | Failure Reason |
 | --- | --- | --- |
-| mmc3_test_2/1-clocking.nes | ✅ | #3: Should decrement when A12 is toggled via PPUADDR |
+| mmc3_test_2/1-clocking.nes | ✅ | |
 | mmc3_test_2/2-details.nes | ❌ | #7: IRQ should be set when non-zero and reloading to 0 after clear |
 | mmc3_test_2/3-A12_clocking.nes | ❌ | #5: Should be clocked when A12 changes to 1 via PPUDATA read |
 | mmc3_test_2/4-scanline_timing.nes | ❌ | #14: IRQ never occurred |

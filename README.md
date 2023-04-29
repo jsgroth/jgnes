@@ -19,13 +19,15 @@ Implemented:
   * MMC1
   * MMC3/MMC6
     * MMC3 IRQs are implemented but timing is not perfect; that said, I have not noticed issues in any games that I've tested (including Jurassic Park), and the MMC3 timing test ROM passes all of the test cases for the standard configuration of BG using pattern table $0000 and sprites using pattern table $1000
+  * MMC5
+    * The additional audio channels are not implemented; no US-released games used these but a few Japanese releases did
 * P1 input with hardcoded keys
 
 Not Implemented:
 * An option to scale the native 8:7 NES output to 4:3, as TVs would have done back in the 1980s
 * A smarter way of mapping NES colors to RGB colors; currently using a hardcoded palette that looks kind of ok
 * Overscan customization; some games look really bad without cropping ~8 columns of pixels off each side of the screen
-* Lots of mappers, most notably MMC2 (Punch-Out!!), MMC5 (e.g. Castlevania 3), and Konami's VRC mappers
+* Lots of mappers, most notably MMC2 (Punch-Out!!) and Konami's VRC mappers
 * P2 input and input configuration (or any configuration really)
 * Save file persistence for cartridges with both PRG RAM and a battery
 * RESET button functionality

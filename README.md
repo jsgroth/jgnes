@@ -18,7 +18,7 @@ Implemented:
   * AxROM
   * MMC1
   * MMC3/MMC6
-    * MMC3 IRQs are implemented but timing is not perfect, some games may have (even more) visual glitches than they do on actual hardware
+    * MMC3 IRQs are implemented but timing is not perfect; some games may have (even more) visual glitches than they do on actual hardware. That said, the only game I've noticed issues in is Jurassic Park where the Ocean logo on the title screen has some visible flickering seams
 * P1 input with hardcoded keys
 
 Not Implemented:

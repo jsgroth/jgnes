@@ -18,7 +18,7 @@ Implemented:
   * AxROM
   * MMC1
   * MMC3/MMC6
-    * MMC3 IRQs are implemented but timing is not perfect; that said, I have not noticed issues in any games that I've tested (including Jurassic Park), and the MMC3 timing test ROM passes all of the test cases for the standard configuration of BG using pattern table $0000 and sprites using pattern table $1000
+    * MMC3 IRQs are implemented but timing is not perfect; that said, I have not noticed issues in any games that I've tested (including Jurassic Park)
   * MMC5
     * The additional audio channels are not implemented; no US-released games used these but a few Japanese releases did
 * P1 input with hardcoded keys

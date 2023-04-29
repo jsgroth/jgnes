@@ -18,7 +18,7 @@ Implemented:
   * AxROM
   * MMC1
   * MMC3/MMC6
-    * MMC3 IRQs are implemented but timing is not perfect; some games may have (even more) visual glitches than they do on actual hardware. That said, the only game I've noticed issues in is Jurassic Park where the Ocean logo on the title screen has some visible flickering seams
+    * MMC3 IRQs are implemented but timing is not perfect; that said, I have not noticed issues in any games that I've tested, and the MMC3 timing test ROM passes all of the test cases for the standard configuration of BG using pattern table $0000 and sprites using pattern table $1000
 * P1 input with hardcoded keys
 
 Not Implemented:
@@ -121,7 +121,7 @@ Not Implemented:
 | mmc3_test_2/1-clocking.nes | ✅ | |
 | mmc3_test_2/2-details.nes | ✅ | |
 | mmc3_test_2/3-A12_clocking.nes | ✅ | |
-| mmc3_test_2/4-scanline_timing.nes | ❌ | #3: Scanline 0 IRQ should occur sooner when $2000=$08 |
+| mmc3_test_2/4-scanline_timing.nes | ❌ | #9: Scanline 0 IRQ should occur sooner when $2000=$10 |
 | mmc3_test_2/5-MMC3.nes | ✅ | |
 | mmc3_test_2/6-MMC3_alt.nes | ❌ | #2: IRQ shouldn't be set when reloading to 0 due to counter naturally reaching 0 previously |
 

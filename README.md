@@ -13,9 +13,7 @@ Implemented:
   * DMC IRQ timing is slightly off based on non-binary test ROMs (dpcmletterbox), almost certainly due to lack of DMC DMA cycle stealing
 * The most commonly used mappers
   * NROM
-  * UxROM
-  * CNROM
-  * AxROM
+  * The most common NROM variants (UxROM / CNROM / AxROM)
   * MMC1
   * MMC3/MMC6
     * MMC3 IRQs are implemented but timing is not perfect; that said, I have not noticed issues in any games that I've tested (including Jurassic Park)

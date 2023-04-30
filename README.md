@@ -30,6 +30,7 @@ Not Implemented:
 * P2 input and input configuration (or any configuration really)
 * Save file persistence for cartridges with both PRG RAM and a battery
 * RESET button functionality
+* Save states or fast forward
 * A GUI
 
 ## Test ROM Results

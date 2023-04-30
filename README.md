@@ -19,8 +19,7 @@ Implemented:
   * MMC1
   * MMC2/MMC4
   * MMC3/MMC6
-    * MMC3 IRQs are implemented but timing is not perfect; however I have not noticed issues in any game I've tested, including Jurassic Park
-    * The MC-ACC variant used in a few games is not implemented
+    * The MMC3 MC-ACC variant is not implemented; was used in a few games, e.g. Incredible Crash Dummies
   * MMC5
     * The additional audio channels are not implemented; no US-released games used these but a few Japanese releases did
 * P1 input with hardcoded keys
@@ -153,7 +152,7 @@ cargo run --release /path/to/file.nes
 | mmc3_test_2/1-clocking.nes | ✅ | |
 | mmc3_test_2/2-details.nes | ✅ | |
 | mmc3_test_2/3-A12_clocking.nes | ✅ | |
-| mmc3_test_2/4-scanline_timing.nes | ❌ | #9: Scanline 0 IRQ should occur sooner when $2000=$10 |
+| mmc3_test_2/4-scanline_timing.nes | ✅ | |
 | mmc3_test_2/5-MMC3.nes | ✅ | |
 | mmc3_test_2/6-MMC3_alt.nes | ❌ | #2: IRQ shouldn't be set when reloading to 0 due to counter naturally reaching 0 previously |
 

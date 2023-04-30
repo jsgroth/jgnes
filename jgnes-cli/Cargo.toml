@@ -8,4 +8,6 @@ edition = "2021"
 [dependencies]
 jgnes-core = { path = "../jgnes-core" }
 
+anyhow = "1.0"
 env_logger = "0.10"
+sdl2 = "0.35"

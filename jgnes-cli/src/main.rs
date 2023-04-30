@@ -179,6 +179,8 @@ fn main() -> anyhow::Result<()> {
     let video_subsystem = sdl_ctx.video().map_err(anyhow::Error::msg)?;
     let audio_subsystem = sdl_ctx.audio().map_err(anyhow::Error::msg)?;
 
+    sdl_ctx.mouse().show_cursor(false);
+
     let window = video_subsystem
         .window(&format!("jgnes - {file_name}"), 3 * 256, 3 * 224)
         .build()?;

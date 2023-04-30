@@ -18,7 +18,7 @@ Implemented:
   * The most common NROM variants (UxROM / CNROM / AxROM)
   * MMC1
   * MMC3/MMC6
-    * MMC3 IRQs are implemented but timing is not perfect; seems to cause issues in Rad Racer 2
+    * MMC3 IRQs are implemented but timing is not perfect; however I have not noticed issues in any game I've tested, including Jurassic Park
     * The MC-ACC variant used in a few games is not implemented
   * MMC5
     * The additional audio channels are not implemented; no US-released games used these but a few Japanese releases did

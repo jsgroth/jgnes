@@ -17,7 +17,7 @@ Implemented:
   * NROM
   * The most common NROM variants (UxROM / CNROM / AxROM)
   * MMC1
-  * MMC2
+  * MMC2/MMC4
   * MMC3/MMC6
     * MMC3 IRQs are implemented but timing is not perfect; however I have not noticed issues in any game I've tested, including Jurassic Park
     * The MC-ACC variant used in a few games is not implemented
@@ -29,7 +29,7 @@ Not Implemented:
 * An option to scale the native 8:7 NES output to 4:3, as TVs would have done back in the 1980s
 * A smarter way of mapping NES colors to RGB colors; currently using a hardcoded palette that looks kind of ok
 * Overscan customization; some games look really bad without cropping ~8 columns of pixels off each side of the screen
-* Lots of mappers, most notably MMC4 (Famicom Wars / Fire Emblem) and Konami's and Namco's custom mappers
+* Lots of mappers, most notably Konami's and Namco's custom mappers
 * P2 input and input configuration (or any configuration really)
 * Save file persistence for cartridges with both PRG RAM and a battery
 * RESET button functionality

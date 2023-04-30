@@ -1,7 +1,7 @@
 use env_logger::Env;
 use jgnes_core::{
     AudioPlayer, ColorEmphasis, EmulationError, Emulator, FrameBuffer, InputPoller, JoypadState,
-    Renderer,
+    Renderer, SaveWriter,
 };
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
 use sdl2::event::Event;
@@ -155,10 +155,30 @@ impl SdlInputHandler {
     }
 }
 
+struct FsSaveWriter {
+    path: String,
+}
+
+impl SaveWriter for FsSaveWriter {
+    type Err = anyhow::Error;
+
+    fn persist_sram(&mut self, sram: &[u8]) -> Result<(), Self::Err> {
+        let tmp_path = Path::new(&self.path).with_extension("tmp");
+        fs::write(&tmp_path, sram)?;
+        fs::rename(tmp_path, Path::new(&self.path))?;
+
+        Ok(())
+    }
+}
+
 fn get_color_emphasis_offset(color_emphasis: ColorEmphasis) -> u16 {
     64 * u16::from(color_emphasis.red)
         + 128 * u16::from(color_emphasis.green)
         + 256 * u16::from(color_emphasis.blue)
+}
+
+fn load_sav_file(path: &str) -> Option<Vec<u8>> {
+    fs::read(Path::new(path)).ok()
 }
 
 fn main() -> anyhow::Result<()> {
@@ -173,7 +193,7 @@ fn main() -> anyhow::Result<()> {
         .and_then(OsStr::to_str)
         .unwrap();
 
-    let file_bytes = fs::read(Path::new(&path))?;
+    let rom_bytes = fs::read(Path::new(&path))?;
 
     let sdl_ctx = sdl2::init().map_err(anyhow::Error::msg)?;
     let video_subsystem = sdl_ctx.video().map_err(anyhow::Error::msg)?;
@@ -214,15 +234,38 @@ fn main() -> anyhow::Result<()> {
         joypad_state: Rc::clone(&input_poller.joypad_state),
     };
 
+    let sav_path = Path::new(&path)
+        .with_extension("sav")
+        .to_str()
+        .unwrap()
+        .to_owned();
+    let sav_bytes = load_sav_file(&sav_path);
+    let save_writer = FsSaveWriter {
+        path: sav_path.clone(),
+    };
+
+    if sav_bytes.is_some() {
+        log::info!("Loaded SRAM from {sav_path}");
+    }
+
     let mut event_pump = sdl_ctx.event_pump().map_err(anyhow::Error::msg)?;
 
-    let mut emulator = Emulator::create(&file_bytes, renderer, audio_player, input_poller)?;
+    let mut emulator = Emulator::create(
+        rom_bytes,
+        sav_bytes,
+        renderer,
+        audio_player,
+        input_poller,
+        save_writer,
+    )?;
 
     let mut ticks = 0_u64;
     loop {
         if let Err(err) = emulator.tick() {
             return match err {
-                EmulationError::Render(err) | EmulationError::Audio(err) => Err(err),
+                EmulationError::Render(err)
+                | EmulationError::Audio(err)
+                | EmulationError::Save(err) => Err(err),
             };
         }
 

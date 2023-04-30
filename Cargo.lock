@@ -122,6 +122,7 @@ dependencies = [
  "anyhow",
  "env_logger",
  "jgnes-core",
+ "log",
  "sdl2",
 ]
 

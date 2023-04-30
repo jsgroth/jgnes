@@ -31,7 +31,6 @@ Not Implemented:
 * Overscan customization; some games look really bad without cropping ~8 columns of pixels off each side of the screen
 * Lots of mappers, most notably Konami's and Namco's custom mappers
 * P2 input and input configuration (or any configuration really)
-* Save file persistence for cartridges with both PRG RAM and a battery
 * RESET button functionality
 * Save states or fast forward
 * A GUI

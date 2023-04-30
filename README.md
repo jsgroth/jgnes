@@ -2,6 +2,8 @@
 
 The early stages of what might some day be a functional NES emulator
 
+## Feature Status
+
 Implemented:
 * Cycle-based 6502 CPU emulation
   * Unofficial opcodes not implemented

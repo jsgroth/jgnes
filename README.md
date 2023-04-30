@@ -33,6 +33,34 @@ Not Implemented:
 * Save states or fast forward
 * A GUI
 
+## Requirements
+
+### Rust
+
+This project requires version 1.65.0 or later of the [Rust toolchain](https://doc.rust-lang.org/book/ch01-01-installation.html) to build.
+See link for installation instructions.
+
+### SDL2
+
+This project requires SDL2 core headers to build.
+
+Linux (Debian-based):
+```shell
+sudo apt install libsdl2-dev
+```
+
+macOS:
+```shell
+brew install sdl2
+```
+
+## Build & Run
+
+To build the emulator and run for a given NES ROM file:
+```shell
+cargo run --release /path/to/file.nes
+```
+
 ## Test ROM Results
 
 ### CPU Test ROMs

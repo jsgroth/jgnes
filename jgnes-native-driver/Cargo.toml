@@ -1,5 +1,5 @@
 [package]
-name = "jgnes-cli"
+name = "jgnes-native-driver"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 jgnes-core = { path = "../jgnes-core" }
-jgnes-native-driver = { path = "../jgnes-native-driver" }
 
 anyhow = "1.0"
-env_logger = "0.10"
+log = "0.4"
+sdl2 = "0.35"

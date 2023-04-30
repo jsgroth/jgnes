@@ -122,8 +122,7 @@ dependencies = [
  "anyhow",
  "env_logger",
  "jgnes-core",
- "log",
- "sdl2",
+ "jgnes-native-driver",
 ]
 
 [[package]]
@@ -134,6 +133,16 @@ dependencies = [
  "rand",
  "thiserror",
  "tinyvec",
+]
+
+[[package]]
+name = "jgnes-native-driver"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "jgnes-core",
+ "log",
+ "sdl2",
 ]
 
 [[package]]

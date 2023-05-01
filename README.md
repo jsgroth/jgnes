@@ -33,6 +33,7 @@ Not Implemented:
 * RESET button functionality
 * Save states or fast forward
 * A GUI
+* Support for PAL/EU releases (the processor timings are different compared to NTSC US/JP)
 
 ## Requirements
 

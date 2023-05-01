@@ -180,21 +180,27 @@ fn load_sav_file<P: AsRef<Path>>(path: P) -> Option<Vec<u8>> {
     fs::read(path.as_ref()).ok()
 }
 
+pub struct JgnesNativeConfig {
+    pub nes_file_path: String,
+    pub window_width: u32,
+    pub window_height: u32,
+}
+
 /// Run the emulator in a loop until it terminates.
 ///
 /// # Errors
 ///
 /// This function will return an error if any issues are encountered rendering graphics, playing
 /// audio, or writing a save file.
-pub fn run(path: &str) -> anyhow::Result<()> {
-    let Some(file_name) = Path::new(&path)
+pub fn run(config: &JgnesNativeConfig) -> anyhow::Result<()> {
+    let Some(file_name) = Path::new(&config.nes_file_path)
         .file_name()
         .and_then(OsStr::to_str)
     else {
-        return Err(anyhow::Error::msg(format!("cannot determine file name of {path}")));
+        return Err(anyhow::Error::msg(format!("cannot determine file name of {}", config.nes_file_path)));
     };
 
-    let rom_bytes = fs::read(Path::new(&path))?;
+    let rom_bytes = fs::read(Path::new(&config.nes_file_path))?;
 
     let sdl_ctx = sdl2::init().map_err(anyhow::Error::msg)?;
     let video_subsystem = sdl_ctx.video().map_err(anyhow::Error::msg)?;
@@ -203,7 +209,11 @@ pub fn run(path: &str) -> anyhow::Result<()> {
     sdl_ctx.mouse().show_cursor(false);
 
     let window = video_subsystem
-        .window(&format!("jgnes - {file_name}"), 3 * 256, 3 * 224)
+        .window(
+            &format!("jgnes - {file_name}"),
+            config.window_width,
+            config.window_height,
+        )
         .build()?;
     let mut canvas = window.into_canvas().present_vsync().build()?;
 
@@ -235,7 +245,7 @@ pub fn run(path: &str) -> anyhow::Result<()> {
         joypad_state: Rc::clone(&input_poller.joypad_state),
     };
 
-    let sav_path = Path::new(&path).with_extension("sav");
+    let sav_path = Path::new(&config.nes_file_path).with_extension("sav");
     let sav_bytes = load_sav_file(&sav_path);
     let save_writer = FsSaveWriter {
         path: sav_path.clone(),

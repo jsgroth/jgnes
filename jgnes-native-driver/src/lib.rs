@@ -9,6 +9,7 @@ use sdl2::pixels::{Color, PixelFormatEnum};
 use sdl2::render::{Texture, TextureCreator, WindowCanvas};
 use std::cell::RefCell;
 use std::ffi::OsStr;
+use std::fmt::{Display, Formatter};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -180,10 +181,21 @@ fn load_sav_file<P: AsRef<Path>>(path: P) -> Option<Vec<u8>> {
     fs::read(path.as_ref()).ok()
 }
 
+#[derive(Debug, Clone)]
 pub struct JgnesNativeConfig {
     pub nes_file_path: String,
     pub window_width: u32,
     pub window_height: u32,
+}
+
+impl Display for JgnesNativeConfig {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "nes_file_path: {}", self.nes_file_path)?;
+        writeln!(f, "window_width: {}", self.window_width)?;
+        writeln!(f, "window_height: {}", self.window_height)?;
+
+        Ok(())
+    }
 }
 
 /// Run the emulator in a loop until it terminates.
@@ -193,6 +205,8 @@ pub struct JgnesNativeConfig {
 /// This function will return an error if any issues are encountered rendering graphics, playing
 /// audio, or writing a save file.
 pub fn run(config: &JgnesNativeConfig) -> anyhow::Result<()> {
+    log::info!("Running with config:\n{config}");
+
     let Some(file_name) = Path::new(&config.nes_file_path)
         .file_name()
         .and_then(OsStr::to_str)

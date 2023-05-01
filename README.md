@@ -39,7 +39,7 @@ Not Implemented:
 
 ### Rust
 
-This project requires version 1.65.0 or later of the [Rust toolchain](https://doc.rust-lang.org/book/ch01-01-installation.html) to build.
+This project requires the latest stable version of the [Rust toolchain](https://doc.rust-lang.org/book/ch01-01-installation.html) to build.
 See link for installation instructions.
 
 ### SDL2

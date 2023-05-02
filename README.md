@@ -26,6 +26,7 @@ Implemented:
 
 Not Implemented:
 * An option to scale the native 8:7 NES output to 4:3, as TVs would have done back in the 1980s
+  * You can technically do this now by setting a 4:3 window size, but the scaling is nearest neighbor which I think looks quite bad
 * A smarter way of mapping NES colors to RGB colors; currently using a hardcoded palette that looks kind of ok
 * Overscan customization; some games look really bad without cropping ~8 columns of pixels off each side of the screen
 * Lots of mappers, most notably Konami's and Namco's custom mappers

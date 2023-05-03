@@ -13,9 +13,10 @@ pub(crate) fn sdl_texture_updater(
     frame_buffer: &FrameBuffer,
     color_emphasis: ColorEmphasis,
 ) -> impl FnOnce(&mut [u8], usize) + '_ {
+    let screen_height = jgnes_core::SCREEN_HEIGHT as usize;
     let color_emphasis_offset = get_color_emphasis_offset(color_emphasis) as usize;
     move |pixels, pitch| {
-        for (i, scanline) in frame_buffer[8..232].iter().enumerate() {
+        for (i, scanline) in frame_buffer[8..screen_height - 8].iter().enumerate() {
             for (j, nes_color) in scanline.iter().copied().enumerate() {
                 let color_map_index = color_emphasis_offset + (3 * nes_color) as usize;
                 let start = i * pitch + 3 * j;
@@ -27,8 +28,10 @@ pub(crate) fn sdl_texture_updater(
 }
 
 pub(crate) fn to_rgba(frame_buffer: &FrameBuffer, color_emphasis: ColorEmphasis, out: &mut [u8]) {
+    let screen_width = jgnes_core::SCREEN_WIDTH as usize;
+    let screen_height = jgnes_core::SCREEN_HEIGHT as usize;
     let color_emphasis_offset = get_color_emphasis_offset(color_emphasis) as usize;
-    for (i, scanline) in frame_buffer[8..232].iter().enumerate() {
+    for (i, scanline) in frame_buffer[8..screen_height - 8].iter().enumerate() {
         for (j, nes_color) in scanline.iter().copied().enumerate() {
             let color_map_index = color_emphasis_offset + (3 * nes_color) as usize;
             let [r, g, b] = COLOR_MAPPING[color_map_index..color_map_index + 3]
@@ -37,7 +40,7 @@ pub(crate) fn to_rgba(frame_buffer: &FrameBuffer, color_emphasis: ColorEmphasis,
             };
 
             // TODO configurable
-            let out_index = i * 4 * 256 + j * 4;
+            let out_index = i * 4 * screen_width + j * 4;
             out[out_index..out_index + 4].copy_from_slice(&[r, g, b, 255]);
         }
     }

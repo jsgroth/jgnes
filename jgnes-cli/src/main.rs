@@ -20,7 +20,7 @@ struct CliArgs {
     #[arg(long, default_value_t = NativeRenderer::Sdl2)]
     renderer: NativeRenderer,
 
-    /// Internal resolution scale (1 to 4, only applicable to Vulkan renderer)
+    /// Internal resolution scale (1 to 8 only applicable to Vulkan renderer)
     #[arg(long, default_value_t = 3)]
     render_scale: u32,
 }

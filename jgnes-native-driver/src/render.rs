@@ -87,7 +87,11 @@ pub(crate) struct WgpuRenderer {
 impl WgpuRenderer {
     pub(crate) fn from_window(window: Window, render_scale: RenderScale) -> anyhow::Result<Self> {
         // TODO configurable
-        let output_buffer = vec![0; 4 * 256 * 224];
+        let output_buffer = vec![
+            0;
+            4 * jgnes_core::SCREEN_WIDTH as usize
+                * jgnes_core::VISIBLE_SCREEN_HEIGHT as usize
+        ];
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::VULKAN,
@@ -137,8 +141,8 @@ impl WgpuRenderer {
 
         // TODO configurable dimensions
         let texture_size = wgpu::Extent3d {
-            width: 256,
-            height: 224,
+            width: jgnes_core::SCREEN_WIDTH.into(),
+            height: jgnes_core::VISIBLE_SCREEN_HEIGHT.into(),
             depth_or_array_layers: 1,
         };
         let texture = device.create_texture(&wgpu::TextureDescriptor {
@@ -155,8 +159,8 @@ impl WgpuRenderer {
 
         let scaled_texture_size = wgpu::Extent3d {
             // TODO configurable
-            width: render_scale.0 * 256,
-            height: render_scale.0 * 224,
+            width: render_scale.0 * u32::from(jgnes_core::SCREEN_WIDTH),
+            height: render_scale.0 * u32::from(jgnes_core::VISIBLE_SCREEN_HEIGHT),
             depth_or_array_layers: 1,
         };
         let scaled_texture = device.create_texture(&wgpu::TextureDescriptor {
@@ -375,8 +379,8 @@ impl Renderer for WgpuRenderer {
             wgpu::ImageDataLayout {
                 offset: 0,
                 // TODO configurable
-                bytes_per_row: Some(4 * 256),
-                rows_per_image: Some(224),
+                bytes_per_row: Some(4 * u32::from(jgnes_core::SCREEN_WIDTH)),
+                rows_per_image: Some(jgnes_core::VISIBLE_SCREEN_HEIGHT.into()),
             },
             self.texture.size(),
         );
@@ -401,7 +405,11 @@ impl Renderer for WgpuRenderer {
             compute_pass.set_bind_group(0, &self.compute_bind_group, &[]);
 
             // TODO configurable
-            compute_pass.dispatch_workgroups(256, 224, 1);
+            compute_pass.dispatch_workgroups(
+                jgnes_core::SCREEN_WIDTH.into(),
+                jgnes_core::VISIBLE_SCREEN_HEIGHT.into(),
+                1,
+            );
         }
 
         {

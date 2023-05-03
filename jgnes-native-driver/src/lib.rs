@@ -1,3 +1,5 @@
+mod colors;
+
 use jgnes_core::{
     AudioPlayer, ColorEmphasis, EmulationError, Emulator, FrameBuffer, InputPoller, JoypadState,
     Renderer, SaveWriter,
@@ -13,9 +15,6 @@ use std::fmt::{Display, Formatter};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
-
-// TODO do colors properly
-const COLOR_MAPPING: &[u8; 8 * 64 * 3] = include_bytes!("../../nespalette.pal");
 
 struct SdlRenderer<'a> {
     canvas: WindowCanvas,
@@ -40,18 +39,11 @@ impl<'a> Renderer for SdlRenderer<'a> {
         frame_buffer: &FrameBuffer,
         color_emphasis: ColorEmphasis,
     ) -> Result<(), Self::Err> {
-        let color_emphasis_offset = get_color_emphasis_offset(color_emphasis) as usize;
         self.texture
-            .with_lock(None, |pixels, pitch| {
-                for (i, scanline) in frame_buffer[8..232].iter().enumerate() {
-                    for (j, nes_color) in scanline.iter().copied().enumerate() {
-                        let color_map_index = color_emphasis_offset + (3 * nes_color) as usize;
-                        let start = i * pitch + 3 * j;
-                        pixels[start..start + 3]
-                            .copy_from_slice(&COLOR_MAPPING[color_map_index..color_map_index + 3]);
-                    }
-                }
-            })
+            .with_lock(
+                None,
+                colors::sdl_texture_updater(frame_buffer, color_emphasis),
+            )
             .map_err(anyhow::Error::msg)?;
 
         self.canvas.clear();
@@ -169,12 +161,6 @@ impl SaveWriter for FsSaveWriter {
 
         Ok(())
     }
-}
-
-fn get_color_emphasis_offset(color_emphasis: ColorEmphasis) -> u16 {
-    64 * u16::from(color_emphasis.red)
-        + 128 * u16::from(color_emphasis.green)
-        + 256 * u16::from(color_emphasis.blue)
 }
 
 fn load_sav_file<P: AsRef<Path>>(path: P) -> Option<Vec<u8>> {

@@ -4,3 +4,7 @@ members = [
     "jgnes-native-driver",
     "jgnes-cli",
 ]
+
+[profile.release-with-debug]
+inherits = "release"
+debug = true

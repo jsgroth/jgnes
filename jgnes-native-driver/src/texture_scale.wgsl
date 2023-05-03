@@ -70,3 +70,75 @@ fn texture_scale_8x(
     let pixel = textureLoad(texture_in, workgroup_id.xy, 0);
     textureStore(texture_out, global_invocation_id.xy, pixel);
 }
+
+@compute @workgroup_size(9, 9, 1)
+fn texture_scale_9x(
+    @builtin(global_invocation_id) global_invocation_id: vec3<u32>,
+    @builtin(workgroup_id) workgroup_id: vec3<u32>,
+) {
+    let pixel = textureLoad(texture_in, workgroup_id.xy, 0);
+    textureStore(texture_out, global_invocation_id.xy, pixel);
+}
+
+@compute @workgroup_size(10, 10, 1)
+fn texture_scale_10x(
+    @builtin(global_invocation_id) global_invocation_id: vec3<u32>,
+    @builtin(workgroup_id) workgroup_id: vec3<u32>,
+) {
+    let pixel = textureLoad(texture_in, workgroup_id.xy, 0);
+    textureStore(texture_out, global_invocation_id.xy, pixel);
+}
+
+@compute @workgroup_size(11, 11, 1)
+fn texture_scale_11x(
+    @builtin(global_invocation_id) global_invocation_id: vec3<u32>,
+    @builtin(workgroup_id) workgroup_id: vec3<u32>,
+) {
+    let pixel = textureLoad(texture_in, workgroup_id.xy, 0);
+    textureStore(texture_out, global_invocation_id.xy, pixel);
+}
+
+@compute @workgroup_size(12, 12, 1)
+fn texture_scale_12x(
+    @builtin(global_invocation_id) global_invocation_id: vec3<u32>,
+    @builtin(workgroup_id) workgroup_id: vec3<u32>,
+) {
+    let pixel = textureLoad(texture_in, workgroup_id.xy, 0);
+    textureStore(texture_out, global_invocation_id.xy, pixel);
+}
+
+@compute @workgroup_size(13, 13, 1)
+fn texture_scale_13x(
+    @builtin(global_invocation_id) global_invocation_id: vec3<u32>,
+    @builtin(workgroup_id) workgroup_id: vec3<u32>,
+) {
+    let pixel = textureLoad(texture_in, workgroup_id.xy, 0);
+    textureStore(texture_out, global_invocation_id.xy, pixel);
+}
+
+@compute @workgroup_size(14, 14, 1)
+fn texture_scale_14x(
+    @builtin(global_invocation_id) global_invocation_id: vec3<u32>,
+    @builtin(workgroup_id) workgroup_id: vec3<u32>,
+) {
+    let pixel = textureLoad(texture_in, workgroup_id.xy, 0);
+    textureStore(texture_out, global_invocation_id.xy, pixel);
+}
+
+@compute @workgroup_size(15, 15, 1)
+fn texture_scale_15x(
+    @builtin(global_invocation_id) global_invocation_id: vec3<u32>,
+    @builtin(workgroup_id) workgroup_id: vec3<u32>,
+) {
+    let pixel = textureLoad(texture_in, workgroup_id.xy, 0);
+    textureStore(texture_out, global_invocation_id.xy, pixel);
+}
+
+@compute @workgroup_size(16, 16, 1)
+fn texture_scale_16x(
+    @builtin(global_invocation_id) global_invocation_id: vec3<u32>,
+    @builtin(workgroup_id) workgroup_id: vec3<u32>,
+) {
+    let pixel = textureLoad(texture_in, workgroup_id.xy, 0);
+    textureStore(texture_out, global_invocation_id.xy, pixel);
+}

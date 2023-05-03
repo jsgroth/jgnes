@@ -55,7 +55,7 @@ struct CliArgs {
     #[arg(long, default_value_t = GpuFilterType::Linear)]
     gpu_filter_type: GpuFilterType,
 
-    /// Internal resolution scale (1 to 8, only applicable to Vulkan renderer w/ linear filter mode)
+    /// Internal resolution scale (1 to 16, only applicable to Vulkan renderer w/ linear filter mode)
     #[arg(long, default_value_t = 3)]
     gpu_render_scale: u32,
 }

@@ -63,7 +63,7 @@ impl TryFrom<u32> for RenderScale {
 
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         match value {
-            1..=8 => Ok(Self(value)),
+            1..=16 => Ok(Self(value)),
             _ => Err(anyhow::Error::msg(format!(
                 "Invalid render scale value: {value}"
             ))),

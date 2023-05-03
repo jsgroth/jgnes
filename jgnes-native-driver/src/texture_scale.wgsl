@@ -5,7 +5,8 @@ var texture_in: texture_2d<f32>;
 @group(0) @binding(1)
 var texture_out: texture_storage_2d<rgba8unorm, write>;
 
-// This repetition is pathological but I can't figure out a better way to do this
+// This repetition is pathological (all of these shaders have the same body with different workgroup sizes), but I
+// can't figure out a better way to do this
 
 @compute @workgroup_size(2, 2, 1)
 fn texture_scale_2x(

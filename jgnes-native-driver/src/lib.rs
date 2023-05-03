@@ -1,5 +1,7 @@
 mod colors;
+mod render;
 
+use crate::render::WgpuRenderer;
 use jgnes_core::{
     AudioPlayer, ColorEmphasis, EmulationError, Emulator, FrameBuffer, InputPoller, JoypadState,
     Renderer, SaveWriter,
@@ -15,6 +17,7 @@ use std::fmt::{Display, Formatter};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::str::FromStr;
 
 struct SdlRenderer<'a> {
     canvas: WindowCanvas,
@@ -167,11 +170,40 @@ fn load_sav_file<P: AsRef<Path>>(path: P) -> Option<Vec<u8>> {
     fs::read(path.as_ref()).ok()
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NativeRenderer {
+    Sdl2,
+    Vulkan,
+}
+
+impl Display for NativeRenderer {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Sdl2 => write!(f, "Sdl2"),
+            Self::Vulkan => write!(f, "Vulkan"),
+        }
+    }
+}
+
+impl FromStr for NativeRenderer {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Sdl2" => Ok(Self::Sdl2),
+            "Vulkan" => Ok(Self::Vulkan),
+            _ => Err(format!("invalid renderer string: {s}")),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct JgnesNativeConfig {
     pub nes_file_path: String,
     pub window_width: u32,
     pub window_height: u32,
+    pub renderer: NativeRenderer,
+    pub render_scale: u32,
 }
 
 impl Display for JgnesNativeConfig {
@@ -179,6 +211,8 @@ impl Display for JgnesNativeConfig {
         writeln!(f, "nes_file_path: {}", self.nes_file_path)?;
         writeln!(f, "window_width: {}", self.window_width)?;
         writeln!(f, "window_height: {}", self.window_height)?;
+        writeln!(f, "renderer: {:?}", self.renderer)?;
+        writeln!(f, "render_scale: {}", self.render_scale)?;
 
         Ok(())
     }
@@ -223,7 +257,13 @@ pub fn run(config: &JgnesNativeConfig) -> anyhow::Result<()> {
 
     let texture_creator = canvas.texture_creator();
 
-    let renderer = SdlRenderer::new(canvas, &texture_creator)?;
+    let renderer: Box<dyn Renderer<Err = anyhow::Error>> = match config.renderer {
+        NativeRenderer::Sdl2 => Box::new(SdlRenderer::new(canvas, &texture_creator)?),
+        NativeRenderer::Vulkan => Box::new(WgpuRenderer::from_window(
+            canvas.into_window(),
+            config.render_scale,
+        )?),
+    };
 
     let audio_queue = audio_subsystem
         .open_queue(

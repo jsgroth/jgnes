@@ -110,7 +110,7 @@ impl WgpuRenderer {
         ];
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::VULKAN,
+            backends: wgpu::Backends::PRIMARY,
             dx12_shader_compiler: wgpu::Dx12Compiler::default(),
         });
 
@@ -125,6 +125,11 @@ impl WgpuRenderer {
             force_fallback_adapter: false,
         }))
         .ok_or_else(|| anyhow::Error::msg("Unable to obtain wgpu adapter"))?;
+
+        log::info!(
+            "Using GPU adapter with backend {:?}",
+            adapter.get_info().backend
+        );
 
         let (window_width, window_height) = window.size();
 

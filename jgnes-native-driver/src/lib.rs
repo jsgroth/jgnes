@@ -175,14 +175,14 @@ fn load_sav_file<P: AsRef<Path>>(path: P) -> Option<Vec<u8>> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NativeRenderer {
     Sdl2,
-    Vulkan,
+    Wgpu,
 }
 
 impl Display for NativeRenderer {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Sdl2 => write!(f, "Sdl2"),
-            Self::Vulkan => write!(f, "Vulkan"),
+            Self::Wgpu => write!(f, "Wgpu"),
         }
     }
 }
@@ -193,7 +193,7 @@ impl FromStr for NativeRenderer {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "Sdl2" => Ok(Self::Sdl2),
-            "Vulkan" => Ok(Self::Vulkan),
+            "Wgpu" => Ok(Self::Wgpu),
             _ => Err(format!("invalid renderer string: {s}")),
         }
     }
@@ -261,7 +261,7 @@ pub fn run(config: &JgnesNativeConfig) -> anyhow::Result<()> {
 
     let renderer: Box<dyn Renderer<Err = anyhow::Error>> = match config.renderer {
         NativeRenderer::Sdl2 => Box::new(SdlRenderer::new(canvas, &texture_creator)?),
-        NativeRenderer::Vulkan => Box::new(WgpuRenderer::from_window(
+        NativeRenderer::Wgpu => Box::new(WgpuRenderer::from_window(
             canvas.into_window(),
             config.gpu_filter_mode,
         )?),

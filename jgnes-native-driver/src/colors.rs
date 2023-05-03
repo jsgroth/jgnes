@@ -26,14 +26,7 @@ pub(crate) fn sdl_texture_updater(
     }
 }
 
-// TODO there is almost certainly a way to do this on the GPU; this is extremely CPU-intensive at
-// high render scales
-pub(crate) fn to_rgba_scaled(
-    frame_buffer: &FrameBuffer,
-    color_emphasis: ColorEmphasis,
-    render_scale: u32,
-    out: &mut [u8],
-) {
+pub(crate) fn to_rgba(frame_buffer: &FrameBuffer, color_emphasis: ColorEmphasis, out: &mut [u8]) {
     let color_emphasis_offset = get_color_emphasis_offset(color_emphasis) as usize;
     for (i, scanline) in frame_buffer[8..232].iter().enumerate() {
         for (j, nes_color) in scanline.iter().copied().enumerate() {
@@ -43,17 +36,9 @@ pub(crate) fn to_rgba_scaled(
                 unreachable!("destructuring a slice of size 3 into [a, b, c]")
             };
 
-            let rgba = [r, g, b, 255];
-
-            for n in 0..render_scale {
-                let row_offset =
-                    (i * render_scale as usize + n as usize) * 4 * 256 * render_scale as usize;
-                for m in 0..render_scale {
-                    let out_col = j * 4 * render_scale as usize + 4 * m as usize;
-                    let index = row_offset + out_col;
-                    out[index..index + 4].copy_from_slice(&rgba);
-                }
-            }
+            // TODO configurable
+            let out_index = i * 4 * 256 + j * 4;
+            out[out_index..out_index + 4].copy_from_slice(&[r, g, b, 255]);
         }
     }
 }

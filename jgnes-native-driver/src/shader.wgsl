@@ -1,3 +1,5 @@
+// Vertex shaders
+
 struct VertexInput {
     @location(0) position: vec2<f32>,
     @location(1) texture_coords: vec2<f32>,
@@ -17,6 +19,8 @@ fn vs_main(input: VertexInput) -> VertexOutput {
 
     return out;
 }
+
+// Fragment shaders
 
 @group(0) @binding(0)
 var t_diffuse: texture_2d<f32>;

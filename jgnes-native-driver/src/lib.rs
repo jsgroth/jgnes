@@ -259,10 +259,13 @@ pub fn run(config: &JgnesNativeConfig) -> anyhow::Result<()> {
 
     let renderer: Box<dyn Renderer<Err = anyhow::Error>> = match config.renderer {
         NativeRenderer::Sdl2 => Box::new(SdlRenderer::new(canvas, &texture_creator)?),
-        NativeRenderer::Vulkan => Box::new(WgpuRenderer::from_window(
-            canvas.into_window(),
-            config.render_scale,
-        )?),
+        NativeRenderer::Vulkan => {
+            let render_scale = config.render_scale.try_into()?;
+            Box::new(WgpuRenderer::from_window(
+                canvas.into_window(),
+                render_scale,
+            )?)
+        }
     };
 
     let audio_queue = audio_subsystem

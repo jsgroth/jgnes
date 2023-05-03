@@ -23,11 +23,10 @@ Implemented:
   * MMC5
     * The additional audio channels are not implemented; no US-released games used these but a few Japanese releases did
 * P1 input with hardcoded keys
+* A GPU-backed renderer based on `wgpu` with an option for integer upscaling + linear interpolation, producing a sharp but clean image even at higher resolutions and non-8:7 aspect ratios
 
 Not Implemented:
-* An option to scale the native 8:7 NES output to 4:3, as TVs would have done back in the 1980s
-  * You can technically do this now by setting a 4:3 window size, but the scaling is nearest neighbor which I think looks quite bad
-* A smarter way of mapping NES colors to RGB colors; currently using a hardcoded palette that looks kind of ok
+* Color palette customization; the NES hardware directly outputs an NTSC video signal rather than RGB pixel grids, so any mapping from NES colors to RGB colors is an approximation at best
 * Overscan customization; some games look really bad without cropping ~8 columns of pixels off each side of the screen
 * Lots of mappers, most notably Konami's and Namco's custom mappers
 * P2 input and input configuration (or any configuration really)

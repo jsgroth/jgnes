@@ -19,6 +19,8 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::str::FromStr;
 
+pub use render::{GpuFilterMode, RenderScale};
+
 struct SdlRenderer<'a> {
     canvas: WindowCanvas,
     texture: Texture<'a>,
@@ -203,7 +205,7 @@ pub struct JgnesNativeConfig {
     pub window_width: u32,
     pub window_height: u32,
     pub renderer: NativeRenderer,
-    pub render_scale: u32,
+    pub gpu_filter_mode: GpuFilterMode,
 }
 
 impl Display for JgnesNativeConfig {
@@ -211,8 +213,8 @@ impl Display for JgnesNativeConfig {
         writeln!(f, "nes_file_path: {}", self.nes_file_path)?;
         writeln!(f, "window_width: {}", self.window_width)?;
         writeln!(f, "window_height: {}", self.window_height)?;
-        writeln!(f, "renderer: {:?}", self.renderer)?;
-        writeln!(f, "render_scale: {}", self.render_scale)?;
+        writeln!(f, "renderer: {}", self.renderer)?;
+        writeln!(f, "gpu_filter_mode: {}", self.gpu_filter_mode)?;
 
         Ok(())
     }
@@ -259,13 +261,10 @@ pub fn run(config: &JgnesNativeConfig) -> anyhow::Result<()> {
 
     let renderer: Box<dyn Renderer<Err = anyhow::Error>> = match config.renderer {
         NativeRenderer::Sdl2 => Box::new(SdlRenderer::new(canvas, &texture_creator)?),
-        NativeRenderer::Vulkan => {
-            let render_scale = config.render_scale.try_into()?;
-            Box::new(WgpuRenderer::from_window(
-                canvas.into_window(),
-                render_scale,
-            )?)
-        }
+        NativeRenderer::Vulkan => Box::new(WgpuRenderer::from_window(
+            canvas.into_window(),
+            config.gpu_filter_mode,
+        )?),
     };
 
     let audio_queue = audio_subsystem

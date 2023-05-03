@@ -4,6 +4,7 @@
 use crate::colors;
 use jgnes_core::{ColorEmphasis, FrameBuffer, Renderer};
 use sdl2::video::Window;
+use std::fmt::{Display, Formatter};
 use std::{iter, mem};
 use wgpu::util::DeviceExt;
 
@@ -55,7 +56,7 @@ impl Vertex2d {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct RenderScale(u32);
+pub struct RenderScale(u32);
 
 impl TryFrom<u32> for RenderScale {
     type Error = anyhow::Error;
@@ -66,6 +67,21 @@ impl TryFrom<u32> for RenderScale {
             _ => Err(anyhow::Error::msg(format!(
                 "Invalid render scale value: {value}"
             ))),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GpuFilterMode {
+    NearestNeighbor,
+    Linear(RenderScale),
+}
+
+impl Display for GpuFilterMode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NearestNeighbor => write!(f, "NearestNeighbor"),
+            Self::Linear(render_scale) => write!(f, "Linear {}x", render_scale.0),
         }
     }
 }
@@ -85,7 +101,7 @@ pub(crate) struct WgpuRenderer {
 }
 
 impl WgpuRenderer {
-    pub(crate) fn from_window(window: Window, render_scale: RenderScale) -> anyhow::Result<Self> {
+    pub(crate) fn from_window(window: Window, filter_mode: GpuFilterMode) -> anyhow::Result<Self> {
         // TODO configurable
         let output_buffer = vec![
             0;
@@ -157,10 +173,14 @@ impl WgpuRenderer {
         });
         let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
+        let render_scale = match filter_mode {
+            GpuFilterMode::NearestNeighbor => 1,
+            GpuFilterMode::Linear(render_scale) => render_scale.0,
+        };
         let scaled_texture_size = wgpu::Extent3d {
             // TODO configurable
-            width: render_scale.0 * u32::from(jgnes_core::SCREEN_WIDTH),
-            height: render_scale.0 * u32::from(jgnes_core::VISIBLE_SCREEN_HEIGHT),
+            width: render_scale * u32::from(jgnes_core::SCREEN_WIDTH),
+            height: render_scale * u32::from(jgnes_core::VISIBLE_SCREEN_HEIGHT),
             depth_or_array_layers: 1,
         };
         let scaled_texture = device.create_texture(&wgpu::TextureDescriptor {
@@ -176,14 +196,18 @@ impl WgpuRenderer {
         let scaled_texture_view =
             scaled_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
+        let sampler_filter_mode = match filter_mode {
+            GpuFilterMode::NearestNeighbor => wgpu::FilterMode::Nearest,
+            GpuFilterMode::Linear(_) => wgpu::FilterMode::Linear,
+        };
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("sampler"),
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
             address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Linear,
-            mipmap_filter: wgpu::FilterMode::Linear,
+            mag_filter: sampler_filter_mode,
+            min_filter: sampler_filter_mode,
+            mipmap_filter: sampler_filter_mode,
             ..wgpu::SamplerDescriptor::default()
         });
 
@@ -247,8 +271,8 @@ impl WgpuRenderer {
             device.create_shader_module(wgpu::include_wgsl!("texture_scale.wgsl"));
 
         // Compute pipeline is for texture scaling and is only needed if render scale is higher than 1
-        let compute_pipeline = (render_scale.0 > 1).then(|| {
-            let compute_entry_point = format!("texture_scale_{}x", render_scale.0);
+        let compute_pipeline = (render_scale > 1).then(|| {
+            let compute_entry_point = format!("texture_scale_{render_scale}x");
             device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
                 label: Some("compute_pipeline"),
                 layout: Some(&compute_pipeline_layout),
@@ -280,7 +304,7 @@ impl WgpuRenderer {
                 ],
             });
         // Ignore the scaled texture if render scale is 1
-        let render_bind_texture = if render_scale.0 > 1 {
+        let render_bind_texture = if render_scale > 1 {
             &scaled_texture_view
         } else {
             &texture_view

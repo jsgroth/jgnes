@@ -1,6 +1,37 @@
 use clap::Parser;
 use env_logger::Env;
-use jgnes_native_driver::{JgnesNativeConfig, NativeRenderer};
+use jgnes_native_driver::{GpuFilterMode, JgnesNativeConfig, NativeRenderer};
+use std::fmt::{Display, Formatter};
+use std::str::FromStr;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum GpuFilterType {
+    NearestNeighbor,
+    Linear,
+}
+
+impl Display for GpuFilterType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NearestNeighbor => write!(f, "NearestNeighbor"),
+            Self::Linear => write!(f, "Linear"),
+        }
+    }
+}
+
+impl FromStr for GpuFilterType {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "NearestNeighbor" => Ok(Self::NearestNeighbor),
+            "Linear" => Ok(Self::Linear),
+            _ => Err(anyhow::Error::msg(format!(
+                "invalid GPU filter type string: {s}"
+            ))),
+        }
+    }
+}
 
 #[derive(Parser)]
 struct CliArgs {
@@ -20,9 +51,13 @@ struct CliArgs {
     #[arg(long, default_value_t = NativeRenderer::Sdl2)]
     renderer: NativeRenderer,
 
-    /// Internal resolution scale (1 to 8 only applicable to Vulkan renderer)
+    /// GPU filter type (NearestNeighbor / Linear)
+    #[arg(long, default_value_t = GpuFilterType::Linear)]
+    gpu_filter_type: GpuFilterType,
+
+    /// Internal resolution scale (1 to 8, only applicable to Vulkan renderer w/ linear filter mode)
     #[arg(long, default_value_t = 3)]
-    render_scale: u32,
+    gpu_render_scale: u32,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -30,12 +65,20 @@ fn main() -> anyhow::Result<()> {
 
     let args = CliArgs::parse();
 
+    let gpu_filter_mode = match args.gpu_filter_type {
+        GpuFilterType::NearestNeighbor => GpuFilterMode::NearestNeighbor,
+        GpuFilterType::Linear => {
+            let render_scale = args.gpu_render_scale.try_into()?;
+            GpuFilterMode::Linear(render_scale)
+        }
+    };
+
     let config = JgnesNativeConfig {
         nes_file_path: args.nes_file_path,
         window_width: args.window_width,
         window_height: args.window_height,
         renderer: args.renderer,
-        render_scale: args.render_scale,
+        gpu_filter_mode,
     };
 
     jgnes_native_driver::run(&config)

@@ -325,7 +325,7 @@ impl App {
                 }
 
                 ui.group(|ui| {
-                    ui.label("Overscan");
+                    ui.label("Overscan in pixels");
 
                     ui.with_layout(Layout::top_down(Align::Center), |ui| {
                         ui.label("Top");

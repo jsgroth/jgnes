@@ -257,7 +257,10 @@ impl eframe::App for App {
             ui.set_enabled(self.state.open_window.is_none());
             menu::bar(ui, |ui| {
                 ui.menu_button("File", |ui| {
-                    if ui.button("Open").clicked() {
+                    let open_button = Button::new("Open")
+                        .shortcut_text(ctx.format_shortcut(&open_shortcut))
+                        .ui(ui);
+                    if open_button.clicked() {
                         self.handle_open();
                         ui.close_menu();
                     }
@@ -270,6 +273,10 @@ impl eframe::App for App {
                     }
                 });
 
+                ui.set_enabled(
+                    self.state.open_window.is_none()
+                        && !self.state.emulator_is_running.load(Ordering::Relaxed),
+                );
                 ui.menu_button("Settings", |ui| {
                     if ui.button("Video").clicked() {
                         self.state.open_window = Some(OpenWindow::VideoSettings);

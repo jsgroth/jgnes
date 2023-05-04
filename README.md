@@ -169,4 +169,4 @@ cargo run --release --bin jgnes-cli -- -f /path/to/file.nes
 
 ## Screenshots
 
-![Screenshot from 2023-04-27 14-38-19](https://user-images.githubusercontent.com/1137683/234973224-c17b6eda-695a-4a13-91c3-111f30be6d0c.png)
+![Screenshot from 2023-05-04 00-08-23](https://user-images.githubusercontent.com/1137683/236116961-e10795d9-f729-4bd5-b36c-8ed58bda45f4.png)

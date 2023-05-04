@@ -10,32 +10,39 @@ use sdl2::audio::{AudioQueue, AudioSpecDesired};
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::{Color, PixelFormatEnum};
+use sdl2::rect::Rect;
 use sdl2::render::{Texture, TextureCreator, WindowCanvas};
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::ffi::OsStr;
 use std::fmt::{Display, Formatter};
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::{cmp, fs};
 
 pub use render::{GpuFilterMode, RenderScale};
 
 struct SdlRenderer<'a> {
     canvas: WindowCanvas,
     texture: Texture<'a>,
+    aspect_ratio: AspectRatio,
 }
 
 impl<'a> SdlRenderer<'a> {
     fn new<T>(
         canvas: WindowCanvas,
         texture_creator: &'a TextureCreator<T>,
+        aspect_ratio: AspectRatio,
     ) -> anyhow::Result<Self> {
         let texture = texture_creator.create_texture_streaming(PixelFormatEnum::RGB24, 256, 224)?;
-        Ok(Self { canvas, texture })
+        Ok(Self {
+            canvas,
+            texture,
+            aspect_ratio,
+        })
     }
 }
 
@@ -54,13 +61,69 @@ impl<'a> Renderer for SdlRenderer<'a> {
             )
             .map_err(anyhow::Error::msg)?;
 
+        let (window_width, window_height) = self.canvas.window().size();
+        let display_area = determine_display_area(window_width, window_height, self.aspect_ratio);
+
         self.canvas.clear();
         self.canvas
-            .copy(&self.texture, None, None)
+            .copy(&self.texture, None, display_area.to_sdl_rect())
             .map_err(anyhow::Error::msg)?;
         self.canvas.present();
 
         Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct DisplayArea {
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+}
+
+impl DisplayArea {
+    fn to_sdl_rect(self) -> Rect {
+        Rect::new(self.x as i32, self.y as i32, self.width, self.height)
+    }
+}
+
+fn determine_display_area(
+    window_width: u32,
+    window_height: u32,
+    aspect_ratio: AspectRatio,
+) -> DisplayArea {
+    match aspect_ratio {
+        AspectRatio::Stretched => DisplayArea {
+            x: 0,
+            y: 0,
+            width: window_width,
+            height: window_height,
+        },
+        AspectRatio::Ntsc | AspectRatio::SquarePixels | AspectRatio::FourThree => {
+            let width_to_height_ratio = match aspect_ratio {
+                AspectRatio::Ntsc => 64.0 / 49.0,
+                AspectRatio::SquarePixels => 8.0 / 7.0,
+                AspectRatio::FourThree => 4.0 / 3.0,
+                AspectRatio::Stretched => unreachable!("nested match expressions"),
+            };
+
+            let width = cmp::min(
+                window_width,
+                (f64::from(window_height) * width_to_height_ratio).floor() as u32,
+            );
+            let height = (f64::from(width) / width_to_height_ratio).floor() as u32;
+
+            assert!(width <= window_width);
+            assert!(height <= window_height);
+
+            DisplayArea {
+                x: (window_width - width) / 2,
+                y: (window_height - height) / 2,
+                width,
+                height,
+            }
+        }
     }
 }
 
@@ -202,6 +265,40 @@ impl FromStr for NativeRenderer {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum AspectRatio {
+    #[default]
+    Ntsc,
+    SquarePixels,
+    FourThree,
+    Stretched,
+}
+
+impl Display for AspectRatio {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Ntsc => write!(f, "Ntsc"),
+            Self::SquarePixels => write!(f, "SquarePixels"),
+            Self::FourThree => write!(f, "FourThree"),
+            Self::Stretched => write!(f, "Stretched"),
+        }
+    }
+}
+
+impl FromStr for AspectRatio {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Ntsc" => Ok(Self::Ntsc),
+            "SquarePixels" => Ok(Self::SquarePixels),
+            "FourThree" => Ok(Self::FourThree),
+            "Stretched" => Ok(Self::Stretched),
+            _ => Err(format!("invalid aspect ratio string: {s}")),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct JgnesNativeConfig {
     pub nes_file_path: String,
@@ -209,6 +306,7 @@ pub struct JgnesNativeConfig {
     pub window_height: u32,
     pub renderer: NativeRenderer,
     pub gpu_filter_mode: GpuFilterMode,
+    pub aspect_ratio: AspectRatio,
 }
 
 impl Display for JgnesNativeConfig {
@@ -218,6 +316,7 @@ impl Display for JgnesNativeConfig {
         writeln!(f, "window_height: {}", self.window_height)?;
         writeln!(f, "renderer: {}", self.renderer)?;
         writeln!(f, "gpu_filter_mode: {}", self.gpu_filter_mode)?;
+        writeln!(f, "aspect_ratio: {}", self.aspect_ratio)?;
 
         Ok(())
     }
@@ -268,10 +367,15 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
     let texture_creator = canvas.texture_creator();
 
     let renderer: Box<dyn Renderer<Err = anyhow::Error>> = match config.renderer {
-        NativeRenderer::Sdl2 => Box::new(SdlRenderer::new(canvas, &texture_creator)?),
+        NativeRenderer::Sdl2 => Box::new(SdlRenderer::new(
+            canvas,
+            &texture_creator,
+            config.aspect_ratio,
+        )?),
         NativeRenderer::Wgpu => Box::new(WgpuRenderer::from_window(
             canvas.into_window(),
             config.gpu_filter_mode,
+            config.aspect_ratio,
         )?),
     };
 

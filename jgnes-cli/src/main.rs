@@ -1,6 +1,8 @@
 use clap::Parser;
 use env_logger::Env;
-use jgnes_native_driver::{GpuFilterMode, JgnesDynamicConfig, JgnesNativeConfig, NativeRenderer};
+use jgnes_native_driver::{
+    AspectRatio, GpuFilterMode, JgnesDynamicConfig, JgnesNativeConfig, NativeRenderer,
+};
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 use std::sync::atomic::AtomicBool;
@@ -60,6 +62,10 @@ struct CliArgs {
     /// Internal resolution scale (1 to 16, only applicable to Wgpu renderer w/ linear filter mode)
     #[arg(long, default_value_t = 3)]
     gpu_render_scale: u32,
+
+    /// Aspect ratio (Ntsc / SquarePixels / FourThree / Stretched)
+    #[arg(long, default_value_t = AspectRatio::SquarePixels)]
+    aspect_ratio: AspectRatio,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -81,6 +87,7 @@ fn main() -> anyhow::Result<()> {
         window_height: args.window_height,
         renderer: args.renderer,
         gpu_filter_mode,
+        aspect_ratio: args.aspect_ratio,
     };
 
     let dynamic_config = JgnesDynamicConfig {

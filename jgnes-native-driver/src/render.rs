@@ -1,7 +1,7 @@
 // The generated Copy impl for Vertex2d violates this rule for some reason
 #![allow(clippy::let_underscore_untyped)]
 
-use crate::colors;
+use crate::{colors, determine_display_area, AspectRatio};
 use jgnes_core::{ColorEmphasis, FrameBuffer, Renderer};
 use sdl2::video::Window;
 use serde::{Deserialize, Serialize};
@@ -112,7 +112,11 @@ pub(crate) struct WgpuRenderer {
 }
 
 impl WgpuRenderer {
-    pub(crate) fn from_window(window: Window, filter_mode: GpuFilterMode) -> anyhow::Result<Self> {
+    pub(crate) fn from_window(
+        window: Window,
+        filter_mode: GpuFilterMode,
+        aspect_ratio: AspectRatio,
+    ) -> anyhow::Result<Self> {
         // TODO configurable
         let output_buffer = vec![
             0;
@@ -142,8 +146,6 @@ impl WgpuRenderer {
             adapter.get_info().backend
         );
 
-        let (window_width, window_height) = window.size();
-
         let (device, queue) = pollster::block_on(adapter.request_device(
             &wgpu::DeviceDescriptor {
                 label: Some("device"),
@@ -152,6 +154,8 @@ impl WgpuRenderer {
             },
             None,
         ))?;
+
+        let (window_width, window_height) = window.size();
 
         let surface_capabilities = surface.get_capabilities(&adapter);
         let surface_format = surface_capabilities
@@ -227,9 +231,23 @@ impl WgpuRenderer {
             ..wgpu::SamplerDescriptor::default()
         });
 
+        let display_area = determine_display_area(window_width, window_height, aspect_ratio);
+        let vertices: Vec<_> = VERTICES
+            .into_iter()
+            .map(|vertex| Vertex2d {
+                position: [
+                    (f64::from(vertex.position[0]) * f64::from(display_area.width)
+                        / f64::from(window_width)) as f32,
+                    (f64::from(vertex.position[1]) * f64::from(display_area.height)
+                        / f64::from(window_height)) as f32,
+                ],
+                texture_coords: vertex.texture_coords,
+            })
+            .collect();
+
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("vertex_buffer"),
-            contents: bytemuck::cast_slice(&VERTICES),
+            contents: bytemuck::cast_slice(&vertices),
             usage: wgpu::BufferUsages::VERTEX,
         });
 

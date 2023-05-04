@@ -6,7 +6,7 @@ use egui::{
     Widget, Window,
 };
 use jgnes_native_driver::{
-    GpuFilterMode, JgnesDynamicConfig, JgnesNativeConfig, NativeRenderer, RenderScale,
+    AspectRatio, GpuFilterMode, JgnesDynamicConfig, JgnesNativeConfig, NativeRenderer, RenderScale,
 };
 use rfd::FileDialog;
 use serde::{Deserialize, Serialize};
@@ -29,6 +29,8 @@ struct AppConfig {
     renderer: NativeRenderer,
     gpu_filter_type: GpuFilterType,
     gpu_render_scale: RenderScale,
+    #[serde(default)]
+    aspect_ratio: AspectRatio,
 }
 
 impl Default for AppConfig {
@@ -39,6 +41,7 @@ impl Default for AppConfig {
             renderer: NativeRenderer::Wgpu,
             gpu_filter_type: GpuFilterType::Linear,
             gpu_render_scale: RenderScale::THREE,
+            aspect_ratio: AspectRatio::default(),
         }
     }
 }
@@ -192,6 +195,18 @@ impl App {
                     ui.colored_label(Color32::RED, "Scaling factor must be an integer between 1 and 16");
                 }
 
+                ui.group(|ui| {
+                    ui.label("Aspect ratio");
+                    ui.radio_value(&mut self.config.aspect_ratio, AspectRatio::Ntsc, "NTSC")
+                        .on_hover_text("8:7 pixel aspect ratio, 64:49 screen aspect ratio");
+                    ui.radio_value(&mut self.config.aspect_ratio, AspectRatio::SquarePixels, "Square pixels")
+                        .on_hover_text("1:1 pixel aspect ratio, 8:7 screen aspect ratio");
+                    ui.radio_value(&mut self.config.aspect_ratio, AspectRatio::FourThree, "4:3")
+                        .on_hover_text("7:6 pixel aspect ratio, 4:3 screen aspect ratio");
+                    ui.radio_value(&mut self.config.aspect_ratio, AspectRatio::Stretched, "Stretched")
+                        .on_hover_text("Image will be stretched to fill the entire display area");
+                });
+
                 ui.horizontal(|ui| {
                     if !TextEdit::singleline(&mut self.state.window_width_text).desired_width(60.0).ui(ui).has_focus() {
                         match self.state.window_width_text.parse::<u32>() {
@@ -342,6 +357,7 @@ fn launch_emulator<P: AsRef<Path>>(
                 GpuFilterType::NearestNeighbor => GpuFilterMode::NearestNeighbor,
                 GpuFilterType::Linear => GpuFilterMode::Linear(config.gpu_render_scale),
             },
+            aspect_ratio: config.aspect_ratio,
         })
         .unwrap();
 }

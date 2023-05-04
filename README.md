@@ -1,6 +1,6 @@
 # jgnes
 
-The early stages of what might some day be a functional NES emulator
+A work-in-progress NES emulator
 
 ## Feature Status
 

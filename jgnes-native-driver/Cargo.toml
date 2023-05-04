@@ -12,6 +12,7 @@ anyhow = "1.0"
 bytemuck = { version = "1", features = ["derive"] }
 log = "0.4"
 pollster = "0.3"
+serde = { version = "1", features = ["derive"] }
 wgpu = "0.16"
 
 # This is necessary because the latest published version of rust-sdl2 (0.35.2) uses raw-window-handle 0.4 which is

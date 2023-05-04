@@ -1529,7 +1529,6 @@ dependencies = [
  "anyhow",
  "clap",
  "env_logger",
- "jgnes-core",
  "jgnes-native-driver",
 ]
 
@@ -1554,6 +1553,8 @@ dependencies = [
  "jgnes-native-driver",
  "log",
  "rfd",
+ "serde",
+ "toml",
 ]
 
 [[package]]
@@ -1566,6 +1567,7 @@ dependencies = [
  "log",
  "pollster",
  "sdl2",
+ "serde",
  "wgpu",
 ]
 

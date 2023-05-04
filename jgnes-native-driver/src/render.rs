@@ -4,6 +4,7 @@
 use crate::colors;
 use jgnes_core::{ColorEmphasis, FrameBuffer, Renderer};
 use sdl2::video::Window;
+use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::{iter, mem};
 use wgpu::util::DeviceExt;
@@ -55,8 +56,18 @@ impl Vertex2d {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RenderScale(u32);
+
+impl RenderScale {
+    pub const TWO: Self = Self(2);
+    pub const THREE: Self = Self(3);
+
+    #[must_use]
+    pub fn get(self) -> u32 {
+        self.0
+    }
+}
 
 impl TryFrom<u32> for RenderScale {
     type Error = anyhow::Error;
@@ -71,7 +82,7 @@ impl TryFrom<u32> for RenderScale {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum GpuFilterMode {
     NearestNeighbor,
     Linear(RenderScale),

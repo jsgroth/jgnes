@@ -11,6 +11,7 @@ use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::{Color, PixelFormatEnum};
 use sdl2::render::{Texture, TextureCreator, WindowCanvas};
+use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::ffi::OsStr;
 use std::fmt::{Display, Formatter};
@@ -174,7 +175,7 @@ fn load_sav_file<P: AsRef<Path>>(path: P) -> Option<Vec<u8>> {
     fs::read(path.as_ref()).ok()
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum NativeRenderer {
     Sdl2,
     Wgpu,

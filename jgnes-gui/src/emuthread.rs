@@ -13,7 +13,13 @@ pub(crate) fn start(
     let (sender, receiver) = mpsc::channel();
 
     thread::spawn(move || loop {
-        let config = receiver.recv().unwrap();
+        let config = match receiver.recv() {
+            Ok(config) => config,
+            Err(err) => {
+                log::info!("Emulation thread terminating due to recv error (most likely caused by closing main window): {err}");
+                return;
+            }
+        };
 
         is_running.store(true, Ordering::Relaxed);
         if let Err(err) = jgnes_native_driver::run(&config, dynamic_config.clone()) {

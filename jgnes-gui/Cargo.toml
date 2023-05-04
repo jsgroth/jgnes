@@ -14,3 +14,5 @@ egui = "0.21"
 env_logger = "0.10"
 log = "0.4"
 rfd = "0.11"
+serde = { version = "1", features = ["derive"] }
+toml = "0.7"

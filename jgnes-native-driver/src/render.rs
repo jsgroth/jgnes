@@ -231,8 +231,12 @@ impl WgpuRenderer {
             ..wgpu::SamplerDescriptor::default()
         });
 
-        let display_area =
-            super::determine_display_area(window_width, window_height, render_config.aspect_ratio);
+        let display_area = super::determine_display_area(
+            window_width,
+            window_height,
+            render_config.aspect_ratio,
+            render_config.forced_integer_height_scaling,
+        );
         let vertices: Vec<_> = VERTICES
             .into_iter()
             .map(|vertex| Vertex2d {

@@ -67,6 +67,10 @@ struct CliArgs {
     #[arg(long, default_value_t = AspectRatio::SquarePixels)]
     aspect_ratio: AspectRatio,
 
+    /// Enable forced integer scaling for height
+    #[arg(long, default_value_t)]
+    forced_integer_height_scaling: bool,
+
     /// Left overscan in pixels
     #[arg(long, default_value_t)]
     overscan_left: u8,
@@ -117,6 +121,7 @@ fn main() -> anyhow::Result<()> {
         gpu_filter_mode,
         aspect_ratio: args.aspect_ratio,
         overscan,
+        forced_integer_height_scaling: args.forced_integer_height_scaling,
     };
 
     let dynamic_config = JgnesDynamicConfig {

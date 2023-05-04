@@ -36,6 +36,8 @@ struct AppConfig {
     aspect_ratio: AspectRatio,
     #[serde(default)]
     overscan: Overscan,
+    #[serde(default)]
+    forced_integer_height_scaling: bool,
 }
 
 impl Default for AppConfig {
@@ -48,6 +50,7 @@ impl Default for AppConfig {
             gpu_render_scale: RenderScale::THREE,
             aspect_ratio: AspectRatio::default(),
             overscan: Overscan::default(),
+            forced_integer_height_scaling: false,
         }
     }
 }
@@ -294,6 +297,9 @@ impl App {
                         .on_hover_text("Image will be stretched to fill the entire display area");
                 });
 
+                ui.checkbox(&mut self.config.forced_integer_height_scaling, "Forced integer scaling for height")
+                    .on_hover_text("Image height will always be the highest possible integer multiple of native (224px)");
+
                 ui.horizontal(|ui| {
                     NumericTextInput::new(
                         &mut self.state.window_width_text,
@@ -498,6 +504,7 @@ fn launch_emulator<P: AsRef<Path>>(
             },
             aspect_ratio: config.aspect_ratio,
             overscan: config.overscan,
+            forced_integer_height_scaling: config.forced_integer_height_scaling,
         })
         .unwrap();
 }

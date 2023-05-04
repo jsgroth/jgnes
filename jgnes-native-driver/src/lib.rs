@@ -66,8 +66,12 @@ impl<'a> Renderer for SdlRenderer<'a> {
             .map_err(anyhow::Error::msg)?;
 
         let (window_width, window_height) = self.canvas.window().size();
-        let display_area =
-            determine_display_area(window_width, window_height, self.config.aspect_ratio);
+        let display_area = determine_display_area(
+            window_width,
+            window_height,
+            self.config.aspect_ratio,
+            self.config.forced_integer_height_scaling,
+        );
 
         self.canvas.clear();
         self.canvas
@@ -97,6 +101,7 @@ fn determine_display_area(
     window_width: u32,
     window_height: u32,
     aspect_ratio: AspectRatio,
+    forced_integer_height_scaling: bool,
 ) -> DisplayArea {
     match aspect_ratio {
         AspectRatio::Stretched => DisplayArea {
@@ -113,11 +118,27 @@ fn determine_display_area(
                 AspectRatio::Stretched => unreachable!("nested match expressions"),
             };
 
+            let visible_screen_height = u32::from(jgnes_core::VISIBLE_SCREEN_HEIGHT);
+
             let width = cmp::min(
                 window_width,
-                (f64::from(window_height) * width_to_height_ratio).floor() as u32,
+                (f64::from(window_height) * width_to_height_ratio).round() as u32,
             );
-            let height = (f64::from(width) / width_to_height_ratio).floor() as u32;
+            let height = cmp::min(
+                window_height,
+                (f64::from(width) / width_to_height_ratio).round() as u32,
+            );
+            let (width, height) =
+                if forced_integer_height_scaling && height >= visible_screen_height {
+                    let height = visible_screen_height * (height / visible_screen_height);
+                    let width = cmp::min(
+                        window_width,
+                        (f64::from(height) * width_to_height_ratio).round() as u32,
+                    );
+                    (width, height)
+                } else {
+                    (width, height)
+                };
 
             assert!(width <= window_width);
             assert!(height <= window_height);
@@ -336,7 +357,7 @@ impl Display for Overscan {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Overscan[U={}, L={}, D={}, R={}]",
+            "Overscan[Top={}, Left={}, Bottom={}, Right={}]",
             self.top, self.left, self.bottom, self.right
         )
     }
@@ -351,6 +372,7 @@ pub struct JgnesNativeConfig {
     pub gpu_filter_mode: GpuFilterMode,
     pub aspect_ratio: AspectRatio,
     pub overscan: Overscan,
+    pub forced_integer_height_scaling: bool,
 }
 
 impl Display for JgnesNativeConfig {
@@ -362,6 +384,11 @@ impl Display for JgnesNativeConfig {
         writeln!(f, "gpu_filter_mode: {}", self.gpu_filter_mode)?;
         writeln!(f, "aspect_ratio: {}", self.aspect_ratio)?;
         writeln!(f, "overscan: {}", self.overscan)?;
+        writeln!(
+            f,
+            "forced_integer_height_scaling: {}",
+            self.forced_integer_height_scaling
+        )?;
 
         Ok(())
     }
@@ -377,6 +404,7 @@ struct RendererConfig {
     gpu_filter_mode: GpuFilterMode,
     aspect_ratio: AspectRatio,
     overscan: Overscan,
+    forced_integer_height_scaling: bool,
 }
 
 /// Run the emulator in a loop until it terminates.
@@ -420,9 +448,22 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
         gpu_filter_mode: config.gpu_filter_mode,
         aspect_ratio: config.aspect_ratio,
         overscan: config.overscan.validate()?,
+        forced_integer_height_scaling: config.forced_integer_height_scaling,
     };
 
     let texture_creator = canvas.texture_creator();
+
+    let (window_width, window_height) = canvas.window().size();
+    let display_area = determine_display_area(
+        window_width,
+        window_height,
+        config.aspect_ratio,
+        config.forced_integer_height_scaling,
+    );
+    log::info!(
+        "Setting display area to {}x{} pixels with window size of {window_width}x{window_height} and aspect ratio {}",
+        display_area.width, display_area.height, config.aspect_ratio
+    );
 
     let renderer: Box<dyn Renderer<Err = anyhow::Error>> = match config.renderer {
         NativeRenderer::Sdl2 => {

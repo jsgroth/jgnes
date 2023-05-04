@@ -4,6 +4,7 @@ use std::sync::mpsc::Sender;
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 
+#[must_use]
 pub(crate) fn start(
     dynamic_config: JgnesDynamicConfig,
     is_running: Arc<AtomicBool>,

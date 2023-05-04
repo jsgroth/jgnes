@@ -22,11 +22,11 @@ Implemented:
     * The additional audio channels are not implemented; no US-released games used these but a few Japanese releases did
 * P1 input with hardcoded keys
 * Support for 3 different forced aspect ratios (NTSC, 1:1 pixel aspect ratio, 4:3 screen aspect ratio), plus an option for stretched/none
+* Overscan customization
 * A GPU-backed renderer based on `wgpu` with an option for integer upscaling + linear interpolation, producing a sharp but clean image even at higher resolutions and non-8:7 aspect ratios
 
 Not Implemented:
 * Color palette customization; the NES hardware directly outputs an NTSC video signal rather than RGB pixel grids, so any mapping from NES colors to RGB colors is an approximation at best
-* Overscan customization; some games look really bad without cropping ~8 columns of pixels off certain sides of the screen
 * Lots of mappers, most notably Konami's and Namco's custom mappers
 * P2 input and input configuration (or any configuration really)
 * RESET button functionality

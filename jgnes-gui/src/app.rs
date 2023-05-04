@@ -2,8 +2,8 @@ use crate::emuthread;
 use eframe::Frame;
 use egui::panel::TopBottomSide;
 use egui::{
-    menu, Button, Color32, Context, Key, KeyboardShortcut, Modifiers, TextEdit, TopBottomPanel,
-    Widget, Window,
+    menu, Align, Button, Color32, Context, Key, KeyboardShortcut, Layout, Modifiers, TextEdit,
+    TopBottomPanel, Ui, Widget, Window,
 };
 use jgnes_native_driver::{
     AspectRatio, GpuFilterMode, JgnesDynamicConfig, JgnesNativeConfig, NativeRenderer, Overscan,
@@ -32,6 +32,8 @@ struct AppConfig {
     gpu_render_scale: RenderScale,
     #[serde(default)]
     aspect_ratio: AspectRatio,
+    #[serde(default)]
+    overscan: Overscan,
 }
 
 impl Default for AppConfig {
@@ -43,6 +45,7 @@ impl Default for AppConfig {
             gpu_filter_type: GpuFilterType::Linear,
             gpu_render_scale: RenderScale::THREE,
             aspect_ratio: AspectRatio::default(),
+            overscan: Overscan::default(),
         }
     }
 }
@@ -53,6 +56,23 @@ enum OpenWindow {
     EmulationError,
 }
 
+struct OverscanState {
+    top_text: String,
+    top_invalid: bool,
+    left_text: String,
+    left_invalid: bool,
+    right_text: String,
+    right_invalid: bool,
+    bottom_text: String,
+    bottom_invalid: bool,
+}
+
+impl OverscanState {
+    fn invalid(&self) -> bool {
+        self.top_invalid || self.left_invalid || self.right_invalid || self.bottom_invalid
+    }
+}
+
 struct AppState {
     render_scale_text: String,
     render_scale_invalid: bool,
@@ -60,6 +80,7 @@ struct AppState {
     window_width_invalid: bool,
     window_height_text: String,
     window_height_invalid: bool,
+    overscan: OverscanState,
     open_window: Option<OpenWindow>,
     emulator_is_running: Arc<AtomicBool>,
     emulator_quit_signal: Arc<AtomicBool>,
@@ -79,6 +100,16 @@ impl AppState {
             Arc::clone(&is_running),
             Arc::clone(&emulation_error),
         );
+        let overscan_state = OverscanState {
+            top_text: config.overscan.top.to_string(),
+            top_invalid: false,
+            left_text: config.overscan.left.to_string(),
+            left_invalid: false,
+            right_text: config.overscan.right.to_string(),
+            right_invalid: false,
+            bottom_text: config.overscan.bottom.to_string(),
+            bottom_invalid: false,
+        };
         Self {
             render_scale_text: config.gpu_render_scale.get().to_string(),
             render_scale_invalid: false,
@@ -86,6 +117,7 @@ impl AppState {
             window_width_invalid: false,
             window_height_text: config.window_height.to_string(),
             window_height_invalid: false,
+            overscan: overscan_state,
             open_window: None,
             emulator_is_running: is_running,
             emulator_quit_signal: quit_signal,
@@ -101,6 +133,47 @@ impl AppState {
         }
     }
 }
+
+struct OverscanTextInput<'a> {
+    text: &'a mut String,
+    config_value: &'a mut u8,
+    invalid: &'a mut bool,
+    max_inclusive: u8,
+}
+
+impl<'a> OverscanTextInput<'a> {
+    fn new(
+        text: &'a mut String,
+        config_value: &'a mut u8,
+        invalid: &'a mut bool,
+        max_inclusive: u8,
+    ) -> Self {
+        Self {
+            text,
+            config_value,
+            invalid,
+            max_inclusive,
+        }
+    }
+
+    fn ui(self, ui: &mut Ui) {
+        let response = TextEdit::singleline(self.text).desired_width(40.0).ui(ui);
+        if !response.has_focus() {
+            match self.text.parse::<u8>() {
+                Ok(value) if value <= self.max_inclusive => {
+                    *self.config_value = value;
+                    *self.invalid = false;
+                }
+                _ => {
+                    *self.invalid = true;
+                }
+            }
+        }
+    }
+}
+
+const OVERSCAN_VERTICAL_MAX: u8 = 112;
+const OVERSCAN_HORIZONTAL_MAX: u8 = 128;
 
 pub struct App {
     config_path: PathBuf,
@@ -243,6 +316,60 @@ impl App {
                 if self.state.window_height_invalid {
                     ui.colored_label(Color32::RED, "Window height must be an unsigned integer");
                 }
+
+                ui.group(|ui| {
+                    ui.label("Overscan");
+
+                    ui.with_layout(Layout::top_down(Align::Center), |ui| {
+                        ui.label("Top");
+                        OverscanTextInput::new(
+                            &mut self.state.overscan.top_text,
+                            &mut self.config.overscan.top,
+                            &mut self.state.overscan.top_invalid,
+                            OVERSCAN_VERTICAL_MAX,
+                        )
+                            .ui(ui);
+                    });
+
+                    ui.horizontal(|ui| {
+                        ui.label("Left");
+                        OverscanTextInput::new(
+                            &mut self.state.overscan.left_text,
+                            &mut self.config.overscan.left,
+                            &mut self.state.overscan.left_invalid,
+                            OVERSCAN_HORIZONTAL_MAX,
+                        )
+                            .ui(ui);
+
+                        ui.with_layout(Layout::top_down(Align::RIGHT), |ui| {
+                            ui.horizontal(|ui| {
+                                ui.label("Right");
+                                OverscanTextInput::new(
+                                    &mut self.state.overscan.right_text,
+                                    &mut self.config.overscan.right,
+                                    &mut self.state.overscan.right_invalid,
+                                    OVERSCAN_HORIZONTAL_MAX,
+                                )
+                                    .ui(ui);
+                            });
+                        });
+                    });
+
+                    ui.with_layout(Layout::top_down(Align::Center), |ui| {
+                        OverscanTextInput::new(
+                            &mut self.state.overscan.bottom_text,
+                            &mut self.config.overscan.bottom,
+                            &mut self.state.overscan.bottom_invalid,
+                            OVERSCAN_VERTICAL_MAX,
+                        )
+                            .ui(ui);
+                        ui.label("Bottom");
+                    });
+
+                    if self.state.overscan.invalid() {
+                        ui.colored_label(Color32::RED, "Overscan settings invalid; vertical must be 0-112 and horizontal must be 0-128");
+                    }
+                });
             });
         if !video_settings_open {
             self.state.open_window = None;
@@ -359,7 +486,7 @@ fn launch_emulator<P: AsRef<Path>>(
                 GpuFilterType::Linear => GpuFilterMode::Linear(config.gpu_render_scale),
             },
             aspect_ratio: config.aspect_ratio,
-            overscan: Overscan::default(),
+            overscan: config.overscan,
         })
         .unwrap();
 }

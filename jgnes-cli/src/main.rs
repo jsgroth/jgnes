@@ -1,7 +1,7 @@
 use clap::Parser;
 use env_logger::Env;
 use jgnes_native_driver::{
-    AspectRatio, GpuFilterMode, JgnesDynamicConfig, JgnesNativeConfig, NativeRenderer,
+    AspectRatio, GpuFilterMode, JgnesDynamicConfig, JgnesNativeConfig, NativeRenderer, Overscan,
 };
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
@@ -88,6 +88,7 @@ fn main() -> anyhow::Result<()> {
         renderer: args.renderer,
         gpu_filter_mode,
         aspect_ratio: args.aspect_ratio,
+        overscan: Overscan::default(),
     };
 
     let dynamic_config = JgnesDynamicConfig {

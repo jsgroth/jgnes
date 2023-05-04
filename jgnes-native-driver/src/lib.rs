@@ -28,20 +28,24 @@ pub use render::{GpuFilterMode, RenderScale};
 struct SdlRenderer<'a> {
     canvas: WindowCanvas,
     texture: Texture<'a>,
-    aspect_ratio: AspectRatio,
+    config: RendererConfig,
 }
 
 impl<'a> SdlRenderer<'a> {
     fn new<T>(
         canvas: WindowCanvas,
         texture_creator: &'a TextureCreator<T>,
-        aspect_ratio: AspectRatio,
+        config: RendererConfig,
     ) -> anyhow::Result<Self> {
-        let texture = texture_creator.create_texture_streaming(PixelFormatEnum::RGB24, 256, 224)?;
+        let texture = texture_creator.create_texture_streaming(
+            PixelFormatEnum::RGB24,
+            jgnes_core::SCREEN_WIDTH.into(),
+            jgnes_core::VISIBLE_SCREEN_HEIGHT.into(),
+        )?;
         Ok(Self {
             canvas,
             texture,
-            aspect_ratio,
+            config,
         })
     }
 }
@@ -57,12 +61,13 @@ impl<'a> Renderer for SdlRenderer<'a> {
         self.texture
             .with_lock(
                 None,
-                colors::sdl_texture_updater(frame_buffer, color_emphasis),
+                colors::sdl_texture_updater(frame_buffer, color_emphasis, self.config.overscan),
             )
             .map_err(anyhow::Error::msg)?;
 
         let (window_width, window_height) = self.canvas.window().size();
-        let display_area = determine_display_area(window_width, window_height, self.aspect_ratio);
+        let display_area =
+            determine_display_area(window_width, window_height, self.config.aspect_ratio);
 
         self.canvas.clear();
         self.canvas
@@ -299,6 +304,44 @@ impl FromStr for AspectRatio {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct Overscan {
+    pub top: u8,
+    pub left: u8,
+    pub right: u8,
+    pub bottom: u8,
+}
+
+impl Overscan {
+    fn validate(self) -> Result<Self, anyhow::Error> {
+        if self.top > 112 || self.bottom > 112 {
+            return Err(anyhow::Error::msg(format!(
+                "Vertical overscan cannot be more than 112; top={}, bottom={}",
+                self.top, self.bottom
+            )));
+        }
+
+        if self.left > 128 || self.right > 128 {
+            return Err(anyhow::Error::msg(format!(
+                "Horizontal overscan cannot be more than 128; left={}, right={}",
+                self.left, self.right
+            )));
+        }
+
+        Ok(self)
+    }
+}
+
+impl Display for Overscan {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Overscan[U={}, L={}, D={}, R={}]",
+            self.top, self.left, self.bottom, self.right
+        )
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct JgnesNativeConfig {
     pub nes_file_path: String,
@@ -307,6 +350,7 @@ pub struct JgnesNativeConfig {
     pub renderer: NativeRenderer,
     pub gpu_filter_mode: GpuFilterMode,
     pub aspect_ratio: AspectRatio,
+    pub overscan: Overscan,
 }
 
 impl Display for JgnesNativeConfig {
@@ -317,6 +361,7 @@ impl Display for JgnesNativeConfig {
         writeln!(f, "renderer: {}", self.renderer)?;
         writeln!(f, "gpu_filter_mode: {}", self.gpu_filter_mode)?;
         writeln!(f, "aspect_ratio: {}", self.aspect_ratio)?;
+        writeln!(f, "overscan: {}", self.overscan)?;
 
         Ok(())
     }
@@ -325,6 +370,13 @@ impl Display for JgnesNativeConfig {
 #[derive(Debug, Clone)]
 pub struct JgnesDynamicConfig {
     pub quit_signal: Arc<AtomicBool>,
+}
+
+#[derive(Debug, Clone)]
+struct RendererConfig {
+    gpu_filter_mode: GpuFilterMode,
+    aspect_ratio: AspectRatio,
+    overscan: Overscan,
 }
 
 /// Run the emulator in a loop until it terminates.
@@ -364,18 +416,21 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
     canvas.clear();
     canvas.present();
 
+    let renderer_config = RendererConfig {
+        gpu_filter_mode: config.gpu_filter_mode,
+        aspect_ratio: config.aspect_ratio,
+        overscan: config.overscan.validate()?,
+    };
+
     let texture_creator = canvas.texture_creator();
 
     let renderer: Box<dyn Renderer<Err = anyhow::Error>> = match config.renderer {
-        NativeRenderer::Sdl2 => Box::new(SdlRenderer::new(
-            canvas,
-            &texture_creator,
-            config.aspect_ratio,
-        )?),
+        NativeRenderer::Sdl2 => {
+            Box::new(SdlRenderer::new(canvas, &texture_creator, renderer_config)?)
+        }
         NativeRenderer::Wgpu => Box::new(WgpuRenderer::from_window(
             canvas.into_window(),
-            config.gpu_filter_mode,
-            config.aspect_ratio,
+            renderer_config,
         )?),
     };
 

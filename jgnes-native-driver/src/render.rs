@@ -1,7 +1,7 @@
 // The generated Copy impl for Vertex2d violates this rule for some reason
 #![allow(clippy::let_underscore_untyped)]
 
-use crate::{colors, determine_display_area, AspectRatio};
+use crate::{colors, RendererConfig};
 use jgnes_core::{ColorEmphasis, FrameBuffer, Renderer};
 use sdl2::video::Window;
 use serde::{Deserialize, Serialize};
@@ -114,8 +114,7 @@ pub(crate) struct WgpuRenderer {
 impl WgpuRenderer {
     pub(crate) fn from_window(
         window: Window,
-        filter_mode: GpuFilterMode,
-        aspect_ratio: AspectRatio,
+        render_config: RendererConfig,
     ) -> anyhow::Result<Self> {
         // TODO configurable
         let output_buffer = vec![
@@ -193,7 +192,7 @@ impl WgpuRenderer {
         });
         let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        let render_scale = match filter_mode {
+        let render_scale = match render_config.gpu_filter_mode {
             GpuFilterMode::NearestNeighbor => 1,
             GpuFilterMode::Linear(render_scale) => render_scale.0,
         };
@@ -216,7 +215,7 @@ impl WgpuRenderer {
         let scaled_texture_view =
             scaled_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        let sampler_filter_mode = match filter_mode {
+        let sampler_filter_mode = match render_config.gpu_filter_mode {
             GpuFilterMode::NearestNeighbor => wgpu::FilterMode::Nearest,
             GpuFilterMode::Linear(_) => wgpu::FilterMode::Linear,
         };
@@ -231,7 +230,8 @@ impl WgpuRenderer {
             ..wgpu::SamplerDescriptor::default()
         });
 
-        let display_area = determine_display_area(window_width, window_height, aspect_ratio);
+        let display_area =
+            super::determine_display_area(window_width, window_height, render_config.aspect_ratio);
         let vertices: Vec<_> = VERTICES
             .into_iter()
             .map(|vertex| Vertex2d {

@@ -6,7 +6,8 @@ use egui::{
     Widget, Window,
 };
 use jgnes_native_driver::{
-    AspectRatio, GpuFilterMode, JgnesDynamicConfig, JgnesNativeConfig, NativeRenderer, RenderScale,
+    AspectRatio, GpuFilterMode, JgnesDynamicConfig, JgnesNativeConfig, NativeRenderer, Overscan,
+    RenderScale,
 };
 use rfd::FileDialog;
 use serde::{Deserialize, Serialize};
@@ -358,6 +359,7 @@ fn launch_emulator<P: AsRef<Path>>(
                 GpuFilterType::Linear => GpuFilterMode::Linear(config.gpu_render_scale),
             },
             aspect_ratio: config.aspect_ratio,
+            overscan: Overscan::default(),
         })
         .unwrap();
 }

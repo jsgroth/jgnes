@@ -160,10 +160,14 @@ impl App {
                 ui.group(|ui| {
                     ui.set_enabled(self.config.renderer == NativeRenderer::Wgpu);
 
-                    ui.label("Image filtering");
+                    let disabled_hover_text = "Only nearest neighbor filtering is supported with SDL2 renderer";
+                    ui.label("Image filtering")
+                        .on_disabled_hover_text(disabled_hover_text);
                     ui.horizontal(|ui| {
-                        ui.radio_value(&mut self.config.gpu_filter_type, GpuFilterType::Linear, "Linear interpolation");
-                        ui.radio_value(&mut self.config.gpu_filter_type, GpuFilterType::NearestNeighbor, "Nearest neighbor");
+                        ui.radio_value(&mut self.config.gpu_filter_type, GpuFilterType::NearestNeighbor, "Nearest neighbor")
+                            .on_disabled_hover_text(disabled_hover_text);
+                        ui.radio_value(&mut self.config.gpu_filter_type, GpuFilterType::Linear, "Linear interpolation")
+                            .on_disabled_hover_text(disabled_hover_text);
                     });
                 });
 

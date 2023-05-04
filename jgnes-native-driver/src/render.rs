@@ -99,6 +99,7 @@ impl Display for GpuFilterMode {
 
 pub(crate) struct WgpuRenderer {
     _window: Window,
+    render_config: RendererConfig,
     output_buffer: Vec<u8>,
     device: wgpu::Device,
     queue: wgpu::Queue,
@@ -402,6 +403,7 @@ impl WgpuRenderer {
 
         Ok(Self {
             _window: window,
+            render_config,
             output_buffer,
             device,
             queue,
@@ -424,7 +426,12 @@ impl Renderer for WgpuRenderer {
         frame_buffer: &FrameBuffer,
         color_emphasis: ColorEmphasis,
     ) -> Result<(), Self::Err> {
-        colors::to_rgba(frame_buffer, color_emphasis, &mut self.output_buffer);
+        colors::to_rgba(
+            frame_buffer,
+            color_emphasis,
+            self.render_config.overscan,
+            &mut self.output_buffer,
+        );
 
         self.queue.write_texture(
             wgpu::ImageCopyTexture {

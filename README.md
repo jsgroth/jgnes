@@ -1,6 +1,6 @@
 # jgnes
 
-A work-in-progress NES emulator
+A work-in-progress cross-platform NES emulator
 
 ## Feature Status
 

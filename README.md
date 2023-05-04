@@ -5,13 +5,11 @@ A work-in-progress NES emulator
 ## Feature Status
 
 Implemented:
-* Cycle-based 6502 CPU emulation
-  * Unofficial opcodes not implemented
-  * Open bus is not implemented; open bus reads always return $FF
-* Cycle-based PPU emulation (graphics)
-  * Rendering effects of mid-scanline writes may not be cycle-accurate based on non-binary test ROMs (nmi_sync / scanline)
-* Cycle-based APU emulation (audio)
-  * DMC DMA cycle stealing is not implemented
+* Cycle-based 6502 CPU emulation, PPU emulation (graphics), and APU emulation (audio)
+  * Unofficial CPU opcodes not implemented
+  * CPU open bus is not implemented; CPU open bus reads always return $FF
+  * Rendering effects of certain mid-scanline writes may not be cycle-accurate based on non-binary test ROMs (nmi_sync / scanline)
+  * DMC DMA cycle stealing and dummy reads are not implemented
   * DMC IRQ timing is slightly off based on non-binary test ROMs (dpcmletterbox), almost certainly due to lack of DMC DMA cycle stealing
 * The most commonly used mappers
   * NROM
@@ -33,7 +31,6 @@ Not Implemented:
 * P2 input and input configuration (or any configuration really)
 * RESET button functionality
 * Save states or fast forward
-* A GUI
 * Support for PAL/EU releases (the processor timings are different compared to NTSC US/JP)
 
 ## Requirements

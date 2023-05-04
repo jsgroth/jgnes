@@ -68,9 +68,14 @@ sudo apt install libgtk-3-dev
 
 ## Build & Run
 
-To build the emulator and run for a given NES ROM file:
+To build the CLI and run for a given NES ROM file:
 ```shell
 cargo run --release --bin jgnes-cli -- -f /path/to/file.nes
+```
+
+To build and run the GUI:
+```shell
+cargo run --release --bin jgnes-gui
 ```
 
 ## Test ROM Results

@@ -170,7 +170,7 @@ impl App {
                 ui.horizontal(|ui| {
                     ui.set_enabled(self.config.renderer == NativeRenderer::Wgpu && self.config.gpu_filter_type == GpuFilterType::Linear);
 
-                    if !TextEdit::singleline(&mut self.state.render_scale_text).desired_width(60.0).ui(ui).has_focus() {
+                    if !TextEdit::singleline(&mut self.state.render_scale_text).desired_width(30.0).ui(ui).has_focus() {
                         match RenderScale::try_from(self.state.render_scale_text.parse::<u32>().unwrap_or(0)) {
                             Ok(render_scale) => {
                                 self.state.render_scale_invalid = false;

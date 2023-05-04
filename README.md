@@ -111,10 +111,10 @@ cargo run --release --bin jgnes-cli -- -f /path/to/file.nes
 | blargg_apu_2005.07.30/09.reset_timing.nes | ✅ | |
 | blargg_apu_2005.07.30/10.len_halt_timing.nes | ✅ | |
 | blargg_apu_2005.07.30/11.len_reload_timing.nes | ❌ | #5: Reload during length clock when ctr > 0 should be ignored |
-| dmc_dma_during_read4/dma_2007_read.nes | ❌ | Unknown |
+| dmc_dma_during_read4/dma_2007_read.nes | ❌ | DMC DMA dummy reads not implemented |
 | dmc_dma_during_read4/dma_2007_write.nes | ✅ | |
-| dmc_dma_during_read4/dma_4016_read.nes | ❌ | Unknown |
-| dmc_dma_during_read4/double_2007_read.nes | ❌ | Unknown |
+| dmc_dma_during_read4/dma_4016_read.nes | ❌ | DMC DMA dummy reads not implemented |
+| dmc_dma_during_read4/double_2007_read.nes | ❌ | DMC DMA dummy reads not implemented |
 | dmc_dma_during_read4/read_write_2007.nes | ✅ | |
 | sprdma_and_dmc_dma/sprdma_and_dmc_dma.nes | ❌ | DMC DMA cycle stealing not implemented |
 | sprdma_and_dmc_dma/sprdma_and_dmc_dma_512.nes | ❌ | DMC DMA cycle stealing not implemented |

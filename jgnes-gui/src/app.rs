@@ -285,6 +285,13 @@ impl App {
                     ui.colored_label(Color32::RED, "Scaling factor must be an integer between 1 and 16");
                 }
 
+                ui.with_layout(Layout::top_down(Align::LEFT), |ui| {
+                    ui.set_enabled(self.config.aspect_ratio != AspectRatio::Stretched);
+                    ui.checkbox(&mut self.config.forced_integer_height_scaling, "Forced integer scaling for height")
+                        .on_hover_text("Image height will always be the highest possible integer multiple of native (224px)")
+                        .on_disabled_hover_text("This option is not available in stretched image mode");
+                });
+
                 ui.group(|ui| {
                     ui.label("Aspect ratio");
                     ui.radio_value(&mut self.config.aspect_ratio, AspectRatio::Ntsc, "NTSC")
@@ -296,9 +303,6 @@ impl App {
                     ui.radio_value(&mut self.config.aspect_ratio, AspectRatio::Stretched, "Stretched")
                         .on_hover_text("Image will be stretched to fill the entire display area");
                 });
-
-                ui.checkbox(&mut self.config.forced_integer_height_scaling, "Forced integer scaling for height")
-                    .on_hover_text("Image height will always be the highest possible integer multiple of native (224px)");
 
                 ui.horizontal(|ui| {
                     NumericTextInput::new(

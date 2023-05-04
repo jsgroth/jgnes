@@ -45,7 +45,7 @@ See link for installation instructions.
 
 ### SDL2
 
-This project requires SDL2 core headers to build.
+This project requires [SDL2](https://libsdl.org/) core headers to build.
 
 Linux (Debian-based):
 ```shell
@@ -55,6 +55,15 @@ sudo apt install libsdl2-dev
 macOS:
 ```shell
 brew install sdl2
+```
+
+### GTK3 (Linux GUI only)
+
+On Linux only, the GUI requires [GTK3](https://www.gtk.org/) headers to build.
+
+Linux (Debian-based):
+```shell
+sudo apt install libgtk-3-dev
 ```
 
 ## Build & Run

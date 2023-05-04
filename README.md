@@ -70,6 +70,11 @@ To build the CLI and run for a given NES ROM file:
 cargo run --release --bin jgnes-cli -- -f /path/to/file.nes
 ```
 
+To view all CLI args:
+```shell
+cargo run --release --bin jgnes-cli -- -h
+```
+
 To build and run the GUI:
 ```shell
 cargo run --release --bin jgnes-gui

@@ -6,7 +6,7 @@ A work-in-progress NES emulator
 
 Implemented:
 * Cycle-based 6502 CPU emulation, PPU emulation (graphics), and APU emulation (audio)
-  * Unofficial CPU opcodes not implemented
+  * Unofficial CPU opcodes not implemented, aside from some of the unofficial NOPs that a few games use
   * CPU open bus is not implemented; CPU open bus reads always return $FF
   * Rendering effects of certain mid-scanline writes may not be cycle-accurate based on non-binary test ROMs (nmi_sync / scanline)
   * DMC DMA cycle stealing and dummy reads are not implemented

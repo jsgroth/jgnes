@@ -66,6 +66,33 @@ struct CliArgs {
     /// Aspect ratio (Ntsc / SquarePixels / FourThree / Stretched)
     #[arg(long, default_value_t = AspectRatio::SquarePixels)]
     aspect_ratio: AspectRatio,
+
+    /// Left overscan in pixels
+    #[arg(long, default_value_t)]
+    overscan_left: u8,
+
+    /// Right overscan in pixels
+    #[arg(long, default_value_t)]
+    overscan_right: u8,
+
+    /// Top overscan in pixels
+    #[arg(long, default_value_t)]
+    overscan_top: u8,
+
+    /// Bottom overscan in pixels
+    #[arg(long, default_value_t)]
+    overscan_bottom: u8,
+}
+
+impl CliArgs {
+    fn overscan(&self) -> Overscan {
+        Overscan {
+            top: self.overscan_top,
+            left: self.overscan_left,
+            right: self.overscan_right,
+            bottom: self.overscan_bottom,
+        }
+    }
 }
 
 fn main() -> anyhow::Result<()> {
@@ -81,6 +108,7 @@ fn main() -> anyhow::Result<()> {
         }
     };
 
+    let overscan = args.overscan();
     let config = JgnesNativeConfig {
         nes_file_path: args.nes_file_path,
         window_width: args.window_width,
@@ -88,7 +116,7 @@ fn main() -> anyhow::Result<()> {
         renderer: args.renderer,
         gpu_filter_mode,
         aspect_ratio: args.aspect_ratio,
-        overscan: Overscan::default(),
+        overscan,
     };
 
     let dynamic_config = JgnesDynamicConfig {

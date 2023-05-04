@@ -1,8 +1,10 @@
 use clap::Parser;
 use env_logger::Env;
-use jgnes_native_driver::{GpuFilterMode, JgnesNativeConfig, NativeRenderer};
+use jgnes_native_driver::{GpuFilterMode, JgnesDynamicConfig, JgnesNativeConfig, NativeRenderer};
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum GpuFilterType {
@@ -81,5 +83,9 @@ fn main() -> anyhow::Result<()> {
         gpu_filter_mode,
     };
 
-    jgnes_native_driver::run(&config)
+    let dynamic_config = JgnesDynamicConfig {
+        quit_signal: Arc::new(AtomicBool::new(false)),
+    };
+
+    jgnes_native_driver::run(&config, dynamic_config)
 }

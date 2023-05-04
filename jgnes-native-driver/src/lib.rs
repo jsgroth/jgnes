@@ -18,6 +18,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::str::FromStr;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 pub use render::{GpuFilterMode, RenderScale};
 
@@ -220,13 +222,18 @@ impl Display for JgnesNativeConfig {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct JgnesDynamicConfig {
+    pub quit_signal: Arc<AtomicBool>,
+}
+
 /// Run the emulator in a loop until it terminates.
 ///
 /// # Errors
 ///
 /// This function will return an error if any issues are encountered rendering graphics, playing
 /// audio, or writing a save file.
-pub fn run(config: &JgnesNativeConfig) -> anyhow::Result<()> {
+pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> anyhow::Result<()> {
     log::info!("Running with config:\n{config}");
 
     let Some(file_name) = Path::new(&config.nes_file_path)
@@ -320,6 +327,10 @@ pub fn run(config: &JgnesNativeConfig) -> anyhow::Result<()> {
 
         ticks += 1;
         if ticks % 15000 == 0 {
+            if dynamic_config.quit_signal.load(Ordering::Relaxed) {
+                return Ok(());
+            }
+
             for event in event_pump.poll_iter() {
                 match event {
                     Event::Quit { .. }

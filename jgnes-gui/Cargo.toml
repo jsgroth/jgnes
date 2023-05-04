@@ -1,0 +1,16 @@
+[package]
+name = "jgnes-gui"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+jgnes-native-driver = { path = "../jgnes-native-driver" }
+
+anyhow = "1"
+eframe = "0.21"
+egui = "0.21"
+env_logger = "0.10"
+log = "0.4"
+rfd = "0.11"

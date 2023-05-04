@@ -61,7 +61,7 @@ brew install sdl2
 
 To build the emulator and run for a given NES ROM file:
 ```shell
-cargo run --release -- -f /path/to/file.nes
+cargo run --release --bin jgnes-cli -- -f /path/to/file.nes
 ```
 
 ## Test ROM Results

@@ -12,7 +12,9 @@ use jgnes_native_driver::{
 use rfd::FileDialog;
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::ops::RangeInclusive;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
@@ -134,33 +136,44 @@ impl AppState {
     }
 }
 
-struct OverscanTextInput<'a> {
+struct NumericTextInput<'a, T> {
     text: &'a mut String,
-    config_value: &'a mut u8,
+    config_value: &'a mut T,
     invalid: &'a mut bool,
-    max_inclusive: u8,
+    allowed_values: RangeInclusive<T>,
+    desired_width: Option<f32>,
 }
 
-impl<'a> OverscanTextInput<'a> {
+impl<'a, T: FromStr + PartialOrd> NumericTextInput<'a, T> {
     fn new(
         text: &'a mut String,
-        config_value: &'a mut u8,
+        config_value: &'a mut T,
         invalid: &'a mut bool,
-        max_inclusive: u8,
+        allowed_values: RangeInclusive<T>,
     ) -> Self {
         Self {
             text,
             config_value,
             invalid,
-            max_inclusive,
+            allowed_values,
+            desired_width: None,
         }
     }
 
+    fn desired_width(mut self, desired_width: f32) -> Self {
+        self.desired_width = Some(desired_width);
+        self
+    }
+
     fn ui(self, ui: &mut Ui) {
-        let response = TextEdit::singleline(self.text).desired_width(40.0).ui(ui);
+        let mut text_edit = TextEdit::singleline(self.text);
+        if let Some(desired_width) = self.desired_width {
+            text_edit = text_edit.desired_width(desired_width);
+        }
+        let response = text_edit.ui(ui);
         if !response.has_focus() {
-            match self.text.parse::<u8>() {
-                Ok(value) if value <= self.max_inclusive => {
+            match self.text.parse::<T>() {
+                Ok(value) if self.allowed_values.contains(&value) => {
                     *self.config_value = value;
                     *self.invalid = false;
                 }
@@ -282,39 +295,33 @@ impl App {
                 });
 
                 ui.horizontal(|ui| {
-                    if !TextEdit::singleline(&mut self.state.window_width_text).desired_width(60.0).ui(ui).has_focus() {
-                        match self.state.window_width_text.parse::<u32>() {
-                            Ok(window_width) => {
-                                self.state.window_width_invalid = false;
-                                self.config.window_width = window_width;
-                            }
-                            Err(_) => {
-                                self.state.window_width_invalid = true;
-                            }
-                        }
-                    }
+                    NumericTextInput::new(
+                        &mut self.state.window_width_text,
+                        &mut self.config.window_width,
+                        &mut self.state.window_width_invalid,
+                        1..=u32::MAX,
+                    )
+                        .desired_width(60.0)
+                        .ui(ui);
                     ui.label("Window width in pixels");
                 });
                 if self.state.window_width_invalid {
-                    ui.colored_label(Color32::RED, "Window width must be an unsigned integer");
+                    ui.colored_label(Color32::RED, "Window width must be a non-negative integer");
                 }
 
                 ui.horizontal(|ui| {
-                    if !TextEdit::singleline(&mut self.state.window_height_text).desired_width(60.0).ui(ui).has_focus() {
-                        match self.state.window_height_text.parse::<u32>() {
-                            Ok(window_height) => {
-                                self.state.window_height_invalid = false;
-                                self.config.window_height = window_height;
-                            }
-                            Err(_) => {
-                                self.state.window_height_invalid = true;
-                            }
-                        }
-                    }
+                    NumericTextInput::new(
+                        &mut self.state.window_height_text,
+                        &mut self.config.window_height,
+                        &mut self.state.window_height_invalid,
+                        1..=u32::MAX
+                    )
+                        .desired_width(60.0)
+                        .ui(ui);
                     ui.label("Window height in pixels");
                 });
                 if self.state.window_height_invalid {
-                    ui.colored_label(Color32::RED, "Window height must be an unsigned integer");
+                    ui.colored_label(Color32::RED, "Window height must be a non-negative integer");
                 }
 
                 ui.group(|ui| {
@@ -322,46 +329,50 @@ impl App {
 
                     ui.with_layout(Layout::top_down(Align::Center), |ui| {
                         ui.label("Top");
-                        OverscanTextInput::new(
+                        NumericTextInput::new(
                             &mut self.state.overscan.top_text,
                             &mut self.config.overscan.top,
                             &mut self.state.overscan.top_invalid,
-                            OVERSCAN_VERTICAL_MAX,
+                            0..=OVERSCAN_VERTICAL_MAX,
                         )
+                            .desired_width(40.0)
                             .ui(ui);
                     });
 
                     ui.horizontal(|ui| {
                         ui.label("Left");
-                        OverscanTextInput::new(
+                        NumericTextInput::new(
                             &mut self.state.overscan.left_text,
                             &mut self.config.overscan.left,
                             &mut self.state.overscan.left_invalid,
-                            OVERSCAN_HORIZONTAL_MAX,
+                            0..=OVERSCAN_HORIZONTAL_MAX,
                         )
+                            .desired_width(40.0)
                             .ui(ui);
 
                         ui.with_layout(Layout::top_down(Align::RIGHT), |ui| {
                             ui.horizontal(|ui| {
                                 ui.label("Right");
-                                OverscanTextInput::new(
+                                NumericTextInput::new(
                                     &mut self.state.overscan.right_text,
                                     &mut self.config.overscan.right,
                                     &mut self.state.overscan.right_invalid,
-                                    OVERSCAN_HORIZONTAL_MAX,
+                                    0..=OVERSCAN_HORIZONTAL_MAX,
                                 )
+                                    .desired_width(40.0)
                                     .ui(ui);
                             });
                         });
                     });
 
                     ui.with_layout(Layout::top_down(Align::Center), |ui| {
-                        OverscanTextInput::new(
+                        NumericTextInput::new(
                             &mut self.state.overscan.bottom_text,
                             &mut self.config.overscan.bottom,
                             &mut self.state.overscan.bottom_invalid,
-                            OVERSCAN_VERTICAL_MAX,
+                            0..=OVERSCAN_VERTICAL_MAX,
                         )
+                            .desired_width(40.0)
                             .ui(ui);
                         ui.label("Bottom");
                     });

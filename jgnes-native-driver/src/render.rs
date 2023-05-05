@@ -98,7 +98,6 @@ impl Display for GpuFilterMode {
 }
 
 pub(crate) struct WgpuRenderer {
-    window: Window,
     render_config: RendererConfig,
     output_buffer: Vec<u8>,
     device: wgpu::Device,
@@ -112,6 +111,8 @@ pub(crate) struct WgpuRenderer {
     render_pipeline: wgpu::RenderPipeline,
     vertices: Vec<Vertex2d>,
     vertex_buffer: wgpu::Buffer,
+    // The window must be declared after the surface for safety reasons related to drop order
+    window: Window,
 }
 
 impl WgpuRenderer {
@@ -132,8 +133,9 @@ impl WgpuRenderer {
         });
 
         // SAFETY: The surface must not outlive the window it was created from.
-        // The surface and window are both owned by WgpuRenderer so they will be dropped at the
-        // same time.
+        // The surface and window are both owned by WgpuRenderer, and the window field is declared
+        // after the surface field, so the surface will always be dropped before the window is
+        // dropped.
         let surface = unsafe { instance.create_surface(&window) }?;
 
         let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
@@ -395,7 +397,6 @@ impl WgpuRenderer {
         });
 
         Ok(Self {
-            window,
             render_config,
             output_buffer,
             device,
@@ -409,6 +410,7 @@ impl WgpuRenderer {
             render_pipeline,
             vertices,
             vertex_buffer,
+            window,
         })
     }
 

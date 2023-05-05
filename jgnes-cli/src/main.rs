@@ -71,6 +71,10 @@ struct CliArgs {
     #[arg(long, default_value_t)]
     forced_integer_height_scaling: bool,
 
+    /// Disable audio sync
+    #[arg(long = "no-audio-sync", default_value_t = true, action = clap::ArgAction::SetFalse)]
+    sync_to_audio: bool,
+
     /// Left overscan in pixels
     #[arg(long, default_value_t)]
     overscan_left: u8,
@@ -122,6 +126,7 @@ fn main() -> anyhow::Result<()> {
         aspect_ratio: args.aspect_ratio,
         overscan,
         forced_integer_height_scaling: args.forced_integer_height_scaling,
+        sync_to_audio: args.sync_to_audio,
     };
 
     let dynamic_config = JgnesDynamicConfig {

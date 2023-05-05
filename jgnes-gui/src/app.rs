@@ -25,6 +25,10 @@ enum GpuFilterType {
     Linear,
 }
 
+fn true_fn() -> bool {
+    true
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct AppConfig {
     window_width: u32,
@@ -38,6 +42,8 @@ struct AppConfig {
     overscan: Overscan,
     #[serde(default)]
     forced_integer_height_scaling: bool,
+    #[serde(default = "true_fn")]
+    sync_to_audio: bool,
 }
 
 impl Default for AppConfig {
@@ -51,6 +57,7 @@ impl Default for AppConfig {
             aspect_ratio: AspectRatio::default(),
             overscan: Overscan::default(),
             forced_integer_height_scaling: false,
+            sync_to_audio: true,
         }
     }
 }
@@ -58,6 +65,7 @@ impl Default for AppConfig {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum OpenWindow {
     VideoSettings,
+    AudioSettings,
     About,
     EmulationError,
 }
@@ -251,6 +259,36 @@ impl App {
                     });
                 });
 
+                ui.horizontal(|ui| {
+                    NumericTextInput::new(
+                        &mut self.state.window_width_text,
+                        &mut self.config.window_width,
+                        &mut self.state.window_width_invalid,
+                        1..=u32::MAX,
+                    )
+                        .desired_width(60.0)
+                        .ui(ui);
+                    ui.label("Window width in pixels");
+                });
+                if self.state.window_width_invalid {
+                    ui.colored_label(Color32::RED, "Window width must be a non-negative integer");
+                }
+
+                ui.horizontal(|ui| {
+                    NumericTextInput::new(
+                        &mut self.state.window_height_text,
+                        &mut self.config.window_height,
+                        &mut self.state.window_height_invalid,
+                        1..=u32::MAX
+                    )
+                        .desired_width(60.0)
+                        .ui(ui);
+                    ui.label("Window height in pixels");
+                });
+                if self.state.window_height_invalid {
+                    ui.colored_label(Color32::RED, "Window height must be a non-negative integer");
+                }
+
                 ui.group(|ui| {
                     ui.set_enabled(self.config.renderer == NativeRenderer::Wgpu);
 
@@ -304,36 +342,6 @@ impl App {
                     ui.radio_value(&mut self.config.aspect_ratio, AspectRatio::Stretched, "Stretched")
                         .on_hover_text("Image will be stretched to fill the entire display area");
                 });
-
-                ui.horizontal(|ui| {
-                    NumericTextInput::new(
-                        &mut self.state.window_width_text,
-                        &mut self.config.window_width,
-                        &mut self.state.window_width_invalid,
-                        1..=u32::MAX,
-                    )
-                        .desired_width(60.0)
-                        .ui(ui);
-                    ui.label("Window width in pixels");
-                });
-                if self.state.window_width_invalid {
-                    ui.colored_label(Color32::RED, "Window width must be a non-negative integer");
-                }
-
-                ui.horizontal(|ui| {
-                    NumericTextInput::new(
-                        &mut self.state.window_height_text,
-                        &mut self.config.window_height,
-                        &mut self.state.window_height_invalid,
-                        1..=u32::MAX
-                    )
-                        .desired_width(60.0)
-                        .ui(ui);
-                    ui.label("Window height in pixels");
-                });
-                if self.state.window_height_invalid {
-                    ui.colored_label(Color32::RED, "Window height must be a non-negative integer");
-                }
 
                 ui.group(|ui| {
                     ui.label("Overscan in pixels");
@@ -394,6 +402,22 @@ impl App {
                 });
             });
         if !video_settings_open {
+            self.state.open_window = None;
+        }
+    }
+
+    fn render_audio_settings_window(&mut self, ctx: &Context) {
+        let mut audio_settings_open = true;
+        Window::new("Audio Settings")
+            .resizable(false)
+            .open(&mut audio_settings_open)
+            .show(ctx, |ui| {
+                ui.checkbox(
+                    &mut self.config.sync_to_audio,
+                    "Sync emulation speed to audio",
+                );
+            });
+        if !audio_settings_open {
             self.state.open_window = None;
         }
     }
@@ -479,6 +503,11 @@ impl eframe::App for App {
                         self.state.open_window = Some(OpenWindow::VideoSettings);
                         ui.close_menu();
                     }
+
+                    if ui.button("Audio").clicked() {
+                        self.state.open_window = Some(OpenWindow::AudioSettings);
+                        ui.close_menu();
+                    }
                 });
 
                 ui.menu_button("Help", |ui| {
@@ -493,6 +522,9 @@ impl eframe::App for App {
         match self.state.open_window {
             Some(OpenWindow::VideoSettings) => {
                 self.render_video_settings_window(ctx);
+            }
+            Some(OpenWindow::AudioSettings) => {
+                self.render_audio_settings_window(ctx);
             }
             Some(OpenWindow::About) => {
                 self.render_about_window(ctx);
@@ -518,7 +550,7 @@ impl eframe::App for App {
                     *self.state.emulation_error.lock().unwrap() = None;
                 }
             }
-            _ => {}
+            None => {}
         }
 
         if prev_config != self.config {
@@ -548,6 +580,7 @@ fn launch_emulator<P: AsRef<Path>>(
             aspect_ratio: config.aspect_ratio,
             overscan: config.overscan,
             forced_integer_height_scaling: config.forced_integer_height_scaling,
+            sync_to_audio: config.sync_to_audio,
         })
         .unwrap();
 }

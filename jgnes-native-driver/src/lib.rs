@@ -23,7 +23,8 @@ use std::rc::Rc;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::{cmp, fs};
+use std::time::Duration;
+use std::{cmp, fs, thread};
 
 use crate::audio::LowPassFilter;
 pub use render::{GpuFilterMode, RenderScale};
@@ -158,15 +159,17 @@ fn determine_display_area(
 
 struct SdlAudioPlayer {
     audio_queue: AudioQueue<f32>,
+    sync_to_audio: bool,
     sample_queue: Vec<f32>,
     low_pass_filter: LowPassFilter,
     sample_count: u64,
 }
 
 impl SdlAudioPlayer {
-    fn new(audio_queue: AudioQueue<f32>) -> Self {
+    fn new(audio_queue: AudioQueue<f32>, sync_to_audio: bool) -> Self {
         Self {
             audio_queue,
+            sync_to_audio,
             sample_queue: Vec::new(),
             low_pass_filter: LowPassFilter::new(),
             sample_count: 0,
@@ -196,6 +199,11 @@ impl AudioPlayer for SdlAudioPlayer {
                 .queue_audio(&self.sample_queue)
                 .map_err(anyhow::Error::msg)?;
             self.sample_queue.clear();
+
+            // 2048 samples * 4 bytes per sample
+            while self.sync_to_audio && self.audio_queue.size() >= 8192 {
+                thread::sleep(Duration::from_micros(250));
+            }
         }
 
         Ok(())
@@ -406,6 +414,7 @@ pub struct JgnesNativeConfig {
     pub aspect_ratio: AspectRatio,
     pub overscan: Overscan,
     pub forced_integer_height_scaling: bool,
+    pub sync_to_audio: bool,
 }
 
 impl Display for JgnesNativeConfig {
@@ -422,6 +431,7 @@ impl Display for JgnesNativeConfig {
             "forced_integer_height_scaling: {}",
             self.forced_integer_height_scaling
         )?;
+        writeln!(f, "sync_to_audio: {}", self.sync_to_audio)?;
 
         Ok(())
     }
@@ -497,7 +507,7 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
         )
         .map_err(anyhow::Error::msg)?;
     audio_queue.resume();
-    let audio_player = SdlAudioPlayer::new(audio_queue);
+    let audio_player = SdlAudioPlayer::new(audio_queue, config.sync_to_audio);
 
     let input_poller = SdlInputPoller {
         joypad_state: Rc::default(),

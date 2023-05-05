@@ -188,24 +188,28 @@ impl AudioPlayer for SdlAudioPlayer {
         self.low_pass_filter.collect_sample(sample);
 
         // TODO don't hardcode frequencies
-        if (prev_count as f64 * 48000.0 / 1789772.73 * 60.0988 / 60.0).round() as u64
-            != (self.sample_count as f64 * 48000.0 / 1789772.73 * 60.0988 / 60.0).round() as u64
+        if (prev_count as f64 * 48000.0 / 1789772.72727273 * 60.0988 / 60.0).round() as u64
+            != (self.sample_count as f64 * 48000.0 / 1789772.72727273 * 60.0988 / 60.0).round()
+                as u64
         {
             self.sample_queue
                 .push(self.low_pass_filter.output_sample() as f32);
         }
 
         // Arbitrary threshold
-        if self.sample_queue.len() >= 32 {
-            self.audio_queue
-                .queue_audio(&self.sample_queue)
-                .map_err(anyhow::Error::msg)?;
-            self.sample_queue.clear();
-
+        if self.sample_queue.len() >= 16 {
             // 2048 samples * 4 bytes per sample
             while self.sync_to_audio && self.audio_queue.size() >= 8192 {
                 thread::sleep(Duration::from_micros(250));
             }
+
+            if self.audio_queue.size() < 8192 {
+                self.audio_queue
+                    .queue_audio(&self.sample_queue)
+                    .map_err(anyhow::Error::msg)?;
+            }
+            // If audio sync is disabled, intentionally drop samples while the audio queue is full
+            self.sample_queue.clear();
         }
 
         Ok(())

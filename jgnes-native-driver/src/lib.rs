@@ -156,15 +156,30 @@ fn determine_display_area(
 
 struct SdlAudioPlayer {
     audio_queue: AudioQueue<f32>,
+    sample_queue: Vec<f32>,
+    sample_count: u64,
 }
 
 impl AudioPlayer for SdlAudioPlayer {
     type Err = anyhow::Error;
 
-    fn push_samples(&mut self, samples: &[f32]) -> Result<(), Self::Err> {
-        self.audio_queue
-            .queue_audio(samples)
-            .map_err(anyhow::Error::msg)?;
+    fn push_sample(&mut self, sample: f64) -> Result<(), Self::Err> {
+        let prev_count = self.sample_count;
+        self.sample_count += 1;
+
+        // TODO don't hardcode frequencies
+        if (prev_count as f64 * 48000.0 / 1789772.73 * 60.0988 / 60.0).round() as u64
+            != (self.sample_count as f64 * 48000.0 / 1789772.73 * 60.0988 / 60.0).round() as u64
+        {
+            self.sample_queue.push(sample as f32);
+        }
+
+        if self.sample_queue.len() >= 256 {
+            self.audio_queue
+                .queue_audio(&self.sample_queue)
+                .map_err(anyhow::Error::msg)?;
+            self.sample_queue.clear();
+        }
 
         Ok(())
     }
@@ -465,7 +480,11 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
         )
         .map_err(anyhow::Error::msg)?;
     audio_queue.resume();
-    let audio_player = SdlAudioPlayer { audio_queue };
+    let audio_player = SdlAudioPlayer {
+        audio_queue,
+        sample_queue: vec![],
+        sample_count: 0,
+    };
 
     let input_poller = SdlInputPoller {
         joypad_state: Rc::default(),

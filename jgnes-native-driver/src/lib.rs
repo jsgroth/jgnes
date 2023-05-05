@@ -1,3 +1,4 @@
+mod audio;
 mod colors;
 mod render;
 
@@ -24,6 +25,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::{cmp, fs};
 
+use crate::audio::LowPassFilter;
 pub use render::{GpuFilterMode, RenderScale};
 
 struct SdlRenderer<'a> {
@@ -157,7 +159,19 @@ fn determine_display_area(
 struct SdlAudioPlayer {
     audio_queue: AudioQueue<f32>,
     sample_queue: Vec<f32>,
+    low_pass_filter: LowPassFilter,
     sample_count: u64,
+}
+
+impl SdlAudioPlayer {
+    fn new(audio_queue: AudioQueue<f32>) -> Self {
+        Self {
+            audio_queue,
+            sample_queue: Vec::new(),
+            low_pass_filter: LowPassFilter::new(),
+            sample_count: 0,
+        }
+    }
 }
 
 impl AudioPlayer for SdlAudioPlayer {
@@ -167,11 +181,14 @@ impl AudioPlayer for SdlAudioPlayer {
         let prev_count = self.sample_count;
         self.sample_count += 1;
 
+        self.low_pass_filter.collect_sample(sample);
+
         // TODO don't hardcode frequencies
         if (prev_count as f64 * 48000.0 / 1789772.73 * 60.0988 / 60.0).round() as u64
             != (self.sample_count as f64 * 48000.0 / 1789772.73 * 60.0988 / 60.0).round() as u64
         {
-            self.sample_queue.push(sample as f32);
+            self.sample_queue
+                .push(self.low_pass_filter.output_sample() as f32);
         }
 
         if self.sample_queue.len() >= 256 {
@@ -480,11 +497,7 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
         )
         .map_err(anyhow::Error::msg)?;
     audio_queue.resume();
-    let audio_player = SdlAudioPlayer {
-        audio_queue,
-        sample_queue: vec![],
-        sample_count: 0,
-    };
+    let audio_player = SdlAudioPlayer::new(audio_queue);
 
     let input_poller = SdlInputPoller {
         joypad_state: Rc::default(),

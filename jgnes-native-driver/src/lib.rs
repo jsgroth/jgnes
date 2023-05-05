@@ -195,7 +195,8 @@ impl AudioPlayer for SdlAudioPlayer {
                 .push(self.low_pass_filter.output_sample() as f32);
         }
 
-        if self.sample_queue.len() >= 256 {
+        // Arbitrary threshold
+        if self.sample_queue.len() >= 32 {
             self.audio_queue
                 .queue_audio(&self.sample_queue)
                 .map_err(anyhow::Error::msg)?;

@@ -6,9 +6,9 @@ use std::ops::Range;
 const COLOR_MAPPING: &[u8; 8 * 64 * 3] = include_bytes!("nespalette.pal");
 
 fn get_color_emphasis_offset(color_emphasis: ColorEmphasis) -> u16 {
-    64 * u16::from(color_emphasis.red)
-        + 128 * u16::from(color_emphasis.green)
-        + 256 * u16::from(color_emphasis.blue)
+    3 * 64 * u16::from(color_emphasis.red)
+        + 3 * 128 * u16::from(color_emphasis.green)
+        + 3 * 256 * u16::from(color_emphasis.blue)
 }
 
 fn clear_rows_rgb(rows: Range<usize>, pixels: &mut [u8], pitch: usize) {

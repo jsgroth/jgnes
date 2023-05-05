@@ -98,17 +98,19 @@ impl Display for GpuFilterMode {
 }
 
 pub(crate) struct WgpuRenderer {
-    _window: Window,
+    window: Window,
     render_config: RendererConfig,
     output_buffer: Vec<u8>,
     device: wgpu::Device,
     queue: wgpu::Queue,
     surface: wgpu::Surface,
+    surface_config: wgpu::SurfaceConfiguration,
     texture: wgpu::Texture,
     compute_bind_group: wgpu::BindGroup,
     compute_pipeline: Option<wgpu::ComputePipeline>,
     render_bind_group: wgpu::BindGroup,
     render_pipeline: wgpu::RenderPipeline,
+    vertices: Vec<Vertex2d>,
     vertex_buffer: wgpu::Buffer,
 }
 
@@ -164,7 +166,7 @@ impl WgpuRenderer {
             .copied()
             .find(wgpu::TextureFormat::is_srgb)
             .ok_or_else(|| anyhow::Error::msg("Unable to find an sRGB wgpu surface format"))?;
-        let config = wgpu::SurfaceConfiguration {
+        let surface_config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
             width: window_width,
@@ -173,7 +175,7 @@ impl WgpuRenderer {
             alpha_mode: surface_capabilities.alpha_modes[0],
             view_formats: vec![],
         };
-        surface.configure(&device, &config);
+        surface.configure(&device, &surface_config);
 
         // TODO configurable dimensions
         let texture_size = wgpu::Extent3d {
@@ -231,29 +233,11 @@ impl WgpuRenderer {
             ..wgpu::SamplerDescriptor::default()
         });
 
-        let display_area = super::determine_display_area(
-            window_width,
-            window_height,
-            render_config.aspect_ratio,
-            render_config.forced_integer_height_scaling,
-        );
-        let vertices: Vec<_> = VERTICES
-            .into_iter()
-            .map(|vertex| Vertex2d {
-                position: [
-                    (f64::from(vertex.position[0]) * f64::from(display_area.width)
-                        / f64::from(window_width)) as f32,
-                    (f64::from(vertex.position[1]) * f64::from(display_area.height)
-                        / f64::from(window_height)) as f32,
-                ],
-                texture_coords: vertex.texture_coords,
-            })
-            .collect();
-
+        let vertices = compute_vertices(window_width, window_height, &render_config);
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("vertex_buffer"),
             contents: bytemuck::cast_slice(&vertices),
-            usage: wgpu::BufferUsages::VERTEX,
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         });
 
         let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
@@ -397,7 +381,7 @@ impl WgpuRenderer {
                 module: &shader,
                 entry_point: "fs_main",
                 targets: &[Some(wgpu::ColorTargetState {
-                    format: config.format,
+                    format: surface_config.format,
                     blend: Some(wgpu::BlendState::REPLACE),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
@@ -406,20 +390,61 @@ impl WgpuRenderer {
         });
 
         Ok(Self {
-            _window: window,
+            window,
             render_config,
             output_buffer,
             device,
             queue,
             surface,
+            surface_config,
             texture,
             compute_bind_group,
             compute_pipeline,
             render_bind_group,
             render_pipeline,
+            vertices,
             vertex_buffer,
         })
     }
+
+    pub(crate) fn window_mut(&mut self) -> &mut Window {
+        &mut self.window
+    }
+
+    pub(crate) fn reconfigure_surface(&mut self) {
+        let (window_width, window_height) = self.window.size();
+        self.surface_config.width = window_width;
+        self.surface_config.height = window_height;
+
+        self.surface.configure(&self.device, &self.surface_config);
+
+        self.vertices = compute_vertices(window_width, window_height, &self.render_config);
+    }
+}
+
+fn compute_vertices(
+    window_width: u32,
+    window_height: u32,
+    render_config: &RendererConfig,
+) -> Vec<Vertex2d> {
+    let display_area = super::determine_display_area(
+        window_width,
+        window_height,
+        render_config.aspect_ratio,
+        render_config.forced_integer_height_scaling,
+    );
+    VERTICES
+        .into_iter()
+        .map(|vertex| Vertex2d {
+            position: [
+                (f64::from(vertex.position[0]) * f64::from(display_area.width)
+                    / f64::from(window_width)) as f32,
+                (f64::from(vertex.position[1]) * f64::from(display_area.height)
+                    / f64::from(window_height)) as f32,
+            ],
+            texture_coords: vertex.texture_coords,
+        })
+        .collect()
 }
 
 impl Renderer for WgpuRenderer {
@@ -430,6 +455,9 @@ impl Renderer for WgpuRenderer {
         frame_buffer: &FrameBuffer,
         color_emphasis: ColorEmphasis,
     ) -> Result<(), Self::Err> {
+        self.queue
+            .write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&self.vertices));
+
         colors::to_rgba(
             frame_buffer,
             color_emphasis,

@@ -44,6 +44,8 @@ struct AppConfig {
     forced_integer_height_scaling: bool,
     #[serde(default = "true_fn")]
     sync_to_audio: bool,
+    #[serde(default)]
+    launch_fullscreen: bool,
 }
 
 impl Default for AppConfig {
@@ -58,6 +60,7 @@ impl Default for AppConfig {
             overscan: Overscan::default(),
             forced_integer_height_scaling: false,
             sync_to_audio: true,
+            launch_fullscreen: false,
         }
     }
 }
@@ -258,6 +261,8 @@ impl App {
                         ui.radio_value(&mut self.config.renderer, NativeRenderer::Sdl2, "SDL2");
                     });
                 });
+
+                ui.checkbox(&mut self.config.launch_fullscreen, "Launch in fullscreen");
 
                 ui.horizontal(|ui| {
                     NumericTextInput::new(
@@ -581,6 +586,7 @@ fn launch_emulator<P: AsRef<Path>>(
             overscan: config.overscan,
             forced_integer_height_scaling: config.forced_integer_height_scaling,
             sync_to_audio: config.sync_to_audio,
+            launch_fullscreen: config.launch_fullscreen,
         })
         .unwrap();
 }

@@ -8,11 +8,12 @@ use jgnes_core::{
     Renderer, SaveWriter,
 };
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
-use sdl2::event::Event;
+use sdl2::event::{Event, WindowEvent};
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::{Color, PixelFormatEnum};
 use sdl2::rect::Rect;
 use sdl2::render::{Texture, TextureCreator, WindowCanvas};
+use sdl2::video::{FullscreenType, Window};
 use sdl2::EventPump;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
@@ -415,6 +416,7 @@ pub struct JgnesNativeConfig {
     pub overscan: Overscan,
     pub forced_integer_height_scaling: bool,
     pub sync_to_audio: bool,
+    pub launch_fullscreen: bool,
 }
 
 impl Display for JgnesNativeConfig {
@@ -432,6 +434,7 @@ impl Display for JgnesNativeConfig {
             self.forced_integer_height_scaling
         )?;
         writeln!(f, "sync_to_audio: {}", self.sync_to_audio)?;
+        writeln!(f, "launch_fullscreen: {}", self.launch_fullscreen)?;
 
         Ok(())
     }
@@ -448,6 +451,32 @@ struct RendererConfig {
     aspect_ratio: AspectRatio,
     overscan: Overscan,
     forced_integer_height_scaling: bool,
+}
+
+trait SdlWindowRenderer {
+    fn window_mut(&mut self) -> &mut Window;
+
+    fn reconfigure(&mut self);
+}
+
+impl<'a> SdlWindowRenderer for SdlRenderer<'a> {
+    fn window_mut(&mut self) -> &mut Window {
+        self.canvas.window_mut()
+    }
+
+    fn reconfigure(&mut self) {
+        // nothing to do
+    }
+}
+
+impl SdlWindowRenderer for WgpuRenderer {
+    fn window_mut(&mut self) -> &mut Window {
+        self.window_mut()
+    }
+
+    fn reconfigure(&mut self) {
+        self.reconfigure_surface();
+    }
 }
 
 /// Run the emulator in a loop until it terminates.
@@ -474,13 +503,15 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
 
     sdl_ctx.mouse().show_cursor(false);
 
-    let window = video_subsystem
-        .window(
-            &format!("jgnes - {file_name}"),
-            config.window_width,
-            config.window_height,
-        )
-        .build()?;
+    let mut window_builder = video_subsystem.window(
+        &format!("jgnes - {file_name}"),
+        config.window_width,
+        config.window_height,
+    );
+    if config.launch_fullscreen {
+        window_builder.fullscreen_desktop();
+    }
+    let window = window_builder.build()?;
     let mut canvas = window.into_canvas().present_vsync().build()?;
 
     canvas.set_draw_color(Color::RGB(0, 0, 0));
@@ -569,7 +600,7 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
 }
 
 fn run_emulator<
-    R: Renderer<Err = anyhow::Error>,
+    R: Renderer<Err = anyhow::Error> + SdlWindowRenderer,
     A: AudioPlayer<Err = anyhow::Error>,
     I: InputPoller,
     S: SaveWriter<Err = anyhow::Error>,
@@ -604,11 +635,31 @@ fn run_emulator<
                     } => {
                         return Ok(());
                     }
+                    Event::Window { win_event, .. } => match win_event {
+                        WindowEvent::FocusGained
+                        | WindowEvent::FocusLost
+                        | WindowEvent::SizeChanged(..)
+                        | WindowEvent::Resized(..) => {
+                            emulator.get_renderer_mut().reconfigure();
+                        }
+                        _ => {}
+                    },
                     Event::KeyDown {
                         keycode: Some(keycode),
                         ..
                     } => {
                         input_handler.key_down(keycode);
+
+                        if keycode == Keycode::F9 {
+                            let window = emulator.get_renderer_mut().window_mut();
+                            let new_fullscreen = match window.fullscreen_state() {
+                                FullscreenType::Off => FullscreenType::Desktop,
+                                _ => FullscreenType::Off,
+                            };
+                            window
+                                .set_fullscreen(new_fullscreen)
+                                .map_err(anyhow::Error::msg)?;
+                        }
                     }
                     Event::KeyUp {
                         keycode: Some(keycode),

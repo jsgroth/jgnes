@@ -13,7 +13,6 @@ pub(crate) fn start(
     let (sender, receiver) = mpsc::channel();
 
     thread::spawn(move || {
-        // TODO maybe better way of reporting unsupported VSync mode errors than killing the process
         std::panic::set_hook(Box::new(|panic_info| {
             log::error!("Emulation thread panicked, killing process: {panic_info}");
             process::exit(1);

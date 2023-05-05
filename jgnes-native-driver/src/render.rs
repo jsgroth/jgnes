@@ -168,18 +168,29 @@ impl WgpuRenderer {
             .copied()
             .find(wgpu::TextureFormat::is_srgb)
             .ok_or_else(|| anyhow::Error::msg("Unable to find an sRGB wgpu surface format"))?;
-        let present_mode = match render_config.vsync_mode {
+        let desired_present_mode = match render_config.vsync_mode {
             VSyncMode::Enabled => wgpu::PresentMode::Fifo,
             VSyncMode::Disabled => wgpu::PresentMode::Immediate,
             VSyncMode::Fast => wgpu::PresentMode::Mailbox,
             VSyncMode::Adaptive => wgpu::PresentMode::FifoRelaxed,
         };
+
+        if !surface_capabilities
+            .present_modes
+            .contains(&desired_present_mode)
+        {
+            return Err(anyhow::Error::msg(format!(
+                "GPU hardware/driver does not support VSync mode {} (wgpu present mode {desired_present_mode:?}); supported present modes are {:?}",
+                render_config.vsync_mode, surface_capabilities.present_modes
+            )));
+        }
+
         let surface_config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
             width: window_width,
             height: window_height,
-            present_mode,
+            present_mode: desired_present_mode,
             alpha_mode: surface_capabilities.alpha_modes[0],
             view_formats: vec![],
         };

@@ -12,6 +12,7 @@ use sdl2::keyboard::Keycode;
 use sdl2::pixels::{Color, PixelFormatEnum};
 use sdl2::rect::Rect;
 use sdl2::render::{Texture, TextureCreator, WindowCanvas};
+use sdl2::EventPump;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::ffi::OsStr;
@@ -453,28 +454,6 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
 
     let texture_creator = canvas.texture_creator();
 
-    let (window_width, window_height) = canvas.window().size();
-    let display_area = determine_display_area(
-        window_width,
-        window_height,
-        config.aspect_ratio,
-        config.forced_integer_height_scaling,
-    );
-    log::info!(
-        "Setting display area to {}x{} pixels with window size of {window_width}x{window_height} and aspect ratio {}",
-        display_area.width, display_area.height, config.aspect_ratio
-    );
-
-    let renderer: Box<dyn Renderer<Err = anyhow::Error>> = match config.renderer {
-        NativeRenderer::Sdl2 => {
-            Box::new(SdlRenderer::new(canvas, &texture_creator, renderer_config)?)
-        }
-        NativeRenderer::Wgpu => Box::new(WgpuRenderer::from_window(
-            canvas.into_window(),
-            renderer_config,
-        )?),
-    };
-
     let audio_queue = audio_subsystem
         .open_queue(
             None,
@@ -491,7 +470,7 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
     let input_poller = SdlInputPoller {
         joypad_state: Rc::default(),
     };
-    let mut input_handler = SdlInputHandler {
+    let input_handler = SdlInputHandler {
         joypad_state: Rc::clone(&input_poller.joypad_state),
     };
 
@@ -505,17 +484,59 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
         log::info!("Loaded SRAM from {}", sav_path.display());
     }
 
-    let mut event_pump = sdl_ctx.event_pump().map_err(anyhow::Error::msg)?;
+    let event_pump = sdl_ctx.event_pump().map_err(anyhow::Error::msg)?;
 
-    let mut emulator = Emulator::create(
-        rom_bytes,
-        sav_bytes,
-        renderer,
-        audio_player,
-        input_poller,
-        save_writer,
-    )?;
+    let (window_width, window_height) = canvas.window().size();
+    let display_area = determine_display_area(
+        window_width,
+        window_height,
+        config.aspect_ratio,
+        config.forced_integer_height_scaling,
+    );
+    log::info!(
+        "Setting display area to {}x{} pixels with window size of {window_width}x{window_height} and aspect ratio {}",
+        display_area.width, display_area.height, config.aspect_ratio
+    );
 
+    match config.renderer {
+        NativeRenderer::Sdl2 => {
+            let renderer = SdlRenderer::new(canvas, &texture_creator, renderer_config)?;
+            let emulator = Emulator::create(
+                rom_bytes,
+                sav_bytes,
+                renderer,
+                audio_player,
+                input_poller,
+                save_writer,
+            )?;
+            run_emulator(emulator, dynamic_config, event_pump, input_handler)
+        }
+        NativeRenderer::Wgpu => {
+            let renderer = WgpuRenderer::from_window(canvas.into_window(), renderer_config)?;
+            let emulator = Emulator::create(
+                rom_bytes,
+                sav_bytes,
+                renderer,
+                audio_player,
+                input_poller,
+                save_writer,
+            )?;
+            run_emulator(emulator, dynamic_config, event_pump, input_handler)
+        }
+    }
+}
+
+fn run_emulator<
+    R: Renderer<Err = anyhow::Error>,
+    A: AudioPlayer<Err = anyhow::Error>,
+    I: InputPoller,
+    S: SaveWriter<Err = anyhow::Error>,
+>(
+    mut emulator: Emulator<R, A, I, S>,
+    dynamic_config: JgnesDynamicConfig,
+    mut event_pump: EventPump,
+    mut input_handler: SdlInputHandler,
+) -> anyhow::Result<()> {
     let mut ticks = 0_u64;
     loop {
         if let Err(err) = emulator.tick() {

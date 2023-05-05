@@ -1,7 +1,7 @@
 // The generated Copy impl for Vertex2d violates this rule for some reason
 #![allow(clippy::let_underscore_untyped)]
 
-use crate::{colors, RendererConfig};
+use crate::{colors, RendererConfig, VSyncMode};
 use jgnes_core::{ColorEmphasis, FrameBuffer, Renderer};
 use sdl2::video::Window;
 use serde::{Deserialize, Serialize};
@@ -168,10 +168,11 @@ impl WgpuRenderer {
             .copied()
             .find(wgpu::TextureFormat::is_srgb)
             .ok_or_else(|| anyhow::Error::msg("Unable to find an sRGB wgpu surface format"))?;
-        let present_mode = if render_config.vsync_enabled {
-            wgpu::PresentMode::Fifo
-        } else {
-            wgpu::PresentMode::Immediate
+        let present_mode = match render_config.vsync_mode {
+            VSyncMode::Enabled => wgpu::PresentMode::Fifo,
+            VSyncMode::Disabled => wgpu::PresentMode::Immediate,
+            VSyncMode::Fast => wgpu::PresentMode::Mailbox,
+            VSyncMode::Adaptive => wgpu::PresentMode::FifoRelaxed,
         };
         let surface_config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,

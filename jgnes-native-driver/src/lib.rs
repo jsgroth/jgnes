@@ -410,6 +410,40 @@ impl Display for Overscan {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum VSyncMode {
+    #[default]
+    Enabled,
+    Disabled,
+    Fast,
+    Adaptive,
+}
+
+impl Display for VSyncMode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Enabled => write!(f, "Enabled"),
+            Self::Disabled => write!(f, "Disabled"),
+            Self::Fast => write!(f, "Fast"),
+            Self::Adaptive => write!(f, "Adaptive"),
+        }
+    }
+}
+
+impl FromStr for VSyncMode {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Enabled" => Ok(Self::Enabled),
+            "Disabled" => Ok(Self::Disabled),
+            "Fast" => Ok(Self::Fast),
+            "Adaptive" => Ok(Self::Adaptive),
+            _ => Err(format!("invalid VSync mode string: {s}")),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct JgnesNativeConfig {
     pub nes_file_path: String,
@@ -420,7 +454,7 @@ pub struct JgnesNativeConfig {
     pub aspect_ratio: AspectRatio,
     pub overscan: Overscan,
     pub forced_integer_height_scaling: bool,
-    pub vsync_enabled: bool,
+    pub vsync_mode: VSyncMode,
     pub sync_to_audio: bool,
     pub launch_fullscreen: bool,
 }
@@ -439,7 +473,7 @@ impl Display for JgnesNativeConfig {
             "forced_integer_height_scaling: {}",
             self.forced_integer_height_scaling
         )?;
-        writeln!(f, "vsync_enabled: {}", self.vsync_enabled)?;
+        writeln!(f, "vsync_mode: {}", self.vsync_mode)?;
         writeln!(f, "sync_to_audio: {}", self.sync_to_audio)?;
         writeln!(f, "launch_fullscreen: {}", self.launch_fullscreen)?;
 
@@ -454,7 +488,7 @@ pub struct JgnesDynamicConfig {
 
 #[derive(Debug, Clone)]
 struct RendererConfig {
-    vsync_enabled: bool,
+    vsync_mode: VSyncMode,
     gpu_filter_mode: GpuFilterMode,
     aspect_ratio: AspectRatio,
     overscan: Overscan,
@@ -522,7 +556,7 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
     let window = window_builder.build()?;
 
     let renderer_config = RendererConfig {
-        vsync_enabled: config.vsync_enabled,
+        vsync_mode: config.vsync_mode,
         gpu_filter_mode: config.gpu_filter_mode,
         aspect_ratio: config.aspect_ratio,
         overscan: config.overscan.validate()?,
@@ -576,7 +610,7 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
     match config.renderer {
         NativeRenderer::Sdl2 => {
             let mut canvas_builder = window.into_canvas();
-            if config.vsync_enabled {
+            if config.vsync_mode == VSyncMode::Enabled {
                 canvas_builder = canvas_builder.present_vsync();
             }
             let canvas = canvas_builder.build()?;

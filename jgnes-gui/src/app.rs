@@ -7,7 +7,7 @@ use egui::{
 };
 use jgnes_native_driver::{
     AspectRatio, GpuFilterMode, JgnesDynamicConfig, JgnesNativeConfig, NativeRenderer, Overscan,
-    RenderScale,
+    RenderScale, VSyncMode,
 };
 use rfd::FileDialog;
 use serde::{Deserialize, Serialize};
@@ -46,8 +46,8 @@ struct AppConfig {
     sync_to_audio: bool,
     #[serde(default)]
     launch_fullscreen: bool,
-    #[serde(default = "true_fn")]
-    vsync_enabled: bool,
+    #[serde(default)]
+    vsync_mode: VSyncMode,
 }
 
 impl Default for AppConfig {
@@ -63,7 +63,7 @@ impl Default for AppConfig {
             forced_integer_height_scaling: false,
             sync_to_audio: true,
             launch_fullscreen: false,
-            vsync_enabled: true,
+            vsync_mode: VSyncMode::Enabled,
         }
     }
 }
@@ -297,7 +297,20 @@ impl App {
                     ui.colored_label(Color32::RED, "Window height must be a non-negative integer");
                 }
 
-                ui.checkbox(&mut self.config.vsync_enabled, "VSync enabled");
+                ui.group(|ui| {
+                    ui.label("VSync mode");
+
+                    ui.horizontal(|ui| {
+                        ui.radio_value(&mut self.config.vsync_mode, VSyncMode::Enabled, "Enabled");
+                        ui.radio_value(&mut self.config.vsync_mode, VSyncMode::Disabled, "Disabled");
+
+                        ui.set_enabled(self.config.renderer == NativeRenderer::Wgpu);
+                        ui.radio_value(&mut self.config.vsync_mode, VSyncMode::Fast, "Fast")
+                            .on_disabled_hover_text("Fast VSync is only supported with the wgpu renderer");
+                        ui.radio_value(&mut self.config.vsync_mode, VSyncMode::Adaptive, "Adaptive")
+                            .on_disabled_hover_text("Adaptive VSync is only supported with the wgpu renderer");
+                    });
+                });
 
                 ui.group(|ui| {
                     ui.set_enabled(self.config.renderer == NativeRenderer::Wgpu);
@@ -590,7 +603,7 @@ fn launch_emulator<P: AsRef<Path>>(
             aspect_ratio: config.aspect_ratio,
             overscan: config.overscan,
             forced_integer_height_scaling: config.forced_integer_height_scaling,
-            vsync_enabled: config.vsync_enabled,
+            vsync_mode: config.vsync_mode,
             sync_to_audio: config.sync_to_audio,
             launch_fullscreen: config.launch_fullscreen,
         })

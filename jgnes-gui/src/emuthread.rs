@@ -2,7 +2,7 @@ use jgnes_native_driver::{JgnesDynamicConfig, JgnesNativeConfig};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{mpsc, Arc, Mutex};
-use std::thread;
+use std::{process, thread};
 
 #[must_use]
 pub(crate) fn start(
@@ -13,6 +13,12 @@ pub(crate) fn start(
     let (sender, receiver) = mpsc::channel();
 
     thread::spawn(move || loop {
+        // TODO maybe better way of reporting unsupported VSync mode errors than killing the process
+        std::panic::set_hook(Box::new(|panic_info| {
+            log::error!("Emulation thread panicked, killing process: {panic_info}");
+            process::exit(1);
+        }));
+
         let config = match receiver.recv() {
             Ok(config) => config,
             Err(err) => {

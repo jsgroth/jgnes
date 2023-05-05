@@ -2,6 +2,7 @@ use clap::Parser;
 use env_logger::Env;
 use jgnes_native_driver::{
     AspectRatio, GpuFilterMode, JgnesDynamicConfig, JgnesNativeConfig, NativeRenderer, Overscan,
+    VSyncMode,
 };
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
@@ -79,9 +80,9 @@ struct CliArgs {
     #[arg(long = "fullscreen", default_value_t)]
     launch_fullscreen: bool,
 
-    /// Disable VSync
-    #[arg(long = "no-vsync", default_value_t = true, action = clap::ArgAction::SetFalse)]
-    vsync_enabled: bool,
+    /// VSync mode (Enabled / Disabled / Fast / Adaptive)
+    #[arg(long = "no-vsync", default_value_t = VSyncMode::Enabled)]
+    vsync_mode: VSyncMode,
 
     /// Left overscan in pixels
     #[arg(long, default_value_t)]
@@ -134,7 +135,7 @@ fn main() -> anyhow::Result<()> {
         aspect_ratio: args.aspect_ratio,
         overscan,
         forced_integer_height_scaling: args.forced_integer_height_scaling,
-        vsync_enabled: args.vsync_enabled,
+        vsync_mode: args.vsync_mode,
         sync_to_audio: args.sync_to_audio,
         launch_fullscreen: args.launch_fullscreen,
     };

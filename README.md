@@ -126,7 +126,7 @@ cargo run --release --bin jgnes-gui
 | sprdma_and_dmc_dma/sprdma_and_dmc_dma.nes | ❌ | DMC DMA cycle stealing not implemented |
 | sprdma_and_dmc_dma/sprdma_and_dmc_dma_512.nes | ❌ | DMC DMA cycle stealing not implemented |
 
-### PPU Test ROMS
+### PPU Test ROMs
 
 | Test | Result | Failure Reason |
 | --- | --- | --- |

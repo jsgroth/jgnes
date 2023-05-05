@@ -81,7 +81,7 @@ struct CliArgs {
     launch_fullscreen: bool,
 
     /// VSync mode (Enabled / Disabled / Fast / Adaptive)
-    #[arg(long = "no-vsync", default_value_t = VSyncMode::Enabled)]
+    #[arg(long, default_value_t = VSyncMode::Enabled)]
     vsync_mode: VSyncMode,
 
     /// Left overscan in pixels

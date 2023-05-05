@@ -681,8 +681,15 @@ fn run_emulator<
                     Event::Window { win_event, .. } => match win_event {
                         WindowEvent::FocusGained
                         | WindowEvent::FocusLost
+                        | WindowEvent::TakeFocus
                         | WindowEvent::SizeChanged(..)
-                        | WindowEvent::Resized(..) => {
+                        | WindowEvent::Resized(..)
+                        | WindowEvent::Moved(..)
+                        | WindowEvent::DisplayChanged(..)
+                        | WindowEvent::Minimized
+                        | WindowEvent::Maximized
+                        | WindowEvent::Restored
+                        | WindowEvent::Shown => {
                             emulator.get_renderer_mut().reconfigure();
                         }
                         _ => {}

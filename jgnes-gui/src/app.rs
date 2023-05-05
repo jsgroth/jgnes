@@ -46,6 +46,8 @@ struct AppConfig {
     sync_to_audio: bool,
     #[serde(default)]
     launch_fullscreen: bool,
+    #[serde(default = "true_fn")]
+    vsync_enabled: bool,
 }
 
 impl Default for AppConfig {
@@ -61,6 +63,7 @@ impl Default for AppConfig {
             forced_integer_height_scaling: false,
             sync_to_audio: true,
             launch_fullscreen: false,
+            vsync_enabled: true,
         }
     }
 }
@@ -293,6 +296,8 @@ impl App {
                 if self.state.window_height_invalid {
                     ui.colored_label(Color32::RED, "Window height must be a non-negative integer");
                 }
+
+                ui.checkbox(&mut self.config.vsync_enabled, "VSync enabled");
 
                 ui.group(|ui| {
                     ui.set_enabled(self.config.renderer == NativeRenderer::Wgpu);
@@ -585,6 +590,7 @@ fn launch_emulator<P: AsRef<Path>>(
             aspect_ratio: config.aspect_ratio,
             overscan: config.overscan,
             forced_integer_height_scaling: config.forced_integer_height_scaling,
+            vsync_enabled: config.vsync_enabled,
             sync_to_audio: config.sync_to_audio,
             launch_fullscreen: config.launch_fullscreen,
         })

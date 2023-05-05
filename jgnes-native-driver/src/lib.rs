@@ -10,7 +10,7 @@ use jgnes_core::{
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
 use sdl2::event::{Event, WindowEvent};
 use sdl2::keyboard::Keycode;
-use sdl2::pixels::{Color, PixelFormatEnum};
+use sdl2::pixels::PixelFormatEnum;
 use sdl2::rect::Rect;
 use sdl2::render::{Texture, TextureCreator, WindowCanvas};
 use sdl2::video::{FullscreenType, Window};
@@ -420,6 +420,7 @@ pub struct JgnesNativeConfig {
     pub aspect_ratio: AspectRatio,
     pub overscan: Overscan,
     pub forced_integer_height_scaling: bool,
+    pub vsync_enabled: bool,
     pub sync_to_audio: bool,
     pub launch_fullscreen: bool,
 }
@@ -438,6 +439,7 @@ impl Display for JgnesNativeConfig {
             "forced_integer_height_scaling: {}",
             self.forced_integer_height_scaling
         )?;
+        writeln!(f, "vsync_enabled: {}", self.vsync_enabled)?;
         writeln!(f, "sync_to_audio: {}", self.sync_to_audio)?;
         writeln!(f, "launch_fullscreen: {}", self.launch_fullscreen)?;
 
@@ -452,6 +454,7 @@ pub struct JgnesDynamicConfig {
 
 #[derive(Debug, Clone)]
 struct RendererConfig {
+    vsync_enabled: bool,
     gpu_filter_mode: GpuFilterMode,
     aspect_ratio: AspectRatio,
     overscan: Overscan,
@@ -517,20 +520,14 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
         window_builder.fullscreen_desktop();
     }
     let window = window_builder.build()?;
-    let mut canvas = window.into_canvas().present_vsync().build()?;
-
-    canvas.set_draw_color(Color::RGB(0, 0, 0));
-    canvas.clear();
-    canvas.present();
 
     let renderer_config = RendererConfig {
+        vsync_enabled: config.vsync_enabled,
         gpu_filter_mode: config.gpu_filter_mode,
         aspect_ratio: config.aspect_ratio,
         overscan: config.overscan.validate()?,
         forced_integer_height_scaling: config.forced_integer_height_scaling,
     };
-
-    let texture_creator = canvas.texture_creator();
 
     let audio_queue = audio_subsystem
         .open_queue(
@@ -564,7 +561,7 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
 
     let event_pump = sdl_ctx.event_pump().map_err(anyhow::Error::msg)?;
 
-    let (window_width, window_height) = canvas.window().size();
+    let (window_width, window_height) = window.size();
     let display_area = determine_display_area(
         window_width,
         window_height,
@@ -578,7 +575,14 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
 
     match config.renderer {
         NativeRenderer::Sdl2 => {
+            let mut canvas_builder = window.into_canvas();
+            if config.vsync_enabled {
+                canvas_builder = canvas_builder.present_vsync();
+            }
+            let canvas = canvas_builder.build()?;
+            let texture_creator = canvas.texture_creator();
             let renderer = SdlRenderer::new(canvas, &texture_creator, renderer_config)?;
+
             let emulator = Emulator::create(
                 rom_bytes,
                 sav_bytes,
@@ -590,7 +594,7 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
             run_emulator(emulator, dynamic_config, event_pump, input_handler)
         }
         NativeRenderer::Wgpu => {
-            let renderer = WgpuRenderer::from_window(canvas.into_window(), renderer_config)?;
+            let renderer = WgpuRenderer::from_window(window, renderer_config)?;
             let emulator = Emulator::create(
                 rom_bytes,
                 sav_bytes,

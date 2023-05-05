@@ -79,6 +79,10 @@ struct CliArgs {
     #[arg(long = "fullscreen", default_value_t)]
     launch_fullscreen: bool,
 
+    /// Disable VSync
+    #[arg(long = "no-vsync", default_value_t = true, action = clap::ArgAction::SetFalse)]
+    vsync_enabled: bool,
+
     /// Left overscan in pixels
     #[arg(long, default_value_t)]
     overscan_left: u8,
@@ -130,6 +134,7 @@ fn main() -> anyhow::Result<()> {
         aspect_ratio: args.aspect_ratio,
         overscan,
         forced_integer_height_scaling: args.forced_integer_height_scaling,
+        vsync_enabled: args.vsync_enabled,
         sync_to_audio: args.sync_to_audio,
         launch_fullscreen: args.launch_fullscreen,
     };

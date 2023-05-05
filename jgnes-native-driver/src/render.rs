@@ -166,12 +166,17 @@ impl WgpuRenderer {
             .copied()
             .find(wgpu::TextureFormat::is_srgb)
             .ok_or_else(|| anyhow::Error::msg("Unable to find an sRGB wgpu surface format"))?;
+        let present_mode = if render_config.vsync_enabled {
+            wgpu::PresentMode::Fifo
+        } else {
+            wgpu::PresentMode::Immediate
+        };
         let surface_config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
             width: window_width,
             height: window_height,
-            present_mode: wgpu::PresentMode::Fifo,
+            present_mode,
             alpha_mode: surface_capabilities.alpha_modes[0],
             view_formats: vec![],
         };

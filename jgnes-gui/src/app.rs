@@ -58,6 +58,7 @@ impl Default for AppConfig {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum OpenWindow {
     VideoSettings,
+    About,
     EmulationError,
 }
 
@@ -396,6 +397,34 @@ impl App {
             self.state.open_window = None;
         }
     }
+
+    fn render_about_window(&mut self, ctx: &Context) {
+        let mut about_open = true;
+        Window::new("About")
+            .resizable(false)
+            .open(&mut about_open)
+            .show(ctx, |ui| {
+                ui.heading("jgnes");
+
+                ui.add_space(10.0);
+
+                ui.label(format!("Version: {}", env!("CARGO_PKG_VERSION")));
+
+                ui.add_space(15.0);
+
+                ui.label("Copyright © 2023 James Groth");
+
+                ui.add_space(15.0);
+
+                ui.horizontal(|ui| {
+                    ui.label("Source code:");
+                    ui.hyperlink("https://github.com/jsgroth/jgnes");
+                });
+            });
+        if !about_open {
+            self.state.open_window = None;
+        }
+    }
 }
 
 fn load_config(path: &PathBuf) -> Result<AppConfig, anyhow::Error> {
@@ -451,12 +480,22 @@ impl eframe::App for App {
                         ui.close_menu();
                     }
                 });
+
+                ui.menu_button("Help", |ui| {
+                    if ui.button("About").clicked() {
+                        self.state.open_window = Some(OpenWindow::About);
+                        ui.close_menu();
+                    }
+                });
             });
         });
 
         match self.state.open_window {
             Some(OpenWindow::VideoSettings) => {
                 self.render_video_settings_window(ctx);
+            }
+            Some(OpenWindow::About) => {
+                self.render_about_window(ctx);
             }
             Some(OpenWindow::EmulationError) => {
                 let mut error_open = true;

@@ -1,4 +1,5 @@
 use eframe::NativeOptions;
+use egui::Vec2;
 use env_logger::Env;
 use jgnes_gui::App;
 use std::path::PathBuf;
@@ -10,7 +11,10 @@ fn main() -> eframe::Result<()> {
     // TODO configurability
     let config_path = PathBuf::from_str("jgnes-config.toml").unwrap();
 
-    let options = NativeOptions::default();
+    let options = NativeOptions {
+        initial_window_size: Some(Vec2::new(800.0, 600.0)),
+        ..NativeOptions::default()
+    };
 
     eframe::run_native(
         "jgnes",

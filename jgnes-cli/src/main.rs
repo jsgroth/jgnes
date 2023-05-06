@@ -2,7 +2,7 @@ use clap::Parser;
 use env_logger::Env;
 use jgnes_native_driver::{
     AspectRatio, GpuFilterMode, InputConfig, JgnesDynamicConfig, JgnesNativeConfig, NativeRenderer,
-    Overscan, VSyncMode,
+    Overscan, VSyncMode, WgpuBackend,
 };
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
@@ -55,6 +55,10 @@ struct CliArgs {
     /// Renderer (Sdl2 / Wgpu)
     #[arg(long, default_value_t = NativeRenderer::Sdl2)]
     renderer: NativeRenderer,
+
+    /// Wgpu backend (Auto / Vulkan / Direct3d12 / Metal)
+    #[arg(long, default_value_t)]
+    wgpu_backend: WgpuBackend,
 
     /// GPU filter type (NearestNeighbor / Linear)
     #[arg(long, default_value_t = GpuFilterType::Linear)]
@@ -131,6 +135,7 @@ fn main() -> anyhow::Result<()> {
         window_width: args.window_width,
         window_height: args.window_height,
         renderer: args.renderer,
+        wgpu_backend: args.wgpu_backend,
         gpu_filter_mode,
         aspect_ratio: args.aspect_ratio,
         overscan,

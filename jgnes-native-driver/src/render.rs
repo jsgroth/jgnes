@@ -134,7 +134,7 @@ impl WgpuRenderer {
         ];
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::PRIMARY,
+            backends: render_config.wgpu_backend.to_wgpu_backends(),
             dx12_shader_compiler: wgpu::Dx12Compiler::default(),
         });
 

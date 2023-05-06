@@ -9,7 +9,7 @@ use egui::{
 use jgnes_native_driver::{
     AspectRatio, GpuFilterMode, InputConfig, InputConfigBase, JgnesDynamicConfig,
     JgnesNativeConfig, JoystickInput, KeyboardInput, NativeRenderer, Overscan, RenderScale,
-    VSyncMode,
+    VSyncMode, WgpuBackend,
 };
 use rfd::FileDialog;
 use serde::{Deserialize, Serialize};
@@ -49,6 +49,8 @@ struct AppConfig {
     window_height: u32,
     #[serde(default)]
     renderer: NativeRenderer,
+    #[serde(default)]
+    wgpu_backend: WgpuBackend,
     #[serde(default)]
     gpu_filter_type: GpuFilterType,
     #[serde(default)]
@@ -414,6 +416,18 @@ impl App {
                     });
                 });
 
+                ui.group(|ui| {
+                    ui.set_enabled(self.config.renderer == NativeRenderer::Wgpu);
+
+                    ui.label("wgpu backend");
+                    ui.horizontal(|ui| {
+                        ui.radio_value(&mut self.config.wgpu_backend, WgpuBackend::Auto, "Auto");
+                        ui.radio_value(&mut self.config.wgpu_backend, WgpuBackend::Vulkan, "Vulkan");
+                        ui.radio_value(&mut self.config.wgpu_backend, WgpuBackend::Direct3d12, "Direct3D 12");
+                        ui.radio_value(&mut self.config.wgpu_backend, WgpuBackend::Metal, "Metal");
+                    });
+                });
+
                 ui.checkbox(&mut self.config.launch_fullscreen, "Launch in fullscreen");
 
                 ui.horizontal(|ui| {
@@ -505,14 +519,16 @@ impl App {
 
                 ui.group(|ui| {
                     ui.label("Aspect ratio");
-                    ui.radio_value(&mut self.config.aspect_ratio, AspectRatio::Ntsc, "NTSC")
-                        .on_hover_text("8:7 pixel aspect ratio, 64:49 screen aspect ratio");
-                    ui.radio_value(&mut self.config.aspect_ratio, AspectRatio::SquarePixels, "Square pixels")
-                        .on_hover_text("1:1 pixel aspect ratio, 8:7 screen aspect ratio");
-                    ui.radio_value(&mut self.config.aspect_ratio, AspectRatio::FourThree, "4:3")
-                        .on_hover_text("7:6 pixel aspect ratio, 4:3 screen aspect ratio");
-                    ui.radio_value(&mut self.config.aspect_ratio, AspectRatio::Stretched, "Stretched")
-                        .on_hover_text("Image will be stretched to fill the entire display area");
+                    ui.horizontal(|ui| {
+                        ui.radio_value(&mut self.config.aspect_ratio, AspectRatio::Ntsc, "NTSC")
+                            .on_hover_text("8:7 pixel aspect ratio, 64:49 screen aspect ratio");
+                        ui.radio_value(&mut self.config.aspect_ratio, AspectRatio::SquarePixels, "Square pixels")
+                            .on_hover_text("1:1 pixel aspect ratio, 8:7 screen aspect ratio");
+                        ui.radio_value(&mut self.config.aspect_ratio, AspectRatio::FourThree, "4:3")
+                            .on_hover_text("7:6 pixel aspect ratio, 4:3 screen aspect ratio");
+                        ui.radio_value(&mut self.config.aspect_ratio, AspectRatio::Stretched, "Stretched")
+                            .on_hover_text("Image will be stretched to fill the entire display area");
+                    });
                 });
 
                 ui.group(|ui| {
@@ -887,6 +903,7 @@ fn launch_emulator<P: AsRef<Path>>(path: P, sender: &Sender<EmuThreadTask>, conf
             window_width: config.window_width,
             window_height: config.window_height,
             renderer: config.renderer,
+            wgpu_backend: config.wgpu_backend,
             gpu_filter_mode: match config.gpu_filter_type {
                 GpuFilterType::NearestNeighbor => GpuFilterMode::NearestNeighbor,
                 GpuFilterType::Linear => GpuFilterMode::Linear(config.gpu_render_scale),

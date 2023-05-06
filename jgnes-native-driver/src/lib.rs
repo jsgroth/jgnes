@@ -31,7 +31,7 @@ use crate::input::SdlInputHandler;
 pub use config::{
     AspectRatio, AxisDirection, HatDirection, InputConfig, InputConfigBase, JgnesDynamicConfig,
     JgnesNativeConfig, JoystickInput, JoystickInputConfig, KeyboardInput, KeyboardInputConfig,
-    NativeRenderer, Overscan, PlayerInputConfig, VSyncMode,
+    NativeRenderer, Overscan, PlayerInputConfig, VSyncMode, WgpuBackend,
 };
 pub use render::{GpuFilterMode, RenderScale};
 
@@ -319,6 +319,7 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
 
     let renderer_config = RendererConfig {
         vsync_mode: config.vsync_mode,
+        wgpu_backend: config.wgpu_backend,
         gpu_filter_mode: config.gpu_filter_mode,
         aspect_ratio: config.aspect_ratio,
         overscan: config.overscan.validate()?,

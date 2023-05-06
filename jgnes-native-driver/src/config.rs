@@ -389,6 +389,7 @@ pub struct JgnesNativeConfig {
     pub window_width: u32,
     pub window_height: u32,
     pub renderer: NativeRenderer,
+    pub wgpu_backend: WgpuBackend,
     pub gpu_filter_mode: GpuFilterMode,
     pub aspect_ratio: AspectRatio,
     pub overscan: Overscan,
@@ -405,6 +406,7 @@ impl Display for JgnesNativeConfig {
         writeln!(f, "window_width: {}", self.window_width)?;
         writeln!(f, "window_height: {}", self.window_height)?;
         writeln!(f, "renderer: {}", self.renderer)?;
+        writeln!(f, "wgpu_backend: {}", self.wgpu_backend)?;
         writeln!(f, "gpu_filter_mode: {}", self.gpu_filter_mode)?;
         writeln!(f, "aspect_ratio: {}", self.aspect_ratio)?;
         writeln!(f, "overscan: {}", self.overscan)?;
@@ -427,9 +429,55 @@ pub struct JgnesDynamicConfig {
     pub quit_signal: Arc<AtomicBool>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum WgpuBackend {
+    #[default]
+    Auto,
+    Vulkan,
+    Direct3d12,
+    Metal,
+}
+
+impl Display for WgpuBackend {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Auto => write!(f, "Auto"),
+            Self::Vulkan => write!(f, "Vulkan"),
+            Self::Direct3d12 => write!(f, "Direct3d12"),
+            Self::Metal => write!(f, "Metal"),
+        }
+    }
+}
+
+impl FromStr for WgpuBackend {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Auto" => Ok(Self::Auto),
+            "Vulkan" => Ok(Self::Vulkan),
+            "Direct3d12" => Ok(Self::Direct3d12),
+            "Metal" => Ok(Self::Metal),
+            _ => Err(format!("invalid wgpu backend string: {s}")),
+        }
+    }
+}
+
+impl WgpuBackend {
+    pub(crate) fn to_wgpu_backends(self) -> wgpu::Backends {
+        match self {
+            Self::Auto => wgpu::Backends::PRIMARY,
+            Self::Vulkan => wgpu::Backends::VULKAN,
+            Self::Direct3d12 => wgpu::Backends::DX12,
+            Self::Metal => wgpu::Backends::METAL,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct RendererConfig {
     pub(crate) vsync_mode: VSyncMode,
+    pub(crate) wgpu_backend: WgpuBackend,
     pub(crate) gpu_filter_mode: GpuFilterMode,
     pub(crate) aspect_ratio: AspectRatio,
     pub(crate) overscan: Overscan,

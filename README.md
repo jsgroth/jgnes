@@ -1,6 +1,6 @@
 # jgnes
 
-A work-in-progress cross-platform NES emulator
+A cross-platform NES emulator.
 
 ## Feature Status
 
@@ -20,7 +20,8 @@ Implemented:
     * The MMC3 MC-ACC variant is not implemented; was used in a few games, e.g. Incredible Crash Dummies
   * MMC5
     * The additional audio channels are not implemented; no US-released games used these but a few Japanese releases did
-* P1 input with hardcoded keys
+* P1 & P2 input with support for keyboard input and DirectInput gamepad input
+  * Using multiple gamepads simultaneously does not work well right now
 * Support for 3 different forced aspect ratios (NTSC, 1:1 pixel aspect ratio, 4:3 screen aspect ratio), plus an option for stretched/none
 * Overscan customization
 * A GPU-backed renderer based on `wgpu` with an option for integer upscaling + linear interpolation, producing a sharp but clean image even at higher resolutions and non-8:7 aspect ratios
@@ -28,7 +29,6 @@ Implemented:
 Not Implemented:
 * Color palette customization; the NES hardware directly outputs an NTSC video signal rather than RGB pixel grids, so any mapping from NES colors to RGB colors is an approximation at best
 * Lots of mappers, most notably Konami's and Namco's custom mappers
-* P2 input and input configuration (or any configuration really)
 * RESET button functionality
 * Save states or fast forward
 * Support for PAL/EU releases (the processor timings are different compared to NTSC US/JP)

@@ -1,6 +1,7 @@
 mod audio;
 mod colors;
 mod config;
+mod input;
 mod render;
 
 use crate::render::WgpuRenderer;
@@ -9,7 +10,7 @@ use jgnes_core::{
     Renderer, SaveWriter,
 };
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
-use sdl2::event::{Event, WindowEvent};
+use sdl2::event::{Event, EventType, WindowEvent};
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::rect::Rect;
@@ -26,8 +27,11 @@ use std::{cmp, fs, thread};
 
 use crate::audio::LowPassFilter;
 use crate::config::RendererConfig;
+use crate::input::SdlInputHandler;
 pub use config::{
-    AspectRatio, JgnesDynamicConfig, JgnesNativeConfig, NativeRenderer, Overscan, VSyncMode,
+    AspectRatio, AxisDirection, HatDirection, InputConfig, InputConfigBase, JgnesDynamicConfig,
+    JgnesNativeConfig, JoystickInput, JoystickInputConfig, KeyboardInput, KeyboardInputConfig,
+    NativeRenderer, Overscan, PlayerInputConfig, VSyncMode,
 };
 pub use render::{GpuFilterMode, RenderScale};
 
@@ -218,77 +222,17 @@ impl AudioPlayer for SdlAudioPlayer {
 }
 
 struct SdlInputPoller {
-    joypad_state: Rc<RefCell<JoypadState>>,
+    p1_joypad_state: Rc<RefCell<JoypadState>>,
+    p2_joypad_state: Rc<RefCell<JoypadState>>,
 }
 
 impl InputPoller for SdlInputPoller {
     fn poll_p1_input(&self) -> JoypadState {
-        *self.joypad_state.borrow()
+        *self.p1_joypad_state.borrow()
     }
 
     fn poll_p2_input(&self) -> JoypadState {
-        JoypadState::default()
-    }
-}
-
-struct SdlInputHandler {
-    joypad_state: Rc<RefCell<JoypadState>>,
-}
-
-impl SdlInputHandler {
-    fn set_field(&mut self, keycode: Keycode, value: bool) {
-        match keycode {
-            Keycode::Up => {
-                self.joypad_state.borrow_mut().up = value;
-            }
-            Keycode::Down => {
-                self.joypad_state.borrow_mut().down = value;
-            }
-            Keycode::Left => {
-                self.joypad_state.borrow_mut().left = value;
-            }
-            Keycode::Right => {
-                self.joypad_state.borrow_mut().right = value;
-            }
-            Keycode::Z => {
-                self.joypad_state.borrow_mut().a = value;
-            }
-            Keycode::X => {
-                self.joypad_state.borrow_mut().b = value;
-            }
-            Keycode::Return => {
-                self.joypad_state.borrow_mut().start = value;
-            }
-            Keycode::RShift => {
-                self.joypad_state.borrow_mut().select = value;
-            }
-            _ => {}
-        };
-    }
-
-    fn key_down(&mut self, keycode: Keycode) {
-        self.set_field(keycode, true);
-
-        // Don't allow inputs of opposite directions
-        match keycode {
-            Keycode::Up => {
-                self.joypad_state.borrow_mut().down = false;
-            }
-            Keycode::Down => {
-                self.joypad_state.borrow_mut().up = false;
-            }
-            Keycode::Left => {
-                self.joypad_state.borrow_mut().right = false;
-            }
-            Keycode::Right => {
-                self.joypad_state.borrow_mut().left = false;
-            }
-            _ => {}
-        }
-    }
-
-    fn key_up(&mut self, keycode: Keycode) {
-        self.set_field(keycode, false);
+        *self.p2_joypad_state.borrow()
     }
 }
 
@@ -359,6 +303,7 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
     let sdl_ctx = sdl2::init().map_err(anyhow::Error::msg)?;
     let video_subsystem = sdl_ctx.video().map_err(anyhow::Error::msg)?;
     let audio_subsystem = sdl_ctx.audio().map_err(anyhow::Error::msg)?;
+    let joystick_subsystem = sdl_ctx.joystick().map_err(anyhow::Error::msg)?;
 
     sdl_ctx.mouse().show_cursor(false);
 
@@ -394,11 +339,15 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
     let audio_player = SdlAudioPlayer::new(audio_queue, config.sync_to_audio);
 
     let input_poller = SdlInputPoller {
-        joypad_state: Rc::default(),
+        p1_joypad_state: Rc::default(),
+        p2_joypad_state: Rc::default(),
     };
-    let input_handler = SdlInputHandler {
-        joypad_state: Rc::clone(&input_poller.joypad_state),
-    };
+    let input_handler = SdlInputHandler::new(
+        &joystick_subsystem,
+        &config.input_config,
+        Rc::clone(&input_poller.p1_joypad_state),
+        Rc::clone(&input_poller.p2_joypad_state),
+    );
 
     let sav_path = Path::new(&config.nes_file_path).with_extension("sav");
     let sav_bytes = load_sav_file(&sav_path);
@@ -410,7 +359,8 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
         log::info!("Loaded SRAM from {}", sav_path.display());
     }
 
-    let event_pump = sdl_ctx.event_pump().map_err(anyhow::Error::msg)?;
+    let mut event_pump = sdl_ctx.event_pump().map_err(anyhow::Error::msg)?;
+    event_pump.disable_event(EventType::MouseMotion);
 
     let (window_width, window_height) = window.size();
     let display_area = determine_display_area(
@@ -468,7 +418,7 @@ fn run_emulator<
     mut emulator: Emulator<R, A, I, S>,
     dynamic_config: JgnesDynamicConfig,
     mut event_pump: EventPump,
-    mut input_handler: SdlInputHandler,
+    mut input_handler: SdlInputHandler<'_>,
 ) -> anyhow::Result<()> {
     let mut ticks = 0_u64;
     loop {
@@ -487,6 +437,8 @@ fn run_emulator<
             }
 
             for event in event_pump.poll_iter() {
+                input_handler.handle_event(&event)?;
+
                 match event {
                     Event::Quit { .. }
                     | Event::KeyDown {
@@ -512,27 +464,18 @@ fn run_emulator<
                         _ => {}
                     },
                     Event::KeyDown {
-                        keycode: Some(keycode),
+                        keycode: Some(Keycode::F9),
                         ..
                     } => {
-                        input_handler.key_down(keycode);
-
-                        if keycode == Keycode::F9 {
-                            let window = emulator.get_renderer_mut().window_mut();
-                            let new_fullscreen = match window.fullscreen_state() {
-                                FullscreenType::Off => FullscreenType::Desktop,
-                                _ => FullscreenType::Off,
-                            };
-                            window
-                                .set_fullscreen(new_fullscreen)
-                                .map_err(anyhow::Error::msg)?;
-                        }
-                    }
-                    Event::KeyUp {
-                        keycode: Some(keycode),
-                        ..
-                    } => {
-                        input_handler.key_up(keycode);
+                        // TODO hotkey configuration
+                        let window = emulator.get_renderer_mut().window_mut();
+                        let new_fullscreen = match window.fullscreen_state() {
+                            FullscreenType::Off => FullscreenType::Desktop,
+                            _ => FullscreenType::Off,
+                        };
+                        window
+                            .set_fullscreen(new_fullscreen)
+                            .map_err(anyhow::Error::msg)?;
                     }
                     _ => {}
                 }

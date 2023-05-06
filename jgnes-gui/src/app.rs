@@ -6,8 +6,8 @@ use egui::{
     TopBottomPanel, Ui, Widget, Window,
 };
 use jgnes_native_driver::{
-    AspectRatio, GpuFilterMode, JgnesDynamicConfig, JgnesNativeConfig, NativeRenderer, Overscan,
-    RenderScale, VSyncMode,
+    AspectRatio, GpuFilterMode, InputConfig, JgnesDynamicConfig, JgnesNativeConfig, NativeRenderer,
+    Overscan, RenderScale, VSyncMode,
 };
 use rfd::FileDialog;
 use serde::{Deserialize, Serialize};
@@ -606,6 +606,7 @@ fn launch_emulator<P: AsRef<Path>>(
             vsync_mode: config.vsync_mode,
             sync_to_audio: config.sync_to_audio,
             launch_fullscreen: config.launch_fullscreen,
+            input_config: InputConfig::default(),
         })
         .unwrap();
 }

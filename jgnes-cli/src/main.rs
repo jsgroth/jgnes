@@ -1,8 +1,8 @@
 use clap::Parser;
 use env_logger::Env;
 use jgnes_native_driver::{
-    AspectRatio, GpuFilterMode, JgnesDynamicConfig, JgnesNativeConfig, NativeRenderer, Overscan,
-    VSyncMode,
+    AspectRatio, GpuFilterMode, InputConfig, JgnesDynamicConfig, JgnesNativeConfig, NativeRenderer,
+    Overscan, VSyncMode,
 };
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
@@ -138,6 +138,7 @@ fn main() -> anyhow::Result<()> {
         vsync_mode: args.vsync_mode,
         sync_to_audio: args.sync_to_audio,
         launch_fullscreen: args.launch_fullscreen,
+        input_config: InputConfig::default(),
     };
 
     let dynamic_config = JgnesDynamicConfig {

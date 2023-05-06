@@ -1,4 +1,5 @@
 use crate::GpuFilterMode;
+use sdl2::keyboard::Keycode;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
@@ -138,6 +139,258 @@ impl FromStr for VSyncMode {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InputConfigBase<T> {
+    pub up: Option<T>,
+    pub left: Option<T>,
+    pub right: Option<T>,
+    pub down: Option<T>,
+    pub a: Option<T>,
+    pub b: Option<T>,
+    pub start: Option<T>,
+    pub select: Option<T>,
+}
+
+impl<T> Default for InputConfigBase<T> {
+    fn default() -> Self {
+        Self {
+            up: None,
+            left: None,
+            right: None,
+            down: None,
+            a: None,
+            b: None,
+            start: None,
+            select: None,
+        }
+    }
+}
+
+impl<T: Display> Display for InputConfigBase<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Up={}, Left={}, Right={}, Down={}, A={}, B={}, Start={}, Select={}",
+            fmt_option(self.up.as_ref()),
+            fmt_option(self.left.as_ref()),
+            fmt_option(self.right.as_ref()),
+            fmt_option(self.down.as_ref()),
+            fmt_option(self.a.as_ref()),
+            fmt_option(self.b.as_ref()),
+            fmt_option(self.start.as_ref()),
+            fmt_option(self.select.as_ref()),
+        )
+    }
+}
+
+fn fmt_option<T: Display>(option: Option<&T>) -> String {
+    option.map_or("<None>".into(), ToString::to_string)
+}
+
+#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
+pub struct KeyboardInput(String);
+
+impl KeyboardInput {
+    fn to_keycode(&self) -> Keycode {
+        Keycode::from_name(&self.0).expect("KeyboardInput should never contain an invalid keycode")
+    }
+}
+
+impl From<Keycode> for KeyboardInput {
+    fn from(value: Keycode) -> Self {
+        Self(value.name())
+    }
+}
+
+impl TryFrom<KeyboardInput> for Keycode {
+    type Error = String;
+
+    fn try_from(value: KeyboardInput) -> Result<Self, Self::Error> {
+        Keycode::from_name(&value.0).ok_or_else(|| format!("invalid keycode name: {}", value.0))
+    }
+}
+
+impl Display for KeyboardInput {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum AxisDirection {
+    Positive,
+    Negative,
+}
+
+impl AxisDirection {
+    fn sign_str(self) -> &'static str {
+        match self {
+            Self::Positive => "+",
+            Self::Negative => "-",
+        }
+    }
+}
+
+impl Display for AxisDirection {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Positive => write!(f, "Positive"),
+            Self::Negative => write!(f, "Negative"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+pub enum HatDirection {
+    #[default]
+    Up,
+    Left,
+    Right,
+    Down,
+}
+
+impl HatDirection {
+    pub(crate) const ALL: [Self; 4] = [Self::Up, Self::Left, Self::Right, Self::Down];
+}
+
+impl Display for HatDirection {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Up => write!(f, "Up"),
+            Self::Left => write!(f, "Left"),
+            Self::Right => write!(f, "Right"),
+            Self::Down => write!(f, "Down"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum JoystickInput {
+    Button {
+        device_idx: u32,
+        button_idx: u8,
+    },
+    Axis {
+        device_idx: u32,
+        axis_idx: u8,
+        direction: AxisDirection,
+    },
+    Hat {
+        device_idx: u32,
+        hat_idx: u8,
+        direction: HatDirection,
+    },
+}
+
+impl Display for JoystickInput {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Button {
+                device_idx,
+                button_idx,
+            } => write!(f, "Joy {device_idx} Button {button_idx}"),
+            Self::Axis {
+                device_idx,
+                axis_idx,
+                direction,
+            } => write!(
+                f,
+                "Joy {device_idx} Axis {axis_idx} {}",
+                direction.sign_str()
+            ),
+            Self::Hat {
+                device_idx,
+                hat_idx,
+                direction,
+            } => write!(f, "Joy {device_idx} Hat {hat_idx} {direction}"),
+        }
+    }
+}
+
+pub type KeyboardInputConfig = InputConfigBase<KeyboardInput>;
+pub type JoystickInputConfig = InputConfigBase<JoystickInput>;
+
+impl InputConfigBase<KeyboardInput> {
+    pub(crate) fn to_keycode_config(&self) -> InputConfigBase<Keycode> {
+        InputConfigBase {
+            up: self.up.as_ref().map(KeyboardInput::to_keycode),
+            left: self.left.as_ref().map(KeyboardInput::to_keycode),
+            right: self.right.as_ref().map(KeyboardInput::to_keycode),
+            down: self.down.as_ref().map(KeyboardInput::to_keycode),
+            a: self.a.as_ref().map(KeyboardInput::to_keycode),
+            b: self.b.as_ref().map(KeyboardInput::to_keycode),
+            start: self.start.as_ref().map(KeyboardInput::to_keycode),
+            select: self.select.as_ref().map(KeyboardInput::to_keycode),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlayerInputConfig {
+    pub keyboard: KeyboardInputConfig,
+    pub joystick: JoystickInputConfig,
+}
+
+impl Display for PlayerInputConfig {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        writeln!(f)?;
+        writeln!(f, "    Keyboard: {}", self.keyboard)?;
+        write!(f, "    Joystick: {}", self.joystick)?;
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InputConfig {
+    pub p1: PlayerInputConfig,
+    pub p2: PlayerInputConfig,
+    pub axis_deadzone: u16,
+    pub allow_opposite_directions: bool,
+}
+
+impl Default for InputConfig {
+    fn default() -> Self {
+        let p1_keyboard = KeyboardInputConfig {
+            up: Some(KeyboardInput(Keycode::Up.name())),
+            left: Some(KeyboardInput(Keycode::Left.name())),
+            right: Some(KeyboardInput(Keycode::Right.name())),
+            down: Some(KeyboardInput(Keycode::Down.name())),
+            a: Some(KeyboardInput(Keycode::Z.name())),
+            b: Some(KeyboardInput(Keycode::X.name())),
+            start: Some(KeyboardInput(Keycode::Return.name())),
+            select: Some(KeyboardInput(Keycode::RShift.name())),
+        };
+        Self {
+            p1: PlayerInputConfig {
+                keyboard: p1_keyboard,
+                joystick: JoystickInputConfig::default(),
+            },
+            p2: PlayerInputConfig {
+                keyboard: KeyboardInputConfig::default(),
+                joystick: JoystickInputConfig::default(),
+            },
+            axis_deadzone: 5000,
+            allow_opposite_directions: false,
+        }
+    }
+}
+
+impl Display for InputConfig {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        writeln!(f)?;
+        writeln!(f, "  Player 1: {}", self.p1)?;
+        writeln!(f, "  Player 2: {}", self.p2)?;
+        writeln!(
+            f,
+            "  axis_deadzone={}, allow_opposite_directions={}",
+            self.axis_deadzone, self.allow_opposite_directions
+        )?;
+
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct JgnesNativeConfig {
     pub nes_file_path: String,
@@ -151,6 +404,7 @@ pub struct JgnesNativeConfig {
     pub vsync_mode: VSyncMode,
     pub sync_to_audio: bool,
     pub launch_fullscreen: bool,
+    pub input_config: InputConfig,
 }
 
 impl Display for JgnesNativeConfig {
@@ -170,6 +424,7 @@ impl Display for JgnesNativeConfig {
         writeln!(f, "vsync_mode: {}", self.vsync_mode)?;
         writeln!(f, "sync_to_audio: {}", self.sync_to_audio)?;
         writeln!(f, "launch_fullscreen: {}", self.launch_fullscreen)?;
+        writeln!(f, "input_config: {}", self.input_config)?;
 
         Ok(())
     }

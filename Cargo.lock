@@ -1569,6 +1569,7 @@ dependencies = [
  "pollster",
  "sdl2",
  "serde",
+ "tinyvec",
  "wgpu",
 ]
 

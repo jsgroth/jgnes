@@ -24,13 +24,13 @@ use std::time::Duration;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 enum GpuFilterType {
-    #[default]
     NearestNeighbor,
+    #[default]
     Linear,
 }
 
 fn default_window_width() -> u32 {
-    3 * 256
+    (f64::from(3 * 224) * 64.0 / 49.0).ceil() as u32
 }
 
 fn default_window_height() -> u32 {

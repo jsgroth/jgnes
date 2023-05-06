@@ -6,9 +6,10 @@ use std::str::FromStr;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum NativeRenderer {
     Sdl2,
+    #[default]
     Wgpu,
 }
 
@@ -139,7 +140,7 @@ impl FromStr for VSyncMode {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InputConfigBase<T> {
     pub up: Option<T>,
     pub left: Option<T>,
@@ -187,7 +188,7 @@ fn fmt_option<T: Display>(option: Option<&T>) -> String {
     option.map_or("<None>".into(), ToString::to_string)
 }
 
-#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct KeyboardInput(String);
 
 impl KeyboardInput {
@@ -265,18 +266,17 @@ impl Display for HatDirection {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(tag = "type")]
+// TODO properly support multiple gamepads
 pub enum JoystickInput {
     Button {
-        device_idx: u32,
         button_idx: u8,
     },
     Axis {
-        device_idx: u32,
         axis_idx: u8,
         direction: AxisDirection,
     },
     Hat {
-        device_idx: u32,
         hat_idx: u8,
         direction: HatDirection,
     },
@@ -285,24 +285,15 @@ pub enum JoystickInput {
 impl Display for JoystickInput {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Button {
-                device_idx,
-                button_idx,
-            } => write!(f, "Joy {device_idx} Button {button_idx}"),
+            Self::Button { button_idx, .. } => write!(f, "Button {button_idx}"),
             Self::Axis {
-                device_idx,
                 axis_idx,
                 direction,
-            } => write!(
-                f,
-                "Joy {device_idx} Axis {axis_idx} {}",
-                direction.sign_str()
-            ),
+                ..
+            } => write!(f, "Axis {axis_idx} {}", direction.sign_str()),
             Self::Hat {
-                device_idx,
-                hat_idx,
-                direction,
-            } => write!(f, "Joy {device_idx} Hat {hat_idx} {direction}"),
+                hat_idx, direction, ..
+            } => write!(f, "Hat {hat_idx} {direction}"),
         }
     }
 }
@@ -325,7 +316,7 @@ impl InputConfigBase<KeyboardInput> {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PlayerInputConfig {
     pub keyboard: KeyboardInputConfig,
     pub joystick: JoystickInputConfig,
@@ -341,7 +332,7 @@ impl Display for PlayerInputConfig {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InputConfig {
     pub p1: PlayerInputConfig,
     pub p2: PlayerInputConfig,
@@ -381,10 +372,11 @@ impl Display for InputConfig {
         writeln!(f)?;
         writeln!(f, "  Player 1: {}", self.p1)?;
         writeln!(f, "  Player 2: {}", self.p2)?;
+        writeln!(f, "  axis_deadzone: {}", self.axis_deadzone)?;
         writeln!(
             f,
-            "  axis_deadzone={}, allow_opposite_directions={}",
-            self.axis_deadzone, self.allow_opposite_directions
+            "  allow_opposite_directions: {}",
+            self.allow_opposite_directions
         )?;
 
         Ok(())

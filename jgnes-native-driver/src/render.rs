@@ -69,6 +69,12 @@ impl RenderScale {
     }
 }
 
+impl Default for RenderScale {
+    fn default() -> Self {
+        Self::THREE
+    }
+}
+
 impl TryFrom<u32> for RenderScale {
     type Error = anyhow::Error;
 

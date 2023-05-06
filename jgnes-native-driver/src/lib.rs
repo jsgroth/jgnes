@@ -12,7 +12,7 @@ use jgnes_core::{
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
 use sdl2::event::{Event, EventType, WindowEvent};
 use sdl2::keyboard::Keycode;
-use sdl2::pixels::PixelFormatEnum;
+use sdl2::pixels::{Color, PixelFormatEnum};
 use sdl2::rect::Rect;
 use sdl2::render::{Texture, TextureCreator, WindowCanvas};
 use sdl2::video::{FullscreenType, Window};
@@ -315,7 +315,7 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
     if config.launch_fullscreen {
         window_builder.fullscreen_desktop();
     }
-    let window = window_builder.build()?;
+    let window = init_window(window_builder.build()?)?;
 
     let renderer_config = RendererConfig {
         vsync_mode: config.vsync_mode,
@@ -407,6 +407,16 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
             run_emulator(emulator, dynamic_config, event_pump, input_handler)
         }
     }
+}
+
+fn init_window(window: Window) -> Result<Window, anyhow::Error> {
+    let mut canvas = window.into_canvas().present_vsync().build()?;
+
+    canvas.set_draw_color(Color::RGB(0, 0, 0));
+    canvas.clear();
+    canvas.present();
+
+    Ok(canvas.into_window())
 }
 
 fn run_emulator<

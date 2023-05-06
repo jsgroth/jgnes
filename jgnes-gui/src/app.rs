@@ -1,13 +1,15 @@
 use crate::emuthread;
+use crate::emuthread::{EmuThreadTask, InputCollectResult};
 use eframe::Frame;
 use egui::panel::TopBottomSide;
 use egui::{
-    menu, Align, Button, Color32, Context, Key, KeyboardShortcut, Layout, Modifiers, TextEdit,
-    TopBottomPanel, Ui, Widget, Window,
+    menu, Align, Button, Color32, Context, Grid, Key, KeyboardShortcut, Layout, Modifiers,
+    TextEdit, TopBottomPanel, Ui, Widget, Window,
 };
 use jgnes_native_driver::{
-    AspectRatio, GpuFilterMode, InputConfig, JgnesDynamicConfig, JgnesNativeConfig, NativeRenderer,
-    Overscan, RenderScale, VSyncMode,
+    AspectRatio, GpuFilterMode, InputConfig, InputConfigBase, JgnesDynamicConfig,
+    JgnesNativeConfig, JoystickInput, KeyboardInput, NativeRenderer, Overscan, RenderScale,
+    VSyncMode,
 };
 use rfd::FileDialog;
 use serde::{Deserialize, Serialize};
@@ -16,13 +18,23 @@ use std::ops::RangeInclusive;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::Sender;
+use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 enum GpuFilterType {
+    #[default]
     NearestNeighbor,
     Linear,
+}
+
+fn default_window_width() -> u32 {
+    3 * 256
+}
+
+fn default_window_height() -> u32 {
+    3 * 224
 }
 
 fn true_fn() -> bool {
@@ -31,10 +43,15 @@ fn true_fn() -> bool {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct AppConfig {
+    #[serde(default = "default_window_width")]
     window_width: u32,
+    #[serde(default = "default_window_height")]
     window_height: u32,
+    #[serde(default)]
     renderer: NativeRenderer,
+    #[serde(default)]
     gpu_filter_type: GpuFilterType,
+    #[serde(default)]
     gpu_render_scale: RenderScale,
     #[serde(default)]
     aspect_ratio: AspectRatio,
@@ -48,23 +65,14 @@ struct AppConfig {
     launch_fullscreen: bool,
     #[serde(default)]
     vsync_mode: VSyncMode,
+    #[serde(default)]
+    input: InputConfig,
 }
 
 impl Default for AppConfig {
     fn default() -> Self {
-        Self {
-            window_width: 960,
-            window_height: 720,
-            renderer: NativeRenderer::Wgpu,
-            gpu_filter_type: GpuFilterType::Linear,
-            gpu_render_scale: RenderScale::THREE,
-            aspect_ratio: AspectRatio::default(),
-            overscan: Overscan::default(),
-            forced_integer_height_scaling: false,
-            sync_to_audio: true,
-            launch_fullscreen: false,
-            vsync_mode: VSyncMode::Enabled,
-        }
+        toml::from_str("")
+            .expect("AppConfig should always deserialize successfully from empty string")
     }
 }
 
@@ -72,9 +80,25 @@ impl Default for AppConfig {
 enum OpenWindow {
     VideoSettings,
     AudioSettings,
+    InputSettings,
     About,
     EmulationError,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Player {
+    P1,
+    P2,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum InputType {
+    Keyboard,
+    Gamepad,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct InputWindow(Player, InputType);
 
 struct OverscanState {
     top_text: String,
@@ -93,6 +117,119 @@ impl OverscanState {
     }
 }
 
+struct InputState {
+    axis_deadzone_text: String,
+    axis_deadzone_invalid: bool,
+}
+
+struct InputButton<'a> {
+    button: Button,
+    player: Player,
+    input_type: InputType,
+    nes_button: NesButton,
+    axis_deadzone: u16,
+    app_state: &'a mut AppState,
+}
+
+impl<'a> InputButton<'a> {
+    fn new(player: Player, input_type: InputType, nes_button: NesButton, app: &'a mut App) -> Self {
+        let current_input_str = match input_type {
+            InputType::Keyboard => get_keyboard_field(&mut app.config.input, player, nes_button)
+                .as_ref()
+                .map_or("<None>".into(), ToString::to_string),
+            InputType::Gamepad => get_joystick_field(&mut app.config.input, player, nes_button)
+                .as_ref()
+                .map_or("<None>".into(), ToString::to_string),
+        };
+        let button = Button::new(current_input_str);
+        Self {
+            button,
+            player,
+            input_type,
+            nes_button,
+            axis_deadzone: app.config.input.axis_deadzone,
+            app_state: &mut app.state,
+        }
+    }
+
+    fn ui(self, ui: &mut Ui) {
+        if self.button.ui(ui).clicked() {
+            self.app_state.waiting_for_input = Some((self.player, self.nes_button));
+            self.app_state
+                .thread_task_sender
+                .send(EmuThreadTask::CollectInput {
+                    input_type: self.input_type,
+                    axis_deadzone: self.axis_deadzone,
+                })
+                .expect("Sending collect input task should not fail");
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum NesButton {
+    Up,
+    Left,
+    Right,
+    Down,
+    A,
+    B,
+    Start,
+    Select,
+}
+
+impl NesButton {
+    const ALL: [Self; 8] = [
+        Self::Up,
+        Self::Left,
+        Self::Right,
+        Self::Down,
+        Self::A,
+        Self::B,
+        Self::Start,
+        Self::Select,
+    ];
+}
+
+fn get_keyboard_field(
+    input_config: &mut InputConfig,
+    player: Player,
+    button: NesButton,
+) -> &mut Option<KeyboardInput> {
+    let player_config = match player {
+        Player::P1 => &mut input_config.p1.keyboard,
+        Player::P2 => &mut input_config.p2.keyboard,
+    };
+
+    get_input_field(player_config, button)
+}
+
+fn get_joystick_field(
+    input_config: &mut InputConfig,
+    player: Player,
+    button: NesButton,
+) -> &mut Option<JoystickInput> {
+    let player_config = match player {
+        Player::P1 => &mut input_config.p1.joystick,
+        Player::P2 => &mut input_config.p2.joystick,
+    };
+
+    get_input_field(player_config, button)
+}
+
+fn get_input_field<T>(player_config: &mut InputConfigBase<T>, button: NesButton) -> &mut Option<T> {
+    match button {
+        NesButton::Up => &mut player_config.up,
+        NesButton::Left => &mut player_config.left,
+        NesButton::Right => &mut player_config.right,
+        NesButton::Down => &mut player_config.down,
+        NesButton::A => &mut player_config.a,
+        NesButton::B => &mut player_config.b,
+        NesButton::Start => &mut player_config.start,
+        NesButton::Select => &mut player_config.select,
+    }
+}
+
 struct AppState {
     render_scale_text: String,
     render_scale_invalid: bool,
@@ -101,11 +238,15 @@ struct AppState {
     window_height_text: String,
     window_height_invalid: bool,
     overscan: OverscanState,
+    input: InputState,
     open_window: Option<OpenWindow>,
+    open_input_window: Option<InputWindow>,
+    waiting_for_input: Option<(Player, NesButton)>,
     emulator_is_running: Arc<AtomicBool>,
     emulator_quit_signal: Arc<AtomicBool>,
     emulation_error: Arc<Mutex<Option<anyhow::Error>>>,
-    emu_thread_sender: Sender<JgnesNativeConfig>,
+    thread_task_sender: Sender<EmuThreadTask>,
+    thread_input_receiver: Receiver<Option<InputCollectResult>>,
 }
 
 impl AppState {
@@ -113,7 +254,7 @@ impl AppState {
         let is_running = Arc::new(AtomicBool::new(false));
         let quit_signal = Arc::new(AtomicBool::new(false));
         let emulation_error = Arc::new(Mutex::new(None));
-        let emu_thread_sender = emuthread::start(
+        let (thread_task_sender, thread_input_receiver) = emuthread::start(
             JgnesDynamicConfig {
                 quit_signal: Arc::clone(&quit_signal),
             },
@@ -130,6 +271,10 @@ impl AppState {
             bottom_text: config.overscan.bottom.to_string(),
             bottom_invalid: false,
         };
+        let input_state = InputState {
+            axis_deadzone_text: config.input.axis_deadzone.to_string(),
+            axis_deadzone_invalid: false,
+        };
         Self {
             render_scale_text: config.gpu_render_scale.get().to_string(),
             render_scale_invalid: false,
@@ -138,11 +283,15 @@ impl AppState {
             window_height_text: config.window_height.to_string(),
             window_height_invalid: false,
             overscan: overscan_state,
+            input: input_state,
             open_window: None,
+            open_input_window: None,
+            waiting_for_input: None,
             emulator_is_running: is_running,
             emulator_quit_signal: quit_signal,
             emulation_error,
-            emu_thread_sender,
+            thread_task_sender,
+            thread_input_receiver,
         }
     }
 
@@ -241,7 +390,7 @@ impl App {
         if let Some(file) = file {
             self.state.stop_emulator_if_running();
 
-            launch_emulator(file, &self.state.emu_thread_sender, &self.config);
+            launch_emulator(file, &self.state.thread_task_sender, &self.config);
         }
     }
 
@@ -445,6 +594,119 @@ impl App {
         }
     }
 
+    fn render_input_settings_window(&mut self, ctx: &Context) {
+        let mut input_settings_open = true;
+        Window::new("Input Settings")
+            .resizable(false)
+            .open(&mut input_settings_open)
+            .show(ctx, |ui| {
+                ui.set_enabled(self.state.open_input_window.is_none() && self.state.waiting_for_input.is_none());
+
+                ui.horizontal(|ui| {
+                    if ui.button("P1 Keyboard Input").clicked() {
+                        self.state.open_input_window = Some(InputWindow(Player::P1, InputType::Keyboard));
+                    }
+
+                    ui.add_space(20.0);
+
+                    if ui.button("P1 Gamepad Input").clicked() {
+                        self.state.open_input_window = Some(InputWindow(Player::P1, InputType::Gamepad));
+                    }
+                });
+
+                ui.add_space(10.0);
+
+                ui.horizontal(|ui| {
+                    if ui.button("P2 Keyboard Input").clicked() {
+                        self.state.open_input_window = Some(InputWindow(Player::P2, InputType::Keyboard));
+                    }
+
+                    ui.add_space(20.0);
+
+                    if ui.button("P2 Gamepad Input").clicked() {
+                        self.state.open_input_window = Some(InputWindow(Player::P2, InputType::Gamepad));
+                    }
+                });
+
+                ui.add_space(20.0);
+
+                ui.checkbox(
+                    &mut self.config.input.allow_opposite_directions,
+                    "Allow simultaneous opposing directional inputs (left+right / up+down)",
+                )
+                    .on_hover_text("Some games exhibit severe glitches when opposing directions are pressed simultaneously");
+
+                ui.horizontal(|ui| {
+                    NumericTextInput::new(
+                        &mut self.state.input.axis_deadzone_text,
+                        &mut self.config.input.axis_deadzone,
+                        &mut self.state.input.axis_deadzone_invalid,
+                        0..=i16::MAX as u16,
+                    )
+                    .desired_width(55.0)
+                    .ui(ui);
+                    ui.label("Joystick axis deadzone (0-32767)");
+                });
+                if self.state.input.axis_deadzone_invalid {
+                    ui.colored_label(
+                        Color32::RED,
+                        "Axis deadzone must be an integer between 0 and 32767",
+                    );
+                }
+            });
+        if !input_settings_open {
+            self.state.open_window = None;
+            self.state.open_input_window = None;
+        }
+
+        self.render_input_subwindow(ctx);
+    }
+
+    fn render_input_subwindow(&mut self, ctx: &Context) {
+        let Some(InputWindow(player, input_type)) = self.state.open_input_window else { return };
+
+        let window_title = format!("{player:?} {input_type:?} Configuration");
+
+        let mut input_subwindow_open = true;
+        Window::new(&window_title)
+            .resizable(false)
+            .open(&mut input_subwindow_open)
+            .show(ctx, |ui| {
+                ui.set_enabled(self.state.waiting_for_input.is_none());
+
+                Grid::new(format!("{player:?}_{input_type:?}")).show(ui, |ui| {
+                    for nes_button in NesButton::ALL {
+                        ui.label(format!("{nes_button:?}:"));
+                        InputButton::new(player, input_type, nes_button, self).ui(ui);
+
+                        if ui.button("Clear").clicked() {
+                            match input_type {
+                                InputType::Keyboard => {
+                                    *get_keyboard_field(
+                                        &mut self.config.input,
+                                        player,
+                                        nes_button,
+                                    ) = None;
+                                }
+                                InputType::Gamepad => {
+                                    *get_joystick_field(
+                                        &mut self.config.input,
+                                        player,
+                                        nes_button,
+                                    ) = None;
+                                }
+                            }
+                        }
+
+                        ui.end_row();
+                    }
+                });
+            });
+        if !input_subwindow_open {
+            self.state.open_input_window = None;
+        }
+    }
+
     fn render_about_window(&mut self, ctx: &Context) {
         let mut about_open = true;
         Window::new("About")
@@ -472,6 +734,30 @@ impl App {
             self.state.open_window = None;
         }
     }
+
+    fn poll_for_input_thread_result(&mut self) {
+        let Some((player, nes_button)) = self.state.waiting_for_input else { return };
+
+        if let Ok(collect_result) = self
+            .state
+            .thread_input_receiver
+            .recv_timeout(Duration::from_millis(1))
+        {
+            self.state.waiting_for_input = None;
+
+            match collect_result {
+                Some(InputCollectResult::Keyboard(keycode)) => {
+                    *get_keyboard_field(&mut self.config.input, player, nes_button) =
+                        Some(KeyboardInput::from(keycode));
+                }
+                Some(InputCollectResult::Gamepad(joystick_input)) => {
+                    *get_joystick_field(&mut self.config.input, player, nes_button) =
+                        Some(joystick_input);
+                }
+                None => {}
+            }
+        }
+    }
 }
 
 fn load_config(path: &PathBuf) -> Result<AppConfig, anyhow::Error> {
@@ -482,6 +768,8 @@ fn load_config(path: &PathBuf) -> Result<AppConfig, anyhow::Error> {
 impl eframe::App for App {
     fn update(&mut self, ctx: &Context, frame: &mut Frame) {
         let prev_config = self.config.clone();
+
+        self.poll_for_input_thread_result();
 
         if self.state.emulation_error.lock().unwrap().is_some() {
             self.state.open_window = Some(OpenWindow::EmulationError);
@@ -498,7 +786,9 @@ impl eframe::App for App {
         }
 
         TopBottomPanel::new(TopBottomSide::Top, "top_bottom_panel").show(ctx, |ui| {
-            ui.set_enabled(self.state.open_window.is_none());
+            ui.set_enabled(
+                self.state.open_window.is_none() && self.state.waiting_for_input.is_none(),
+            );
             menu::bar(ui, |ui| {
                 ui.menu_button("File", |ui| {
                     let open_button = Button::new("Open")
@@ -517,10 +807,7 @@ impl eframe::App for App {
                     }
                 });
 
-                ui.set_enabled(
-                    self.state.open_window.is_none()
-                        && !self.state.emulator_is_running.load(Ordering::Relaxed),
-                );
+                ui.set_enabled(!self.state.emulator_is_running.load(Ordering::Relaxed));
                 ui.menu_button("Settings", |ui| {
                     if ui.button("Video").clicked() {
                         self.state.open_window = Some(OpenWindow::VideoSettings);
@@ -529,6 +816,11 @@ impl eframe::App for App {
 
                     if ui.button("Audio").clicked() {
                         self.state.open_window = Some(OpenWindow::AudioSettings);
+                        ui.close_menu();
+                    }
+
+                    if ui.button("Input").clicked() {
+                        self.state.open_window = Some(OpenWindow::InputSettings);
                         ui.close_menu();
                     }
                 });
@@ -548,6 +840,9 @@ impl eframe::App for App {
             }
             Some(OpenWindow::AudioSettings) => {
                 self.render_audio_settings_window(ctx);
+            }
+            Some(OpenWindow::InputSettings) => {
+                self.render_input_settings_window(ctx);
             }
             Some(OpenWindow::About) => {
                 self.render_about_window(ctx);
@@ -582,16 +877,12 @@ impl eframe::App for App {
     }
 }
 
-fn launch_emulator<P: AsRef<Path>>(
-    path: P,
-    sender: &Sender<JgnesNativeConfig>,
-    config: &AppConfig,
-) {
+fn launch_emulator<P: AsRef<Path>>(path: P, sender: &Sender<EmuThreadTask>, config: &AppConfig) {
     let path = path.as_ref();
 
     let file_path_str = path.to_string_lossy().to_string();
     sender
-        .send(JgnesNativeConfig {
+        .send(EmuThreadTask::RunEmulator(Box::new(JgnesNativeConfig {
             nes_file_path: file_path_str,
             window_width: config.window_width,
             window_height: config.window_height,
@@ -606,7 +897,17 @@ fn launch_emulator<P: AsRef<Path>>(
             vsync_mode: config.vsync_mode,
             sync_to_audio: config.sync_to_audio,
             launch_fullscreen: config.launch_fullscreen,
-            input_config: InputConfig::default(),
-        })
+            input_config: config.input.clone(),
+        })))
         .unwrap();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn app_config_default_does_not_panic() {
+        let _app_config = AppConfig::default();
+    }
 }

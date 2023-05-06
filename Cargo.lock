@@ -1553,7 +1553,9 @@ dependencies = [
  "env_logger",
  "jgnes-native-driver",
  "log",
+ "rand",
  "rfd",
+ "sdl2",
  "serde",
  "toml",
 ]

@@ -11,7 +11,7 @@ Implemented:
   * Rendering effects of certain mid-scanline writes may not be cycle-accurate based on non-binary test ROMs (nmi_sync / scanline)
   * DMC DMA cycle stealing and dummy reads are not implemented
   * DMC IRQ timing is slightly off based on non-binary test ROMs (dpcmletterbox), almost certainly due to lack of DMC DMA cycle stealing
-* The most commonly used mappers
+* The most commonly used cartridge boards (aka mappers)
   * NROM
   * The most common NROM variants (UxROM / CNROM / AxROM), including the Codemasters UxROM variants
   * MMC1

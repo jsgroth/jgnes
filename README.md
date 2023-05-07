@@ -176,4 +176,13 @@ cargo run --release --bin jgnes-gui
 
 ## Screenshots
 
-![Screenshot from 2023-05-04 00-08-23](https://user-images.githubusercontent.com/1137683/236116961-e10795d9-f729-4bd5-b36c-8ed58bda45f4.png)
+![Screenshot from 2023-05-06 23-12-07](https://user-images.githubusercontent.com/1137683/236657493-07f070d7-4cc8-4db4-ae0b-196e2c67216e.png)
+
+![Screenshot from 2023-05-06 23-14-04](https://user-images.githubusercontent.com/1137683/236657497-2a62be4a-1700-4f7a-8b0c-5c007fdc5a7b.png)
+
+![Screenshot from 2023-05-06 23-16-40](https://user-images.githubusercontent.com/1137683/236657499-0a6d0604-cae1-4d9a-b222-dd9767b44f4d.png)
+
+![Screenshot from 2023-05-06 23-22-50](https://user-images.githubusercontent.com/1137683/236657502-01801f32-f521-4cd2-a68c-61b3649920b7.png)
+
+![Screenshot from 2023-05-06 23-26-54](https://user-images.githubusercontent.com/1137683/236657588-20db8af6-51aa-430b-b927-fc8335113345.png)
+

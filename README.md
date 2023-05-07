@@ -20,6 +20,8 @@ Implemented:
     * The MMC3 MC-ACC variant is not implemented; was used in a few games, e.g. Incredible Crash Dummies
   * MMC5
     * The additional audio channels are not implemented; no US-released games used these but a few Japanese releases did
+  * Sunsoft 5A / 5B / FME-7
+    * The additional audio channels in 5B are not implemented; these were only used in one game, Gimmick! (JP version)
 * P1 & P2 input with support for keyboard input and DirectInput gamepad input
   * Using multiple gamepads simultaneously does not work well right now
 * Support for 3 different forced aspect ratios (NTSC, 1:1 pixel aspect ratio, 4:3 screen aspect ratio), plus an option for stretched/none

@@ -17,7 +17,6 @@ Implemented:
   * MMC1
   * MMC2/MMC4
   * MMC3/MMC6
-    * The MMC3 MC-ACC variant is not implemented; was used in a few games, e.g. Incredible Crash Dummies
   * MMC5
     * The additional audio channels are not implemented; no US-released games used these but a few Japanese releases did
   * Sunsoft 5A / 5B / FME-7

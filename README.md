@@ -13,7 +13,7 @@ Implemented:
   * DMC IRQ timing is slightly off based on non-binary test ROMs (dpcmletterbox), almost certainly due to lack of DMC DMA cycle stealing
 * The most commonly used mappers
   * NROM
-  * The most common NROM variants (UxROM / CNROM / AxROM)
+  * The most common NROM variants (UxROM / CNROM / AxROM), including the Codemasters UxROM variants
   * MMC1
   * MMC2/MMC4
   * MMC3/MMC6

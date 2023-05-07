@@ -45,15 +45,15 @@ struct CliArgs {
     nes_file_path: String,
 
     /// Window width in pixels
-    #[arg(short = 'w', long, default_value_t = 3 * 256)]
+    #[arg(short = 'w', long, default_value_t = 878)]
     window_width: u32,
 
     /// Window height in pixels
-    #[arg(short = 'l', long, default_value_t = 3 * 224)]
+    #[arg(short = 'l', long, default_value_t = 672)]
     window_height: u32,
 
     /// Renderer (Sdl2 / Wgpu)
-    #[arg(long, default_value_t = NativeRenderer::Sdl2)]
+    #[arg(long, default_value_t)]
     renderer: NativeRenderer,
 
     /// Wgpu backend (Auto / Vulkan / Direct3d12 / Metal)
@@ -69,7 +69,7 @@ struct CliArgs {
     gpu_render_scale: u32,
 
     /// Aspect ratio (Ntsc / SquarePixels / FourThree / Stretched)
-    #[arg(long, default_value_t = AspectRatio::SquarePixels)]
+    #[arg(long, default_value_t)]
     aspect_ratio: AspectRatio,
 
     /// Enable forced integer scaling for height
@@ -85,7 +85,7 @@ struct CliArgs {
     launch_fullscreen: bool,
 
     /// VSync mode (Enabled / Disabled / Fast / Adaptive)
-    #[arg(long, default_value_t = VSyncMode::Enabled)]
+    #[arg(long, default_value_t)]
     vsync_mode: VSyncMode,
 
     /// Left overscan in pixels

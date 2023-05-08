@@ -1,11 +1,13 @@
-use crate::emuthread;
 use crate::emuthread::{EmuThreadTask, InputCollectResult};
+use crate::romlist::RomMetadata;
+use crate::{emuthread, romlist};
 use eframe::Frame;
 use egui::panel::TopBottomSide;
 use egui::{
-    menu, Align, Button, Color32, Context, Grid, Key, KeyboardShortcut, Layout, Modifiers,
-    TextEdit, TopBottomPanel, Ui, Widget, Window,
+    menu, Align, Button, CentralPanel, Color32, Context, Grid, Key, KeyboardShortcut, Layout,
+    Modifiers, TextEdit, TopBottomPanel, Ui, Widget, Window,
 };
+use egui_extras::{Column, TableBuilder};
 use jgnes_native_driver::{
     AspectRatio, GpuFilterMode, InputConfig, InputConfigBase, JgnesDynamicConfig,
     JgnesNativeConfig, JoystickInput, KeyboardInput, NativeRenderer, Overscan, RenderScale,
@@ -67,6 +69,7 @@ struct AppConfig {
     launch_fullscreen: bool,
     #[serde(default)]
     vsync_mode: VSyncMode,
+    rom_search_dir: Option<String>,
     #[serde(default)]
     input: InputConfig,
 }
@@ -83,6 +86,7 @@ enum OpenWindow {
     VideoSettings,
     AudioSettings,
     InputSettings,
+    UiSettings,
     About,
     EmulationError,
 }
@@ -241,6 +245,7 @@ struct AppState {
     window_height_invalid: bool,
     overscan: OverscanState,
     input: InputState,
+    rom_list: Vec<RomMetadata>,
     open_window: Option<OpenWindow>,
     open_input_window: Option<InputWindow>,
     waiting_for_input: Option<(Player, NesButton)>,
@@ -286,6 +291,7 @@ impl AppState {
             window_height_invalid: false,
             overscan: overscan_state,
             input: input_state,
+            rom_list: Vec::new(),
             open_window: None,
             open_input_window: None,
             waiting_for_input: None,
@@ -380,11 +386,13 @@ impl App {
 
         let state = AppState::new(&config);
 
-        Self {
+        let mut app = Self {
             config_path,
             config,
             state,
-        }
+        };
+        app.refresh_rom_list();
+        app
     }
 
     fn handle_open(&mut self) {
@@ -400,6 +408,94 @@ impl App {
         let config_str =
             toml::to_string(&self.config).expect("Config should always be serializable");
         fs::write(&self.config_path, config_str).expect("Unable to save config file");
+    }
+
+    fn render_central_panel(&mut self, ctx: &Context) {
+        CentralPanel::default().show(ctx, |ui| match &self.config.rom_search_dir {
+            Some(_) => {
+                TableBuilder::new(ui)
+                    .auto_shrink([false; 2])
+                    .striped(true)
+                    .cell_layout(Layout::left_to_right(Align::Center))
+                    .columns(Column::auto(), 3)
+                    .column(Column::remainder())
+                    .header(30.0, |mut row| {
+                        row.col(|ui| {
+                            ui.heading("Name");
+                        });
+                        row.col(|ui| {
+                            ui.heading("Board");
+                        });
+                        row.col(|ui| {
+                            ui.heading("PRG ROM");
+                        });
+                        row.col(|ui| {
+                            ui.heading("CHR ROM");
+                        });
+                    })
+                    .body(|mut body| {
+                        for metadata in self.state.rom_list.clone() {
+                            body.row(40.0, |mut row| {
+                                row.col(|ui| {
+                                    if ui.button(&metadata.file_name_no_ext).clicked() {
+                                        self.state.stop_emulator_if_running();
+                                        launch_emulator(
+                                            &metadata.full_path,
+                                            &self.state.thread_task_sender,
+                                            &self.config,
+                                        );
+                                    }
+                                });
+
+                                row.col(|ui| {
+                                    ui.label(&metadata.mapper_name);
+                                });
+
+                                row.col(|ui| {
+                                    let size_kb = metadata.prg_rom_len / 1024;
+                                    ui.label(format!("{size_kb}KB"));
+                                });
+
+                                row.col(|ui| {
+                                    let size_kb = metadata.chr_rom_len / 1024;
+                                    ui.label(format!("{size_kb}KB"));
+                                });
+                            });
+                        }
+                    });
+            }
+            None => {
+                ui.centered_and_justified(|ui| {
+                    ui.label("Configure a ROM search directory to see ROM list here");
+                });
+            }
+        });
+    }
+
+    fn render_ui_settings_window(&mut self, ctx: &Context) {
+        let mut ui_settings_open = true;
+        Window::new("UI Settings")
+            .resizable(false)
+            .open(&mut ui_settings_open)
+            .show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label("ROM search directory:");
+
+                    let button_text = self.config.rom_search_dir.as_deref().unwrap_or("<None>");
+                    if ui.button(button_text).clicked() {
+                        if let Some(dir) = FileDialog::new().pick_folder() {
+                            self.config.rom_search_dir = dir.to_str().map(String::from);
+                        }
+                    }
+
+                    if ui.button("Clear").clicked() {
+                        self.config.rom_search_dir = None;
+                    }
+                });
+            });
+        if !ui_settings_open {
+            self.state.open_window = None;
+        }
     }
 
     fn render_video_settings_window(&mut self, ctx: &Context) {
@@ -774,6 +870,20 @@ impl App {
             }
         }
     }
+
+    fn refresh_rom_list(&mut self) {
+        let Some(rom_search_dir) = &self.config.rom_search_dir else { return };
+
+        match romlist::get_rom_list(rom_search_dir) {
+            Ok(mut rom_list) => {
+                rom_list.sort_by(|a, b| a.file_name_no_ext.cmp(&b.file_name_no_ext));
+                self.state.rom_list = rom_list;
+            }
+            Err(err) => {
+                log::error!("Error retriving ROM list from {rom_search_dir}: {err}");
+            }
+        }
+    }
 }
 
 fn load_config(path: &PathBuf) -> Result<AppConfig, anyhow::Error> {
@@ -839,6 +949,11 @@ impl eframe::App for App {
                         self.state.open_window = Some(OpenWindow::InputSettings);
                         ui.close_menu();
                     }
+
+                    if ui.button("Interface").clicked() {
+                        self.state.open_window = Some(OpenWindow::UiSettings);
+                        ui.close_menu();
+                    }
                 });
 
                 ui.menu_button("Help", |ui| {
@@ -850,6 +965,8 @@ impl eframe::App for App {
             });
         });
 
+        self.render_central_panel(ctx);
+
         match self.state.open_window {
             Some(OpenWindow::VideoSettings) => {
                 self.render_video_settings_window(ctx);
@@ -859,6 +976,9 @@ impl eframe::App for App {
             }
             Some(OpenWindow::InputSettings) => {
                 self.render_input_settings_window(ctx);
+            }
+            Some(OpenWindow::UiSettings) => {
+                self.render_ui_settings_window(ctx);
             }
             Some(OpenWindow::About) => {
                 self.render_about_window(ctx);
@@ -889,6 +1009,7 @@ impl eframe::App for App {
 
         if prev_config != self.config {
             self.save_config();
+            self.refresh_rom_list();
         }
     }
 }

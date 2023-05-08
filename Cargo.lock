@@ -1524,7 +1524,7 @@ dependencies = [
 
 [[package]]
 name = "jgnes-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -1534,7 +1534,7 @@ dependencies = [
 
 [[package]]
 name = "jgnes-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jgnes-proc-macros",
  "log",
@@ -1546,7 +1546,7 @@ dependencies = [
 
 [[package]]
 name = "jgnes-gui"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "eframe",
@@ -1563,7 +1563,7 @@ dependencies = [
 
 [[package]]
 name = "jgnes-native-driver"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "bytemuck",
@@ -1578,7 +1578,7 @@ dependencies = [
 
 [[package]]
 name = "jgnes-proc-macros"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "quote",
  "syn 2.0.15",

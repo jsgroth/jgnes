@@ -13,14 +13,17 @@ Implemented:
   * DMC IRQ timing is slightly off based on non-binary test ROMs (dpcmletterbox), almost certainly due to lack of DMC DMA cycle stealing
 * The most commonly used cartridge boards (aka mappers)
   * NROM
-  * The most common NROM variants (UxROM / CNROM / AxROM), including the Codemasters UxROM variants
+  * The most common NROM variants (UxROM / CNROM / AxROM)
   * MMC1
-  * MMC2/MMC4
   * MMC3/MMC6
+* Some less commonly used cartridge boards
+  * MMC2/MMC4
   * MMC5
     * The additional audio channels are not implemented; no US-released games used these but a few Japanese releases did
   * Sunsoft 5A / 5B / FME-7
     * The additional audio channels in 5B are not implemented; these were only used in one game, Gimmick! (JP version)
+  * Codemasters unlicensed board
+  * Color Dreams unlicensed board
 * P1 & P2 input with support for keyboard input and DirectInput gamepad input
   * Using multiple gamepads simultaneously does not work well right now
 * Support for 3 different forced aspect ratios (NTSC, 1:1 pixel aspect ratio, 4:3 screen aspect ratio), plus an option for stretched/none

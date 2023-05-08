@@ -20,6 +20,7 @@ Implemented:
   * MMC2/MMC4
   * MMC5
     * The additional audio channels are not implemented; no US-released games used these but a few Japanese releases did
+  * Konami VRC2 / VRC4
   * Sunsoft 5A / 5B / FME-7
     * The additional audio channels in 5B are not implemented; these were only used in one game, Gimmick! (JP version)
   * Codemasters unlicensed board

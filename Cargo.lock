@@ -1536,6 +1536,7 @@ dependencies = [
 name = "jgnes-core"
 version = "0.1.0"
 dependencies = [
+ "jgnes-proc-macros",
  "log",
  "once_cell",
  "rand",
@@ -1573,6 +1574,14 @@ dependencies = [
  "serde",
  "tinyvec",
  "wgpu",
+]
+
+[[package]]
+name = "jgnes-proc-macros"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn 2.0.15",
 ]
 
 [[package]]

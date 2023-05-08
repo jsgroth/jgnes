@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "jgnes-proc-macros",
     "jgnes-core",
     "jgnes-native-driver",
     "jgnes-cli",

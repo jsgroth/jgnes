@@ -20,7 +20,8 @@ Implemented:
   * MMC2/MMC4
   * MMC5
     * The PCM expansion audio channel is not implemented; only one game used it, _Shin 4 Nin Uchi Mahjong_
-  * Konami VRC2 / VRC4 / VRC6
+  * Konami VRC2 / VRC4 / VRC6 / VRC7
+    * VRC7 FM synth expansion audio is not implemented; only one game used it, _Lagrange Point_
   * Sunsoft 5A / 5B / FME-7
     * The additional audio channels in 5B are not implemented; these were only used in one game, _Gimmick!_ (JP version)
   * Codemasters unlicensed board
@@ -33,7 +34,7 @@ Implemented:
 
 Not Implemented:
 * Color palette customization; the NES hardware directly outputs an NTSC video signal rather than RGB pixel grids, so any mapping from NES colors to RGB colors is an approximation at best
-* Lots of mappers, most notably Konami's and Namco's custom mappers
+* Lots of mappers, most notably Namco's and Bandai's custom mappers
 * RESET button functionality
 * Save states or fast forward
 * Support for PAL/EU releases (the processor timings are different compared to NTSC US/JP)

@@ -21,7 +21,6 @@ Implemented:
   * MMC5
     * The PCM expansion audio channel is not implemented; only one game used it, _Shin 4 Nin Uchi Mahjong_
   * Konami VRC2 / VRC4 / VRC6
-    * The VRC6 additional audio channels are not implemented; all three VRC6 games used them (_Akumajou Densetsu_, _Esper Dream 2_, _Mouryou Senki Madara_)
   * Sunsoft 5A / 5B / FME-7
     * The additional audio channels in 5B are not implemented; these were only used in one game, _Gimmick!_ (JP version)
   * Codemasters unlicensed board

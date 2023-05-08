@@ -20,7 +20,8 @@ Implemented:
   * MMC2/MMC4
   * MMC5
     * The additional audio channels are not implemented; no US-released games used these but a few Japanese releases did
-  * Konami VRC2 / VRC4
+  * Konami VRC2 / VRC4 / VRC6
+    * The VRC6 additional audio channels are not implemented; all three VRC6 games used them (Akumajou Densetsu, Esper Dream 2, Mouryou Senki Madara)
   * Sunsoft 5A / 5B / FME-7
     * The additional audio channels in 5B are not implemented; these were only used in one game, Gimmick! (JP version)
   * Codemasters unlicensed board

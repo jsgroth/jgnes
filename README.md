@@ -8,7 +8,7 @@ Implemented:
 * Cycle-based 6502 CPU emulation, PPU emulation (graphics), and APU emulation (audio)
   * Unofficial CPU opcodes not implemented, aside from some of the unofficial NOPs that a few games use
   * CPU open bus is not implemented; CPU open bus reads always return $FF (or $40 for the high 3 bits of JOY1/JOY2)
-  * Rendering effects of certain mid-scanline writes may not be cycle-accurate based on non-binary test ROMs (nmi_sync / scanline)
+  * Rendering effects of certain mid-scanline writes may not be cycle-accurate based on non-binary test ROMs (nmi\_sync / scanline)
   * DMC DMA cycle stealing and dummy reads are not implemented
   * DMC IRQ timing is slightly off based on non-binary test ROMs (dpcmletterbox), almost certainly due to lack of DMC DMA cycle stealing
 * The most commonly used cartridge boards (aka mappers)
@@ -19,11 +19,11 @@ Implemented:
 * Some less commonly used cartridge boards
   * MMC2/MMC4
   * MMC5
-    * The additional audio channels are not implemented; no US-released games used these but a few Japanese releases did
+    * The PCM expansion audio channel is not implemented; only one game used it, _Shin 4 Nin Uchi Mahjong_
   * Konami VRC2 / VRC4 / VRC6
-    * The VRC6 additional audio channels are not implemented; all three VRC6 games used them (Akumajou Densetsu, Esper Dream 2, Mouryou Senki Madara)
+    * The VRC6 additional audio channels are not implemented; all three VRC6 games used them (_Akumajou Densetsu_, _Esper Dream 2_, _Mouryou Senki Madara_)
   * Sunsoft 5A / 5B / FME-7
-    * The additional audio channels in 5B are not implemented; these were only used in one game, Gimmick! (JP version)
+    * The additional audio channels in 5B are not implemented; these were only used in one game, _Gimmick!_ (JP version)
   * Codemasters unlicensed board
   * Color Dreams unlicensed board
 * P1 & P2 input with support for keyboard input and DirectInput gamepad input

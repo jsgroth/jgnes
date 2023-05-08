@@ -19,7 +19,6 @@ Implemented:
 * Some less commonly used cartridge boards
   * MMC2/MMC4
   * MMC5
-    * The PCM expansion audio channel is not implemented; only one game used it, _Shin 4 Nin Uchi Mahjong_
   * Konami VRC2 / VRC4 / VRC6 / VRC7
     * VRC7 FM synth expansion audio is not implemented; only one game used it, _Lagrange Point_
   * Sunsoft 5A / 5B / FME-7

@@ -74,6 +74,29 @@ struct AppConfig {
     input: InputConfig,
 }
 
+impl AppConfig {
+    fn to_jgnes_native_config(&self, nes_file_path: String) -> JgnesNativeConfig {
+        JgnesNativeConfig {
+            nes_file_path,
+            window_width: self.window_width,
+            window_height: self.window_height,
+            renderer: self.renderer,
+            wgpu_backend: self.wgpu_backend,
+            gpu_filter_mode: match self.gpu_filter_type {
+                GpuFilterType::NearestNeighbor => GpuFilterMode::NearestNeighbor,
+                GpuFilterType::Linear => GpuFilterMode::Linear(self.gpu_render_scale),
+            },
+            aspect_ratio: self.aspect_ratio,
+            overscan: self.overscan,
+            forced_integer_height_scaling: self.forced_integer_height_scaling,
+            vsync_mode: self.vsync_mode,
+            sync_to_audio: self.sync_to_audio,
+            launch_fullscreen: self.launch_fullscreen,
+            input_config: self.input.clone(),
+        }
+    }
+}
+
 impl Default for AppConfig {
     fn default() -> Self {
         toml::from_str("")
@@ -1047,24 +1070,9 @@ fn launch_emulator<P: AsRef<Path>>(path: P, sender: &Sender<EmuThreadTask>, conf
 
     let file_path_str = path.to_string_lossy().to_string();
     sender
-        .send(EmuThreadTask::RunEmulator(Box::new(JgnesNativeConfig {
-            nes_file_path: file_path_str,
-            window_width: config.window_width,
-            window_height: config.window_height,
-            renderer: config.renderer,
-            wgpu_backend: config.wgpu_backend,
-            gpu_filter_mode: match config.gpu_filter_type {
-                GpuFilterType::NearestNeighbor => GpuFilterMode::NearestNeighbor,
-                GpuFilterType::Linear => GpuFilterMode::Linear(config.gpu_render_scale),
-            },
-            aspect_ratio: config.aspect_ratio,
-            overscan: config.overscan,
-            forced_integer_height_scaling: config.forced_integer_height_scaling,
-            vsync_mode: config.vsync_mode,
-            sync_to_audio: config.sync_to_audio,
-            launch_fullscreen: config.launch_fullscreen,
-            input_config: config.input.clone(),
-        })))
+        .send(EmuThreadTask::RunEmulator(Box::new(
+            config.to_jgnes_native_config(file_path_str),
+        )))
         .unwrap();
 }
 

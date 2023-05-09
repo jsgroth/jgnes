@@ -9,7 +9,7 @@ use egui::{
 };
 use egui_extras::{Column, TableBuilder};
 use jgnes_native_driver::{
-    AspectRatio, GpuFilterMode, InputConfig, InputConfigBase, JgnesDynamicConfig,
+    AspectRatio, GpuFilterMode, HotkeyConfig, InputConfig, InputConfigBase, JgnesDynamicConfig,
     JgnesNativeConfig, JoystickInput, KeyboardInput, NativeRenderer, Overscan, RenderScale,
     VSyncMode, WgpuBackend,
 };
@@ -109,6 +109,7 @@ enum OpenWindow {
     VideoSettings,
     AudioSettings,
     InputSettings,
+    HotkeySettings,
     UiSettings,
     About,
     EmulationError,
@@ -183,7 +184,8 @@ impl<'a> InputButton<'a> {
 
     fn ui(self, ui: &mut Ui) {
         if self.button.ui(ui).clicked() {
-            self.app_state.waiting_for_input = Some((self.player, self.nes_button));
+            self.app_state.waiting_for_input =
+                Some(WaitingForInput::NesButton(self.player, self.nes_button));
             self.app_state
                 .thread_task_sender
                 .send(EmuThreadTask::CollectInput {
@@ -191,6 +193,45 @@ impl<'a> InputButton<'a> {
                     axis_deadzone: self.axis_deadzone,
                 })
                 .expect("Sending collect input task should not fail");
+        }
+    }
+}
+
+struct HotkeyButton<'a> {
+    button: Button,
+    hotkey: Hotkey,
+    axis_deadzone: u16,
+    app_state: &'a mut AppState,
+}
+
+impl<'a> HotkeyButton<'a> {
+    fn new(hotkey: Hotkey, app: &'a mut App) -> Self {
+        let current_value = match hotkey {
+            Hotkey::Quit => app.config.input.hotkeys.quit.as_ref(),
+            Hotkey::ToggleFullscreen => app.config.input.hotkeys.toggle_fullscreen.as_ref(),
+            Hotkey::SaveState => app.config.input.hotkeys.save_state.as_ref(),
+            Hotkey::LoadState => app.config.input.hotkeys.load_state.as_ref(),
+        };
+        let button_text = current_value.map_or("<None>", String::as_str);
+
+        Self {
+            button: Button::new(button_text),
+            hotkey,
+            axis_deadzone: app.config.input.axis_deadzone,
+            app_state: &mut app.state,
+        }
+    }
+
+    fn ui(self, ui: &mut Ui) {
+        if self.button.ui(ui).clicked() {
+            self.app_state
+                .thread_task_sender
+                .send(EmuThreadTask::CollectInput {
+                    input_type: InputType::Keyboard,
+                    axis_deadzone: self.axis_deadzone,
+                })
+                .unwrap();
+            self.app_state.waiting_for_input = Some(WaitingForInput::Hotkey(self.hotkey));
         }
     }
 }
@@ -220,6 +261,32 @@ impl NesButton {
     ];
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Hotkey {
+    Quit,
+    ToggleFullscreen,
+    SaveState,
+    LoadState,
+}
+
+impl Hotkey {
+    const ALL: [Self; 4] = [
+        Self::Quit,
+        Self::ToggleFullscreen,
+        Self::SaveState,
+        Self::LoadState,
+    ];
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::Quit => "Quit",
+            Self::ToggleFullscreen => "Toggle Fullscreen",
+            Self::SaveState => "Save State",
+            Self::LoadState => "Load State",
+        }
+    }
+}
+
 fn get_keyboard_field(
     input_config: &mut InputConfig,
     player: Player,
@@ -246,6 +313,15 @@ fn get_joystick_field(
     get_input_field(player_config, button)
 }
 
+fn get_hotkey_field(hotkey_config: &mut HotkeyConfig, hotkey: Hotkey) -> &mut Option<String> {
+    match hotkey {
+        Hotkey::Quit => &mut hotkey_config.quit,
+        Hotkey::ToggleFullscreen => &mut hotkey_config.toggle_fullscreen,
+        Hotkey::SaveState => &mut hotkey_config.save_state,
+        Hotkey::LoadState => &mut hotkey_config.load_state,
+    }
+}
+
 fn get_input_field<T>(player_config: &mut InputConfigBase<T>, button: NesButton) -> &mut Option<T> {
     match button {
         NesButton::Up => &mut player_config.up,
@@ -257,6 +333,12 @@ fn get_input_field<T>(player_config: &mut InputConfigBase<T>, button: NesButton)
         NesButton::Start => &mut player_config.start,
         NesButton::Select => &mut player_config.select,
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum WaitingForInput {
+    NesButton(Player, NesButton),
+    Hotkey(Hotkey),
 }
 
 struct AppState {
@@ -271,7 +353,7 @@ struct AppState {
     rom_list: Vec<RomMetadata>,
     open_window: Option<OpenWindow>,
     open_input_window: Option<InputWindow>,
-    waiting_for_input: Option<(Player, NesButton)>,
+    waiting_for_input: Option<WaitingForInput>,
     emulator_is_running: Arc<AtomicBool>,
     emulator_quit_signal: Arc<AtomicBool>,
     emulation_error: Arc<Mutex<Option<anyhow::Error>>>,
@@ -434,91 +516,97 @@ impl App {
     }
 
     fn render_central_panel(&mut self, ctx: &Context) {
-        CentralPanel::default().show(ctx, |ui| match &self.config.rom_search_dir {
-            Some(_) => {
-                TableBuilder::new(ui)
-                    .auto_shrink([false; 2])
-                    .striped(true)
-                    .cell_layout(Layout::left_to_right(Align::Center))
-                    .column(Column::auto().at_most(300.0))
-                    .columns(Column::auto(), 3)
-                    .column(Column::remainder())
-                    .header(30.0, |mut row| {
-                        row.col(|ui| {
-                            ui.vertical_centered(|ui| {
-                                ui.heading("Name");
-                            });
-                        });
-                        row.col(|ui| {
-                            ui.vertical_centered(|ui| {
-                                ui.heading("Board");
-                            });
-                        });
-                        row.col(|ui| {
-                            ui.vertical_centered(|ui| {
-                                ui.heading("PRG ROM");
-                            });
-                        });
-                        row.col(|ui| {
-                            ui.vertical_centered(|ui| {
-                                ui.heading("CHR ROM");
-                            });
-                        });
+        CentralPanel::default().show(ctx, |ui| {
+            ui.set_enabled(
+                self.state.open_window.is_none() && self.state.waiting_for_input.is_none(),
+            );
 
-                        // Blank column to make the stripes extend to the right
-                        row.col(|_ui| {});
-                    })
-                    .body(|mut body| {
-                        for metadata in &self.state.rom_list {
-                            body.row(40.0, |mut row| {
-                                row.col(|ui| {
-                                    let button = Button::new(&metadata.file_name_no_ext)
-                                        .min_size(Vec2::new(300.0, 30.0))
-                                        .wrap(true);
-                                    if button.ui(ui).clicked() {
-                                        self.state.stop_emulator_if_running();
-                                        launch_emulator(
-                                            &metadata.full_path,
-                                            &self.state.thread_task_sender,
-                                            &self.config,
-                                        );
-                                    }
+            match &self.config.rom_search_dir {
+                Some(_) => {
+                    TableBuilder::new(ui)
+                        .auto_shrink([false; 2])
+                        .striped(true)
+                        .cell_layout(Layout::left_to_right(Align::Center))
+                        .column(Column::auto().at_most(300.0))
+                        .columns(Column::auto(), 3)
+                        .column(Column::remainder())
+                        .header(30.0, |mut row| {
+                            row.col(|ui| {
+                                ui.vertical_centered(|ui| {
+                                    ui.heading("Name");
                                 });
-
-                                row.col(|ui| {
-                                    ui.centered_and_justified(|ui| {
-                                        ui.label(&metadata.mapper_name);
-                                    });
+                            });
+                            row.col(|ui| {
+                                ui.vertical_centered(|ui| {
+                                    ui.heading("Board");
                                 });
-
-                                row.col(|ui| {
-                                    ui.centered_and_justified(|ui| {
-                                        let size_kb = metadata.prg_rom_len / 1024;
-                                        ui.label(format!("{size_kb}KB"));
-                                    });
+                            });
+                            row.col(|ui| {
+                                ui.vertical_centered(|ui| {
+                                    ui.heading("PRG ROM");
                                 });
+                            });
+                            row.col(|ui| {
+                                ui.vertical_centered(|ui| {
+                                    ui.heading("CHR ROM");
+                                });
+                            });
 
-                                row.col(|ui| {
-                                    ui.centered_and_justified(|ui| {
-                                        let size_kb = metadata.chr_rom_len / 1024;
-                                        if size_kb > 0 {
-                                            ui.label(format!("{size_kb}KB"));
-                                        } else {
-                                            ui.label("None (RAM)");
+                            // Blank column to make the stripes extend to the right
+                            row.col(|_ui| {});
+                        })
+                        .body(|mut body| {
+                            for metadata in &self.state.rom_list {
+                                body.row(40.0, |mut row| {
+                                    row.col(|ui| {
+                                        let button = Button::new(&metadata.file_name_no_ext)
+                                            .min_size(Vec2::new(300.0, 30.0))
+                                            .wrap(true);
+                                        if button.ui(ui).clicked() {
+                                            self.state.stop_emulator_if_running();
+                                            launch_emulator(
+                                                &metadata.full_path,
+                                                &self.state.thread_task_sender,
+                                                &self.config,
+                                            );
                                         }
                                     });
-                                });
 
-                                // Blank column to make the stripes extend to the right
-                                row.col(|_ui| {});
-                            });
-                        }
+                                    row.col(|ui| {
+                                        ui.centered_and_justified(|ui| {
+                                            ui.label(&metadata.mapper_name);
+                                        });
+                                    });
+
+                                    row.col(|ui| {
+                                        ui.centered_and_justified(|ui| {
+                                            let size_kb = metadata.prg_rom_len / 1024;
+                                            ui.label(format!("{size_kb}KB"));
+                                        });
+                                    });
+
+                                    row.col(|ui| {
+                                        ui.centered_and_justified(|ui| {
+                                            let size_kb = metadata.chr_rom_len / 1024;
+                                            if size_kb > 0 {
+                                                ui.label(format!("{size_kb}KB"));
+                                            } else {
+                                                ui.label("None (RAM)");
+                                            }
+                                        });
+                                    });
+
+                                    // Blank column to make the stripes extend to the right
+                                    row.col(|_ui| {});
+                                });
+                            }
+                        });
+                }
+                None => {
+                    ui.centered_and_justified(|ui| {
+                        ui.label("Configure a ROM search directory to see ROM list here");
                     });
-            }
-            None => {
-                ui.centered_and_justified(|ui| {
-                    ui.label("Configure a ROM search directory to see ROM list here");
-                });
+                }
             }
         });
     }
@@ -870,6 +958,31 @@ impl App {
         }
     }
 
+    fn render_hotkey_settings_window(&mut self, ctx: &Context) {
+        let mut hotkey_settings_open = true;
+        Window::new("Hotkey Settings")
+            .resizable(false)
+            .open(&mut hotkey_settings_open)
+            .show(ctx, |ui| {
+                Grid::new("hotkey_settings_grid").show(ui, |ui| {
+                    for hotkey in Hotkey::ALL {
+                        ui.label(format!("{}:", hotkey.label()));
+
+                        HotkeyButton::new(hotkey, self).ui(ui);
+
+                        if ui.button("Clear").clicked() {
+                            *get_hotkey_field(&mut self.config.input.hotkeys, hotkey) = None;
+                        }
+
+                        ui.end_row();
+                    }
+                });
+            });
+        if !hotkey_settings_open {
+            self.state.open_window = None;
+        }
+    }
+
     fn render_about_window(&mut self, ctx: &Context) {
         let mut about_open = true;
         Window::new("About")
@@ -899,7 +1012,7 @@ impl App {
     }
 
     fn poll_for_input_thread_result(&mut self) {
-        let Some((player, nes_button)) = self.state.waiting_for_input else { return };
+        let Some(waiting_for_input) = self.state.waiting_for_input else { return };
 
         if let Ok(collect_result) = self
             .state
@@ -908,16 +1021,28 @@ impl App {
         {
             self.state.waiting_for_input = None;
 
-            match collect_result {
-                Some(InputCollectResult::Keyboard(keycode)) => {
-                    *get_keyboard_field(&mut self.config.input, player, nes_button) =
-                        Some(KeyboardInput::from(keycode));
-                }
-                Some(InputCollectResult::Gamepad(joystick_input)) => {
-                    *get_joystick_field(&mut self.config.input, player, nes_button) =
-                        Some(joystick_input);
-                }
-                None => {}
+            match waiting_for_input {
+                WaitingForInput::NesButton(player, nes_button) => match collect_result {
+                    Some(InputCollectResult::Keyboard(keycode)) => {
+                        *get_keyboard_field(&mut self.config.input, player, nes_button) =
+                            Some(KeyboardInput::from(keycode));
+                    }
+                    Some(InputCollectResult::Gamepad(joystick_input)) => {
+                        *get_joystick_field(&mut self.config.input, player, nes_button) =
+                            Some(joystick_input);
+                    }
+                    None => {}
+                },
+                WaitingForInput::Hotkey(hotkey) => match collect_result {
+                    Some(InputCollectResult::Keyboard(keycode)) => {
+                        *get_hotkey_field(&mut self.config.input.hotkeys, hotkey) =
+                            Some(keycode.name());
+                    }
+                    Some(InputCollectResult::Gamepad(..)) => {
+                        panic!("hotkey input results should always be keyboard")
+                    }
+                    None => {}
+                },
             }
         }
     }
@@ -1001,6 +1126,11 @@ impl eframe::App for App {
                         ui.close_menu();
                     }
 
+                    if ui.button("Hotkeys").clicked() {
+                        self.state.open_window = Some(OpenWindow::HotkeySettings);
+                        ui.close_menu();
+                    }
+
                     if ui.button("Interface").clicked() {
                         self.state.open_window = Some(OpenWindow::UiSettings);
                         ui.close_menu();
@@ -1027,6 +1157,9 @@ impl eframe::App for App {
             }
             Some(OpenWindow::InputSettings) => {
                 self.render_input_settings_window(ctx);
+            }
+            Some(OpenWindow::HotkeySettings) => {
+                self.render_hotkey_settings_window(ctx);
             }
             Some(OpenWindow::UiSettings) => {
                 self.render_ui_settings_window(ctx);

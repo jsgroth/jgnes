@@ -344,9 +344,54 @@ impl Display for PlayerInputConfig {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HotkeyConfig {
+    pub quit: Option<String>,
+    pub toggle_fullscreen: Option<String>,
+    pub save_state: Option<String>,
+    pub load_state: Option<String>,
+}
+
+impl Default for HotkeyConfig {
+    fn default() -> Self {
+        Self {
+            quit: Some(Keycode::Escape.name()),
+            toggle_fullscreen: Some(Keycode::F9.name()),
+            save_state: Some(Keycode::F5.name()),
+            load_state: Some(Keycode::F6.name()),
+        }
+    }
+}
+
+impl Display for HotkeyConfig {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        writeln!(f)?;
+        writeln!(f, "    Quit: {}", fmt_option(self.quit.as_ref()))?;
+        writeln!(
+            f,
+            "    Toggle Fullscreen: {}",
+            fmt_option(self.toggle_fullscreen.as_ref())
+        )?;
+        writeln!(
+            f,
+            "    Save State: {}",
+            fmt_option(self.save_state.as_ref())
+        )?;
+        write!(
+            f,
+            "    Load State: {}",
+            fmt_option(self.load_state.as_ref())
+        )?;
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InputConfig {
     pub p1: PlayerInputConfig,
     pub p2: PlayerInputConfig,
+    #[serde(default)]
+    pub hotkeys: HotkeyConfig,
     pub axis_deadzone: u16,
     pub allow_opposite_directions: bool,
 }
@@ -372,6 +417,7 @@ impl Default for InputConfig {
                 keyboard: KeyboardInputConfig::default(),
                 joystick: JoystickInputConfig::default(),
             },
+            hotkeys: HotkeyConfig::default(),
             axis_deadzone: 5000,
             allow_opposite_directions: false,
         }
@@ -383,6 +429,7 @@ impl Display for InputConfig {
         writeln!(f)?;
         writeln!(f, "  Player 1: {}", self.p1)?;
         writeln!(f, "  Player 2: {}", self.p2)?;
+        writeln!(f, "  Hotkeys: {}", self.hotkeys)?;
         writeln!(f, "  axis_deadzone: {}", self.axis_deadzone)?;
         writeln!(
             f,

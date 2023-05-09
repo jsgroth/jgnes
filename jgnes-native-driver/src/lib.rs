@@ -30,9 +30,9 @@ use crate::audio::LowPassFilter;
 use crate::config::RendererConfig;
 use crate::input::SdlInputHandler;
 pub use config::{
-    AspectRatio, AxisDirection, HatDirection, InputConfig, InputConfigBase, JgnesDynamicConfig,
-    JgnesNativeConfig, JoystickInput, JoystickInputConfig, KeyboardInput, KeyboardInputConfig,
-    NativeRenderer, Overscan, PlayerInputConfig, VSyncMode, WgpuBackend,
+    AspectRatio, AxisDirection, HatDirection, HotkeyConfig, InputConfig, InputConfigBase,
+    JgnesDynamicConfig, JgnesNativeConfig, JoystickInput, JoystickInputConfig, KeyboardInput,
+    KeyboardInputConfig, NativeRenderer, Overscan, PlayerInputConfig, VSyncMode, WgpuBackend,
 };
 pub use render::{GpuFilterMode, RenderScale};
 

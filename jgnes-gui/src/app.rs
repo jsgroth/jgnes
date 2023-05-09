@@ -458,7 +458,11 @@ impl App {
 
                                 row.col(|ui| {
                                     let size_kb = metadata.chr_rom_len / 1024;
-                                    ui.label(format!("{size_kb}KB"));
+                                    if size_kb > 0 {
+                                        ui.label(format!("{size_kb}KB"));
+                                    } else {
+                                        ui.label("None (RAM)");
+                                    }
                                 });
                             });
                         }

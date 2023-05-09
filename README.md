@@ -29,12 +29,13 @@ Implemented:
 * Support for 3 different forced aspect ratios (NTSC, 1:1 pixel aspect ratio, 4:3 screen aspect ratio), plus an option for stretched/none
 * Overscan customization
 * A GPU-backed renderer based on `wgpu` with an option for integer upscaling + linear interpolation, producing a sharp but clean image even at higher resolutions and non-8:7 aspect ratios
+* Save & load state
 
 Not Implemented:
 * Color palette customization; the NES hardware directly outputs an NTSC video signal rather than RGB pixel grids, so any mapping from NES colors to RGB colors is an approximation at best
 * Lots of mappers, most notably Namco's and Bandai's custom mappers
 * RESET button functionality
-* Save states or fast forward
+* Fast forward
 * Support for PAL/EU releases (the processor timings are different compared to NTSC US/JP)
 
 ## Requirements

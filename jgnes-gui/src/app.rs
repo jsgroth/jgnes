@@ -303,7 +303,7 @@ impl AppState {
         }
     }
 
-    fn stop_emulator_if_running(&mut self) {
+    fn stop_emulator_if_running(&self) {
         if self.emulator_is_running.load(Ordering::Relaxed) {
             log::info!("Setting quit signal to stop running emulator");
             self.emulator_quit_signal.store(true, Ordering::Relaxed);
@@ -446,7 +446,7 @@ impl App {
                         row.col(|_ui| {});
                     })
                     .body(|mut body| {
-                        for metadata in self.state.rom_list.clone() {
+                        for metadata in &self.state.rom_list {
                             body.row(40.0, |mut row| {
                                 row.col(|ui| {
                                     let button = Button::new(&metadata.file_name_no_ext)

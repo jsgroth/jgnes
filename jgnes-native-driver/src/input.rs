@@ -1,4 +1,6 @@
-use crate::{AxisDirection, HatDirection, InputConfig, InputConfigBase, JoystickInput};
+use crate::{
+    AxisDirection, HatDirection, HotkeyConfig, InputConfig, InputConfigBase, JoystickInput,
+};
 use jgnes_core::JoypadState;
 use sdl2::event::Event;
 use sdl2::joystick::{HatState, Joystick};
@@ -29,6 +31,14 @@ enum Player {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Hotkey {
+    Quit,
+    ToggleFullscreen,
+    SaveState,
+    LoadState,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Input {
     Keyboard(Keycode),
     Joystick(JoystickInput),
@@ -41,12 +51,15 @@ pub(crate) struct SdlInputHandler<'a> {
     p2_joypad_state: Rc<RefCell<JoypadState>>,
     keyboard_input_mapping: HashMap<Keycode, Vec<(Player, Button)>>,
     joystick_input_mapping: HashMap<JoystickInput, Vec<(Player, Button)>>,
+    hotkey_mapping: HashMap<Keycode, Vec<Hotkey>>,
     axis_deadzone: u16,
     allow_opposite_directions: bool,
     joystick_subsystem: &'a JoystickSubsystem,
     joysticks: HashMap<u32, Joystick>,
     instance_id_to_device_id: HashMap<u32, u32>,
 }
+
+const EMPTY_VEC: &Vec<Hotkey> = &Vec::new();
 
 impl<'a> SdlInputHandler<'a> {
     pub(crate) fn new(
@@ -79,6 +92,9 @@ impl<'a> SdlInputHandler<'a> {
             Player::Player2,
         );
 
+        let mut hotkey_mapping = HashMap::new();
+        populate_hotkey_map(&mut hotkey_mapping, &input_config.hotkeys);
+
         Self {
             raw_p1_joypad_state: JoypadState::new(),
             p1_joypad_state,
@@ -86,6 +102,7 @@ impl<'a> SdlInputHandler<'a> {
             p2_joypad_state,
             keyboard_input_mapping,
             joystick_input_mapping,
+            hotkey_mapping,
             axis_deadzone: input_config.axis_deadzone,
             allow_opposite_directions: input_config.allow_opposite_directions,
             joystick_subsystem,
@@ -226,6 +243,10 @@ impl<'a> SdlInputHandler<'a> {
         Ok(())
     }
 
+    pub(crate) fn check_for_hotkeys(&self, keycode: Keycode) -> &Vec<Hotkey> {
+        self.hotkey_mapping.get(&keycode).unwrap_or(EMPTY_VEC)
+    }
+
     fn update_joypad_state(&mut self, input: Input, value: bool) {
         let input_mapping = match input {
             Input::Keyboard(keycode) => self.keyboard_input_mapping.get(&keycode),
@@ -266,7 +287,7 @@ fn populate_map<K>(
             {
                 $(
                     if let Some(field) = $field {
-                        add_to_map(map, field, player, $button);
+                        add_to_map(map, field, (player, $button));
                     }
                 )*
             }
@@ -285,17 +306,35 @@ fn populate_map<K>(
     );
 }
 
-fn add_to_map<K>(
-    map: &mut HashMap<K, Vec<(Player, Button)>>,
-    key: K,
-    player: Player,
-    button: Button,
-) where
+fn populate_hotkey_map(map: &mut HashMap<Keycode, Vec<Hotkey>>, config: &HotkeyConfig) {
+    macro_rules! populate_hotkey_map {
+        ($($field:expr => $hotkey:expr),+$(,)?) => {
+            {
+                $(
+                    if let Some(field) = &$field {
+                        add_to_map(map, Keycode::from_name(field).unwrap(), $hotkey);
+                    }
+                )*
+            }
+        }
+    }
+
+    populate_hotkey_map!(
+        config.quit => Hotkey::Quit,
+        config.toggle_fullscreen => Hotkey::ToggleFullscreen,
+        config.save_state => Hotkey::SaveState,
+        config.load_state => Hotkey::LoadState,
+    );
+}
+
+fn add_to_map<K, V>(map: &mut HashMap<K, Vec<V>>, key: K, value: V)
+where
     K: Eq + Hash,
+    V: Copy,
 {
     map.entry(key)
-        .and_modify(|buttons| buttons.push((player, button)))
-        .or_insert(vec![(player, button)]);
+        .and_modify(|buttons| buttons.push(value))
+        .or_insert(vec![value]);
 }
 
 fn hat_directions_for(state: HatState) -> ArrayVec<[HatDirection; 2]> {

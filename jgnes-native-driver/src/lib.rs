@@ -11,7 +11,6 @@ use jgnes_core::{
 };
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
 use sdl2::event::{Event, EventType, WindowEvent};
-use sdl2::keyboard::Keycode;
 use sdl2::pixels::{Color, PixelFormatEnum};
 use sdl2::rect::Rect;
 use sdl2::render::{Texture, TextureCreator, WindowCanvas};
@@ -28,7 +27,7 @@ use std::{cmp, fs, thread};
 
 use crate::audio::LowPassFilter;
 use crate::config::RendererConfig;
-use crate::input::SdlInputHandler;
+use crate::input::{Hotkey, SdlInputHandler};
 pub use config::{
     AspectRatio, AxisDirection, HatDirection, HotkeyConfig, InputConfig, InputConfigBase,
     JgnesDynamicConfig, JgnesNativeConfig, JoystickInput, JoystickInputConfig, KeyboardInput,
@@ -471,11 +470,7 @@ where
                 input_handler.handle_event(&event)?;
 
                 match event {
-                    Event::Quit { .. }
-                    | Event::KeyDown {
-                        keycode: Some(Keycode::Escape),
-                        ..
-                    } => {
+                    Event::Quit { .. } => {
                         return Ok(());
                     }
                     Event::Window { win_event, .. } => match win_event {
@@ -494,51 +489,53 @@ where
                         }
                         _ => {}
                     },
-                    // TODO hotkey configuration
                     Event::KeyDown {
-                        keycode: Some(Keycode::F5),
+                        keycode: Some(keycode),
                         ..
                     } => {
-                        emulator.save_state(File::create(save_state_path)?)?;
-                        log::info!("Saved state to '{}'", save_state_path.display());
-                    }
-                    Event::KeyDown {
-                        keycode: Some(Keycode::F6),
-                        ..
-                    } => match File::open(save_state_path) {
-                        Ok(file) => match emulator.load_state(file) {
-                            Ok(..) => {
-                                log::info!(
-                                    "Successfully loaded save state from '{}'",
-                                    save_state_path.display()
-                                );
+                        for hotkey in input_handler.check_for_hotkeys(keycode) {
+                            match hotkey {
+                                Hotkey::Quit => {
+                                    return Ok(());
+                                }
+                                Hotkey::ToggleFullscreen => {
+                                    let window = emulator.get_renderer_mut().window_mut();
+                                    let new_fullscreen = match window.fullscreen_state() {
+                                        FullscreenType::Off => FullscreenType::Desktop,
+                                        _ => FullscreenType::Off,
+                                    };
+                                    window
+                                        .set_fullscreen(new_fullscreen)
+                                        .map_err(anyhow::Error::msg)?;
+                                }
+                                Hotkey::SaveState => {
+                                    emulator.save_state(File::create(save_state_path)?)?;
+                                    log::info!("Saved state to '{}'", save_state_path.display());
+                                }
+                                Hotkey::LoadState => match File::open(save_state_path) {
+                                    Ok(file) => match emulator.load_state(file) {
+                                        Ok(..) => {
+                                            log::info!(
+                                                "Successfully loaded save state from '{}'",
+                                                save_state_path.display()
+                                            );
+                                        }
+                                        Err(err) => {
+                                            log::error!(
+                                                "Error loading state from '{}': {err}",
+                                                save_state_path.display()
+                                            );
+                                        }
+                                    },
+                                    Err(err) => {
+                                        log::error!(
+                                            "Cannot open file at '{}': {err}",
+                                            save_state_path.display()
+                                        );
+                                    }
+                                },
                             }
-                            Err(err) => {
-                                log::error!(
-                                    "Error loading state from '{}': {err}",
-                                    save_state_path.display()
-                                );
-                            }
-                        },
-                        Err(err) => {
-                            log::error!(
-                                "Cannot open file at '{}': {err}",
-                                save_state_path.display()
-                            );
                         }
-                    },
-                    Event::KeyDown {
-                        keycode: Some(Keycode::F9),
-                        ..
-                    } => {
-                        let window = emulator.get_renderer_mut().window_mut();
-                        let new_fullscreen = match window.fullscreen_state() {
-                            FullscreenType::Off => FullscreenType::Desktop,
-                            _ => FullscreenType::Off,
-                        };
-                        window
-                            .set_fullscreen(new_fullscreen)
-                            .map_err(anyhow::Error::msg)?;
                     }
                     _ => {}
                 }

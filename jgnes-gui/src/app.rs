@@ -5,7 +5,7 @@ use eframe::Frame;
 use egui::panel::TopBottomSide;
 use egui::{
     menu, Align, Button, CentralPanel, Color32, Context, Grid, Key, KeyboardShortcut, Layout,
-    Modifiers, TextEdit, TopBottomPanel, Ui, Widget, Window,
+    Modifiers, TextEdit, TopBottomPanel, Ui, Vec2, Widget, Window,
 };
 use egui_extras::{Column, TableBuilder};
 use jgnes_native_driver::{
@@ -417,7 +417,8 @@ impl App {
                     .auto_shrink([false; 2])
                     .striped(true)
                     .cell_layout(Layout::left_to_right(Align::Center))
-                    .columns(Column::auto(), 3)
+                    .column(Column::auto().at_most(300.0))
+                    .columns(Column::auto(), 2)
                     .column(Column::remainder())
                     .header(30.0, |mut row| {
                         row.col(|ui| {
@@ -437,7 +438,10 @@ impl App {
                         for metadata in self.state.rom_list.clone() {
                             body.row(40.0, |mut row| {
                                 row.col(|ui| {
-                                    if ui.button(&metadata.file_name_no_ext).clicked() {
+                                    let button = Button::new(&metadata.file_name_no_ext)
+                                        .min_size(Vec2::new(300.0, 30.0))
+                                        .wrap(true);
+                                    if button.ui(ui).clicked() {
                                         self.state.stop_emulator_if_running();
                                         launch_emulator(
                                             &metadata.full_path,

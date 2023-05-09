@@ -116,6 +116,7 @@ fn collect_input(
     let mut event_pump = sdl_ctx.event_pump().map_err(anyhow::Error::msg)?;
 
     let mut joysticks = HashMap::new();
+    let mut instance_id_to_device_id: HashMap<u32, u32> = HashMap::new();
 
     loop {
         for event in event_pump.poll_iter() {
@@ -129,39 +130,67 @@ fn collect_input(
                 } if input_type == InputType::Keyboard => {
                     return Ok(Some(InputCollectResult::Keyboard(keycode)));
                 }
-                Event::JoyDeviceAdded { which, .. } if input_type == InputType::Gamepad => {
-                    let joystick = joystick_subsystem.open(which)?;
-                    joysticks.insert(which, joystick);
-                }
-                Event::JoyDeviceRemoved { which, .. } if input_type == InputType::Gamepad => {
-                    joysticks.remove(&which);
-                }
-                Event::JoyButtonDown { button_idx, .. } if input_type == InputType::Gamepad => {
-                    return Ok(Some(InputCollectResult::Gamepad(JoystickInput::Button {
-                        button_idx,
-                    })));
-                }
-                Event::JoyAxisMotion {
-                    axis_idx, value, ..
+                Event::JoyDeviceAdded {
+                    which: device_id, ..
                 } if input_type == InputType::Gamepad => {
-                    if value.saturating_abs() as u16 >= axis_deadzone {
-                        let direction = if value > 0 {
-                            AxisDirection::Positive
-                        } else {
-                            AxisDirection::Negative
-                        };
-                        return Ok(Some(InputCollectResult::Gamepad(JoystickInput::Axis {
-                            axis_idx,
-                            direction,
+                    let joystick = joystick_subsystem.open(device_id)?;
+                    instance_id_to_device_id.insert(joystick.instance_id(), device_id);
+                    joysticks.insert(device_id, joystick);
+                }
+                Event::JoyDeviceRemoved {
+                    which: instance_id, ..
+                } if input_type == InputType::Gamepad => {
+                    if let Some(device_id) = instance_id_to_device_id.remove(&instance_id) {
+                        joysticks.remove(&device_id);
+                    }
+                }
+                Event::JoyButtonDown {
+                    which: instance_id,
+                    button_idx,
+                    ..
+                } if input_type == InputType::Gamepad => {
+                    if let Some(&device_id) = instance_id_to_device_id.get(&instance_id) {
+                        return Ok(Some(InputCollectResult::Gamepad(JoystickInput::Button {
+                            device_id,
+                            button_idx,
                         })));
                     }
                 }
-                Event::JoyHatMotion { hat_idx, state, .. } if input_type == InputType::Gamepad => {
-                    if let Some(direction) = hat_direction_for(state) {
-                        return Ok(Some(InputCollectResult::Gamepad(JoystickInput::Hat {
-                            hat_idx,
-                            direction,
-                        })));
+                Event::JoyAxisMotion {
+                    which: instance_id,
+                    axis_idx,
+                    value,
+                    ..
+                } if input_type == InputType::Gamepad => {
+                    if let Some(&device_id) = instance_id_to_device_id.get(&instance_id) {
+                        if value.saturating_abs() as u16 >= axis_deadzone {
+                            let direction = if value > 0 {
+                                AxisDirection::Positive
+                            } else {
+                                AxisDirection::Negative
+                            };
+                            return Ok(Some(InputCollectResult::Gamepad(JoystickInput::Axis {
+                                device_id,
+                                axis_idx,
+                                direction,
+                            })));
+                        }
+                    }
+                }
+                Event::JoyHatMotion {
+                    which: instance_id,
+                    hat_idx,
+                    state,
+                    ..
+                } if input_type == InputType::Gamepad => {
+                    if let Some(&device_id) = instance_id_to_device_id.get(&instance_id) {
+                        if let Some(direction) = hat_direction_for(state) {
+                            return Ok(Some(InputCollectResult::Gamepad(JoystickInput::Hat {
+                                device_id,
+                                hat_idx,
+                                direction,
+                            })));
+                        }
                     }
                 }
                 _ => {}

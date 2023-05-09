@@ -133,46 +133,86 @@ impl<'a> SdlInputHandler<'a> {
                     }
                 }
             }
-            Event::JoyButtonDown { button_idx, .. } => {
-                let input = JoystickInput::Button { button_idx };
-                self.update_joypad_state(Input::Joystick(input), true);
-            }
-            Event::JoyButtonUp { button_idx, .. } => {
-                let input = JoystickInput::Button { button_idx };
-                self.update_joypad_state(Input::Joystick(input), false);
-            }
-            Event::JoyAxisMotion {
-                axis_idx, value, ..
+            Event::JoyButtonDown {
+                which: instance_id,
+                button_idx,
+                ..
             } => {
-                let positive = JoystickInput::Axis {
-                    axis_idx,
-                    direction: AxisDirection::Positive,
-                };
-                let negative = JoystickInput::Axis {
-                    axis_idx,
-                    direction: AxisDirection::Negative,
-                };
-                if value.saturating_abs() >= self.axis_deadzone as i16 {
-                    if value > 0 {
-                        self.update_joypad_state(Input::Joystick(positive), true);
-                        self.update_joypad_state(Input::Joystick(negative), false);
-                    } else {
-                        self.update_joypad_state(Input::Joystick(positive), false);
-                        self.update_joypad_state(Input::Joystick(negative), true);
-                    }
-                } else {
-                    self.update_joypad_state(Input::Joystick(positive), false);
-                    self.update_joypad_state(Input::Joystick(negative), false);
+                if let Some(&device_id) = self.instance_id_to_device_id.get(&instance_id) {
+                    let input = JoystickInput::Button {
+                        device_id,
+                        button_idx,
+                    };
+                    self.update_joypad_state(Input::Joystick(input), true);
                 }
             }
-            Event::JoyHatMotion { hat_idx, state, .. } => {
-                for direction in HatDirection::ALL {
-                    let input = JoystickInput::Hat { hat_idx, direction };
+            Event::JoyButtonUp {
+                which: instance_id,
+                button_idx,
+                ..
+            } => {
+                if let Some(&device_id) = self.instance_id_to_device_id.get(&instance_id) {
+                    let input = JoystickInput::Button {
+                        device_id,
+                        button_idx,
+                    };
                     self.update_joypad_state(Input::Joystick(input), false);
                 }
-                for direction in hat_directions_for(state) {
-                    let input = JoystickInput::Hat { hat_idx, direction };
-                    self.update_joypad_state(Input::Joystick(input), true);
+            }
+            Event::JoyAxisMotion {
+                which: instance_id,
+                axis_idx,
+                value,
+                ..
+            } => {
+                if let Some(&device_id) = self.instance_id_to_device_id.get(&instance_id) {
+                    let positive = JoystickInput::Axis {
+                        device_id,
+                        axis_idx,
+                        direction: AxisDirection::Positive,
+                    };
+                    let negative = JoystickInput::Axis {
+                        device_id,
+                        axis_idx,
+                        direction: AxisDirection::Negative,
+                    };
+                    if value.saturating_abs() >= self.axis_deadzone as i16 {
+                        if value > 0 {
+                            self.update_joypad_state(Input::Joystick(positive), true);
+                            self.update_joypad_state(Input::Joystick(negative), false);
+                        } else {
+                            self.update_joypad_state(Input::Joystick(positive), false);
+                            self.update_joypad_state(Input::Joystick(negative), true);
+                        }
+                    } else {
+                        self.update_joypad_state(Input::Joystick(positive), false);
+                        self.update_joypad_state(Input::Joystick(negative), false);
+                    }
+                }
+            }
+            Event::JoyHatMotion {
+                which: instance_id,
+                hat_idx,
+                state,
+                ..
+            } => {
+                if let Some(&device_id) = self.instance_id_to_device_id.get(&instance_id) {
+                    for direction in HatDirection::ALL {
+                        let input = JoystickInput::Hat {
+                            device_id,
+                            hat_idx,
+                            direction,
+                        };
+                        self.update_joypad_state(Input::Joystick(input), false);
+                    }
+                    for direction in hat_directions_for(state) {
+                        let input = JoystickInput::Hat {
+                            device_id,
+                            hat_idx,
+                            direction,
+                        };
+                        self.update_joypad_state(Input::Joystick(input), true);
+                    }
                 }
             }
             _ => {}

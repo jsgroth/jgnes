@@ -26,7 +26,6 @@ Implemented:
   * Codemasters unlicensed board
   * Color Dreams unlicensed board
 * P1 & P2 input with support for keyboard input and DirectInput gamepad input
-  * Using multiple gamepads simultaneously does not work well right now
 * Support for 3 different forced aspect ratios (NTSC, 1:1 pixel aspect ratio, 4:3 screen aspect ratio), plus an option for stretched/none
 * Overscan customization
 * A GPU-backed renderer based on `wgpu` with an option for integer upscaling + linear interpolation, producing a sharp but clean image even at higher resolutions and non-8:7 aspect ratios

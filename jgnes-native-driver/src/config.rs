@@ -267,16 +267,18 @@ impl Display for HatDirection {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "type")]
-// TODO properly support multiple gamepads
 pub enum JoystickInput {
     Button {
+        device_id: u32,
         button_idx: u8,
     },
     Axis {
+        device_id: u32,
         axis_idx: u8,
         direction: AxisDirection,
     },
     Hat {
+        device_id: u32,
         hat_idx: u8,
         direction: HatDirection,
     },
@@ -285,15 +287,24 @@ pub enum JoystickInput {
 impl Display for JoystickInput {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Button { button_idx, .. } => write!(f, "Button {button_idx}"),
+            Self::Button {
+                device_id,
+                button_idx,
+            } => write!(f, "Joy {device_id} Button {button_idx}"),
             Self::Axis {
+                device_id,
                 axis_idx,
                 direction,
-                ..
-            } => write!(f, "Axis {axis_idx} {}", direction.sign_str()),
+            } => write!(
+                f,
+                "Joy {device_id} Axis {axis_idx} {}",
+                direction.sign_str()
+            ),
             Self::Hat {
-                hat_idx, direction, ..
-            } => write!(f, "Hat {hat_idx} {direction}"),
+                device_id,
+                hat_idx,
+                direction,
+            } => write!(f, "Joy {device_id} Hat {hat_idx} {direction}"),
         }
     }
 }

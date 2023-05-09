@@ -19,6 +19,7 @@ use sdl2::video::{FullscreenType, Window};
 use sdl2::EventPump;
 use std::cell::RefCell;
 use std::ffi::OsStr;
+use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::atomic::Ordering;
@@ -375,6 +376,8 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
         display_area.width, display_area.height, config.aspect_ratio
     );
 
+    let save_state_path = Path::new(&config.nes_file_path).with_extension("ss0");
+
     match config.renderer {
         NativeRenderer::Sdl2 => {
             let mut canvas_builder = window.into_canvas();
@@ -393,7 +396,13 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
                 input_poller,
                 save_writer,
             )?;
-            run_emulator(emulator, dynamic_config, event_pump, input_handler)
+            run_emulator(
+                emulator,
+                dynamic_config,
+                event_pump,
+                input_handler,
+                &save_state_path,
+            )
         }
         NativeRenderer::Wgpu => {
             let renderer = WgpuRenderer::from_window(window, renderer_config)?;
@@ -405,7 +414,13 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
                 input_poller,
                 save_writer,
             )?;
-            run_emulator(emulator, dynamic_config, event_pump, input_handler)
+            run_emulator(
+                emulator,
+                dynamic_config,
+                event_pump,
+                input_handler,
+                &save_state_path,
+            )
         }
     }
 }
@@ -420,17 +435,22 @@ fn init_window(window: Window) -> Result<Window, anyhow::Error> {
     Ok(canvas.into_window())
 }
 
-fn run_emulator<
-    R: Renderer<Err = anyhow::Error> + SdlWindowRenderer,
-    A: AudioPlayer<Err = anyhow::Error>,
-    I: InputPoller,
-    S: SaveWriter<Err = anyhow::Error>,
->(
+fn run_emulator<R, A, I, S, P>(
     mut emulator: Emulator<R, A, I, S>,
     dynamic_config: JgnesDynamicConfig,
     mut event_pump: EventPump,
     mut input_handler: SdlInputHandler<'_>,
-) -> anyhow::Result<()> {
+    save_state_path: P,
+) -> anyhow::Result<()>
+where
+    R: Renderer<Err = anyhow::Error> + SdlWindowRenderer,
+    A: AudioPlayer<Err = anyhow::Error>,
+    I: InputPoller,
+    S: SaveWriter<Err = anyhow::Error>,
+    P: AsRef<Path>,
+{
+    let save_state_path = save_state_path.as_ref();
+
     let mut ticks = 0_u64;
     loop {
         if let Err(err) = emulator.tick() {
@@ -474,11 +494,43 @@ fn run_emulator<
                         }
                         _ => {}
                     },
+                    // TODO hotkey configuration
+                    Event::KeyDown {
+                        keycode: Some(Keycode::F5),
+                        ..
+                    } => {
+                        emulator.save_state(File::create(save_state_path)?)?;
+                        log::info!("Saved state to '{}'", save_state_path.display());
+                    }
+                    Event::KeyDown {
+                        keycode: Some(Keycode::F6),
+                        ..
+                    } => match File::open(save_state_path) {
+                        Ok(file) => match emulator.load_state(file) {
+                            Ok(..) => {
+                                log::info!(
+                                    "Successfully loaded save state from '{}'",
+                                    save_state_path.display()
+                                );
+                            }
+                            Err(err) => {
+                                log::error!(
+                                    "Error loading state from '{}': {err}",
+                                    save_state_path.display()
+                                );
+                            }
+                        },
+                        Err(err) => {
+                            log::error!(
+                                "Cannot open file at '{}': {err}",
+                                save_state_path.display()
+                            );
+                        }
+                    },
                     Event::KeyDown {
                         keycode: Some(Keycode::F9),
                         ..
                     } => {
-                        // TODO hotkey configuration
                         let window = emulator.get_renderer_mut().window_mut();
                         let new_fullscreen = match window.fullscreen_state() {
                             FullscreenType::Off => FullscreenType::Desktop,

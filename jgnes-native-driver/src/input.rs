@@ -45,6 +45,7 @@ pub(crate) struct SdlInputHandler<'a> {
     allow_opposite_directions: bool,
     joystick_subsystem: &'a JoystickSubsystem,
     joysticks: HashMap<u32, Joystick>,
+    instance_id_to_device_id: HashMap<u32, u32>,
 }
 
 impl<'a> SdlInputHandler<'a> {
@@ -89,6 +90,7 @@ impl<'a> SdlInputHandler<'a> {
             allow_opposite_directions: input_config.allow_opposite_directions,
             joystick_subsystem,
             joysticks: HashMap::new(),
+            instance_id_to_device_id: HashMap::new(),
         }
     }
 
@@ -106,18 +108,29 @@ impl<'a> SdlInputHandler<'a> {
             } => {
                 self.update_joypad_state(Input::Keyboard(keycode), false);
             }
-            Event::JoyDeviceAdded { which, .. } => {
-                let joystick = self.joystick_subsystem.open(which)?;
+            Event::JoyDeviceAdded {
+                which: device_id, ..
+            } => {
+                let joystick = self.joystick_subsystem.open(device_id)?;
+                let instance_id = joystick.instance_id();
                 log::info!(
-                    "Opened joystick idx {which}: {} ({})",
+                    "Opened joystick device id {device_id} with instance id {instance_id}: {} ({})",
                     joystick.name(),
                     joystick.guid()
                 );
-                self.joysticks.insert(which, joystick);
+                self.joysticks.insert(device_id, joystick);
+                self.instance_id_to_device_id.insert(instance_id, device_id);
             }
-            Event::JoyDeviceRemoved { which, .. } => {
-                if let Some(removed) = self.joysticks.remove(&which) {
-                    log::info!("Joystick {which} removed: {}", removed.name());
+            Event::JoyDeviceRemoved {
+                which: instance_id, ..
+            } => {
+                if let Some(device_id) = self.instance_id_to_device_id.remove(&instance_id) {
+                    if let Some(removed) = self.joysticks.remove(&device_id) {
+                        log::info!(
+                            "Joystick {device_id} removed (instance id {instance_id}): {}",
+                            removed.name()
+                        );
+                    }
                 }
             }
             Event::JoyButtonDown { button_idx, .. } => {

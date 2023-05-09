@@ -418,21 +418,32 @@ impl App {
                     .striped(true)
                     .cell_layout(Layout::left_to_right(Align::Center))
                     .column(Column::auto().at_most(300.0))
-                    .columns(Column::auto(), 2)
+                    .columns(Column::auto(), 3)
                     .column(Column::remainder())
                     .header(30.0, |mut row| {
                         row.col(|ui| {
-                            ui.heading("Name");
+                            ui.vertical_centered(|ui| {
+                                ui.heading("Name");
+                            });
                         });
                         row.col(|ui| {
-                            ui.heading("Board");
+                            ui.vertical_centered(|ui| {
+                                ui.heading("Board");
+                            });
                         });
                         row.col(|ui| {
-                            ui.heading("PRG ROM");
+                            ui.vertical_centered(|ui| {
+                                ui.heading("PRG ROM");
+                            });
                         });
                         row.col(|ui| {
-                            ui.heading("CHR ROM");
+                            ui.vertical_centered(|ui| {
+                                ui.heading("CHR ROM");
+                            });
                         });
+
+                        // Blank column to make the stripes extend to the right
+                        row.col(|_ui| {});
                     })
                     .body(|mut body| {
                         for metadata in self.state.rom_list.clone() {
@@ -452,22 +463,31 @@ impl App {
                                 });
 
                                 row.col(|ui| {
-                                    ui.label(&metadata.mapper_name);
+                                    ui.centered_and_justified(|ui| {
+                                        ui.label(&metadata.mapper_name);
+                                    });
                                 });
 
                                 row.col(|ui| {
-                                    let size_kb = metadata.prg_rom_len / 1024;
-                                    ui.label(format!("{size_kb}KB"));
-                                });
-
-                                row.col(|ui| {
-                                    let size_kb = metadata.chr_rom_len / 1024;
-                                    if size_kb > 0 {
+                                    ui.centered_and_justified(|ui| {
+                                        let size_kb = metadata.prg_rom_len / 1024;
                                         ui.label(format!("{size_kb}KB"));
-                                    } else {
-                                        ui.label("None (RAM)");
-                                    }
+                                    });
                                 });
+
+                                row.col(|ui| {
+                                    ui.centered_and_justified(|ui| {
+                                        let size_kb = metadata.chr_rom_len / 1024;
+                                        if size_kb > 0 {
+                                            ui.label(format!("{size_kb}KB"));
+                                        } else {
+                                            ui.label("None (RAM)");
+                                        }
+                                    });
+                                });
+
+                                // Blank column to make the stripes extend to the right
+                                row.col(|_ui| {});
                             });
                         }
                     });

@@ -36,6 +36,8 @@ pub enum Hotkey {
     ToggleFullscreen,
     SaveState,
     LoadState,
+    SoftReset,
+    HardReset,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -324,6 +326,8 @@ fn populate_hotkey_map(map: &mut HashMap<Keycode, Vec<Hotkey>>, config: &HotkeyC
         config.toggle_fullscreen => Hotkey::ToggleFullscreen,
         config.save_state => Hotkey::SaveState,
         config.load_state => Hotkey::LoadState,
+        config.soft_reset => Hotkey::SoftReset,
+        config.hard_reset => Hotkey::HardReset,
     );
 }
 

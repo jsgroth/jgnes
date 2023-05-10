@@ -211,6 +211,8 @@ impl<'a> HotkeyButton<'a> {
             Hotkey::ToggleFullscreen => app.config.input.hotkeys.toggle_fullscreen.as_ref(),
             Hotkey::SaveState => app.config.input.hotkeys.save_state.as_ref(),
             Hotkey::LoadState => app.config.input.hotkeys.load_state.as_ref(),
+            Hotkey::SoftReset => app.config.input.hotkeys.soft_reset.as_ref(),
+            Hotkey::HardReset => app.config.input.hotkeys.hard_reset.as_ref(),
         };
         let button_text = current_value.map_or("<None>", String::as_str);
 
@@ -267,14 +269,18 @@ enum Hotkey {
     ToggleFullscreen,
     SaveState,
     LoadState,
+    SoftReset,
+    HardReset,
 }
 
 impl Hotkey {
-    const ALL: [Self; 4] = [
+    const ALL: [Self; 6] = [
         Self::Quit,
         Self::ToggleFullscreen,
         Self::SaveState,
         Self::LoadState,
+        Self::SoftReset,
+        Self::HardReset,
     ];
 
     fn label(self) -> &'static str {
@@ -283,6 +289,8 @@ impl Hotkey {
             Self::ToggleFullscreen => "Toggle Fullscreen",
             Self::SaveState => "Save State",
             Self::LoadState => "Load State",
+            Self::SoftReset => "Soft Reset",
+            Self::HardReset => "Hard Reset",
         }
     }
 }
@@ -319,6 +327,8 @@ fn get_hotkey_field(hotkey_config: &mut HotkeyConfig, hotkey: Hotkey) -> &mut Op
         Hotkey::ToggleFullscreen => &mut hotkey_config.toggle_fullscreen,
         Hotkey::SaveState => &mut hotkey_config.save_state,
         Hotkey::LoadState => &mut hotkey_config.load_state,
+        Hotkey::SoftReset => &mut hotkey_config.soft_reset,
+        Hotkey::HardReset => &mut hotkey_config.hard_reset,
     }
 }
 

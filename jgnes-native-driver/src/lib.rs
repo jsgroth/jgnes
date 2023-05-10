@@ -534,6 +534,14 @@ where
                                         );
                                     }
                                 },
+                                Hotkey::SoftReset => {
+                                    log::info!("Performing soft reset");
+                                    emulator.soft_reset();
+                                }
+                                Hotkey::HardReset => {
+                                    log::info!("Performing hard reset");
+                                    emulator = emulator.hard_reset();
+                                }
                             }
                         }
                     }

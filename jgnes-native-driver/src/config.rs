@@ -349,6 +349,8 @@ pub struct HotkeyConfig {
     pub toggle_fullscreen: Option<String>,
     pub save_state: Option<String>,
     pub load_state: Option<String>,
+    pub soft_reset: Option<String>,
+    pub hard_reset: Option<String>,
 }
 
 impl Default for HotkeyConfig {
@@ -358,6 +360,8 @@ impl Default for HotkeyConfig {
             toggle_fullscreen: Some(Keycode::F9.name()),
             save_state: Some(Keycode::F5.name()),
             load_state: Some(Keycode::F6.name()),
+            soft_reset: Some(Keycode::F3.name()),
+            hard_reset: Some(Keycode::F4.name()),
         }
     }
 }
@@ -376,10 +380,20 @@ impl Display for HotkeyConfig {
             "    Save State: {}",
             fmt_option(self.save_state.as_ref())
         )?;
-        write!(
+        writeln!(
             f,
             "    Load State: {}",
             fmt_option(self.load_state.as_ref())
+        )?;
+        writeln!(
+            f,
+            "    Soft Reset: {}",
+            fmt_option(self.soft_reset.as_ref())
+        )?;
+        write!(
+            f,
+            "    Hard Reset: {}",
+            fmt_option(self.hard_reset.as_ref())
         )?;
 
         Ok(())

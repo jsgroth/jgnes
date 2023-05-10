@@ -35,6 +35,7 @@ Not Implemented:
 * Lots of mappers, most notably Namco's and Bandai's custom mappers
 * Fast forward or rewind
 * Support for PAL/EU releases (the processor timings are different compared to NTSC US/JP)
+* Support for any controller port peripherals (e.g. the Zapper)
 
 ## Requirements
 

@@ -1,10 +1,7 @@
 mod audio;
-mod colors;
 mod config;
 mod input;
-mod render;
 
-use crate::render::WgpuRenderer;
 use jgnes_core::{
     AudioPlayer, ColorEmphasis, EmulationError, Emulator, FrameBuffer, InputPoller, JoypadState,
     Renderer, SaveWriter,
@@ -23,17 +20,17 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
-use std::{cmp, fs, thread};
+use std::{fs, thread};
 
 use crate::audio::LowPassFilter;
-use crate::config::RendererConfig;
-use crate::input::{Hotkey, SdlInputHandler};
-pub use config::{
-    AspectRatio, AxisDirection, HatDirection, HotkeyConfig, InputConfig, InputConfigBase,
-    JgnesDynamicConfig, JgnesNativeConfig, JoystickInput, JoystickInputConfig, KeyboardInput,
-    KeyboardInputConfig, NativeRenderer, Overscan, PlayerInputConfig, VSyncMode, WgpuBackend,
+pub use crate::config::{
+    AxisDirection, HatDirection, HotkeyConfig, InputConfig, InputConfigBase, JgnesDynamicConfig,
+    JgnesNativeConfig, JoystickInput, JoystickInputConfig, KeyboardInput, KeyboardInputConfig,
+    NativeRenderer, PlayerInputConfig,
 };
-pub use render::{GpuFilterMode, RenderScale};
+use crate::input::{Hotkey, SdlInputHandler};
+use jgnes_renderer::config::{RendererConfig, VSyncMode};
+use jgnes_renderer::{colors, WgpuRenderer};
 
 struct SdlRenderer<'a> {
     canvas: WindowCanvas,
@@ -76,7 +73,7 @@ impl<'a> Renderer for SdlRenderer<'a> {
             .map_err(anyhow::Error::msg)?;
 
         let (window_width, window_height) = self.canvas.window().size();
-        let display_area = determine_display_area(
+        let display_area = jgnes_renderer::determine_display_area(
             window_width,
             window_height,
             self.config.aspect_ratio,
@@ -84,82 +81,18 @@ impl<'a> Renderer for SdlRenderer<'a> {
         );
 
         self.canvas.clear();
+        let rect = Rect::new(
+            display_area.x as i32,
+            display_area.y as i32,
+            display_area.width,
+            display_area.height,
+        );
         self.canvas
-            .copy(&self.texture, None, display_area.to_sdl_rect())
+            .copy(&self.texture, None, rect)
             .map_err(anyhow::Error::msg)?;
         self.canvas.present();
 
         Ok(())
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct DisplayArea {
-    x: u32,
-    y: u32,
-    width: u32,
-    height: u32,
-}
-
-impl DisplayArea {
-    fn to_sdl_rect(self) -> Rect {
-        Rect::new(self.x as i32, self.y as i32, self.width, self.height)
-    }
-}
-
-fn determine_display_area(
-    window_width: u32,
-    window_height: u32,
-    aspect_ratio: AspectRatio,
-    forced_integer_height_scaling: bool,
-) -> DisplayArea {
-    match aspect_ratio {
-        AspectRatio::Stretched => DisplayArea {
-            x: 0,
-            y: 0,
-            width: window_width,
-            height: window_height,
-        },
-        AspectRatio::Ntsc | AspectRatio::SquarePixels | AspectRatio::FourThree => {
-            let width_to_height_ratio = match aspect_ratio {
-                AspectRatio::Ntsc => 64.0 / 49.0,
-                AspectRatio::SquarePixels => 8.0 / 7.0,
-                AspectRatio::FourThree => 4.0 / 3.0,
-                AspectRatio::Stretched => unreachable!("nested match expressions"),
-            };
-
-            let visible_screen_height = u32::from(jgnes_core::VISIBLE_SCREEN_HEIGHT);
-
-            let width = cmp::min(
-                window_width,
-                (f64::from(window_height) * width_to_height_ratio).round() as u32,
-            );
-            let height = cmp::min(
-                window_height,
-                (f64::from(width) / width_to_height_ratio).round() as u32,
-            );
-            let (width, height) =
-                if forced_integer_height_scaling && height >= visible_screen_height {
-                    let height = visible_screen_height * (height / visible_screen_height);
-                    let width = cmp::min(
-                        window_width,
-                        (f64::from(height) * width_to_height_ratio).round() as u32,
-                    );
-                    (width, height)
-                } else {
-                    (width, height)
-                };
-
-            assert!(width <= window_width);
-            assert!(height <= window_height);
-
-            DisplayArea {
-                x: (window_width - width) / 2,
-                y: (window_height - height) / 2,
-                width,
-                height,
-            }
-        }
     }
 }
 
@@ -272,7 +205,7 @@ impl<'a> SdlWindowRenderer for SdlRenderer<'a> {
     }
 }
 
-impl SdlWindowRenderer for WgpuRenderer {
+impl SdlWindowRenderer for WgpuRenderer<Window> {
     fn window_mut(&mut self) -> &mut Window {
         self.window_mut()
     }
@@ -322,7 +255,7 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
         wgpu_backend: config.wgpu_backend,
         gpu_filter_mode: config.gpu_filter_mode,
         aspect_ratio: config.aspect_ratio,
-        overscan: config.overscan.validate()?,
+        overscan: config.overscan,
         forced_integer_height_scaling: config.forced_integer_height_scaling,
     };
 
@@ -364,7 +297,7 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
     event_pump.disable_event(EventType::MouseMotion);
 
     let (window_width, window_height) = window.size();
-    let display_area = determine_display_area(
+    let display_area = jgnes_renderer::determine_display_area(
         window_width,
         window_height,
         config.aspect_ratio,
@@ -404,7 +337,11 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
             )
         }
         NativeRenderer::Wgpu => {
-            let renderer = WgpuRenderer::from_window(window, renderer_config)?;
+            let renderer = pollster::block_on(WgpuRenderer::from_window(
+                window,
+                Window::size,
+                renderer_config,
+            ))?;
             let emulator = Emulator::create(
                 rom_bytes,
                 sav_bytes,

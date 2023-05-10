@@ -1,8 +1,8 @@
-use crate::Overscan;
+use crate::config::Overscan;
 use jgnes_core::{ColorEmphasis, FrameBuffer};
 use std::ops::Range;
 
-// TODO do colors properly
+// TODO support color customization
 const COLOR_MAPPING: &[u8; 8 * 64 * 3] = include_bytes!("nespalette.pal");
 
 fn get_color_emphasis_offset(color_emphasis: ColorEmphasis) -> u16 {
@@ -47,7 +47,7 @@ fn clear_cols_rgba(cols: Range<usize>, pixels: &mut [u8], pitch: usize) {
     }
 }
 
-pub(crate) fn sdl_texture_updater(
+pub fn sdl_texture_updater(
     frame_buffer: &FrameBuffer,
     color_emphasis: ColorEmphasis,
     overscan: Overscan,
@@ -85,7 +85,7 @@ pub(crate) fn sdl_texture_updater(
     }
 }
 
-pub(crate) fn to_rgba(
+pub fn to_rgba(
     frame_buffer: &FrameBuffer,
     color_emphasis: ColorEmphasis,
     overscan: Overscan,
@@ -123,7 +123,6 @@ pub(crate) fn to_rgba(
                 unreachable!("destructuring a slice of size 3 into [a, b, c]")
             };
 
-            // TODO configurable
             let out_index = (i - 8) * 4 * screen_width + j * 4;
             out[out_index..out_index + 4].copy_from_slice(&[r, g, b, 255]);
         }

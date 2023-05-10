@@ -1,0 +1,16 @@
+[package]
+name = "jgnes-renderer"
+version = "0.2.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+jgnes-core = { path = "../jgnes-core" }
+
+anyhow = "1"
+bytemuck = { version = "1", features = ["derive"] }
+log = "0.4"
+serde = { version = "1", features = ["derive"] }
+raw-window-handle = "0.5"
+wgpu = "0.16"

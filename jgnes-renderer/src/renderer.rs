@@ -1,11 +1,10 @@
 // The generated Copy impl for Vertex2d violates this rule for some reason
 #![allow(clippy::let_underscore_untyped)]
 
-use crate::{colors, RendererConfig, VSyncMode};
+use crate::colors;
+use crate::config::{GpuFilterMode, RendererConfig, VSyncMode};
 use jgnes_core::{ColorEmphasis, FrameBuffer, Renderer};
-use sdl2::video::Window;
-use serde::{Deserialize, Serialize};
-use std::fmt::{Display, Formatter};
+use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 use std::{iter, mem};
 use wgpu::util::DeviceExt;
 
@@ -56,54 +55,9 @@ impl Vertex2d {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct RenderScale(u32);
+pub type WindowSizeFn<W> = fn(&W) -> (u32, u32);
 
-impl RenderScale {
-    pub const TWO: Self = Self(2);
-    pub const THREE: Self = Self(3);
-
-    #[must_use]
-    pub fn get(self) -> u32 {
-        self.0
-    }
-}
-
-impl Default for RenderScale {
-    fn default() -> Self {
-        Self::THREE
-    }
-}
-
-impl TryFrom<u32> for RenderScale {
-    type Error = anyhow::Error;
-
-    fn try_from(value: u32) -> Result<Self, Self::Error> {
-        match value {
-            1..=16 => Ok(Self(value)),
-            _ => Err(anyhow::Error::msg(format!(
-                "Invalid render scale value: {value}"
-            ))),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum GpuFilterMode {
-    NearestNeighbor,
-    Linear(RenderScale),
-}
-
-impl Display for GpuFilterMode {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::NearestNeighbor => write!(f, "NearestNeighbor"),
-            Self::Linear(render_scale) => write!(f, "Linear {}x", render_scale.0),
-        }
-    }
-}
-
-pub(crate) struct WgpuRenderer {
+pub struct WgpuRenderer<W> {
     render_config: RendererConfig,
     output_buffer: Vec<u8>,
     device: wgpu::Device,
@@ -117,16 +71,27 @@ pub(crate) struct WgpuRenderer {
     render_pipeline: wgpu::RenderPipeline,
     vertices: Vec<Vertex2d>,
     vertex_buffer: wgpu::Buffer,
-    // The window must be declared after the surface for safety reasons related to drop order
-    window: Window,
+    // SAFETY: The window must be declared after the surface so that it is not dropped before the
+    // surface is dropped
+    window: W,
+    window_size_fn: WindowSizeFn<W>,
 }
 
-impl WgpuRenderer {
-    pub(crate) fn from_window(
-        window: Window,
+impl<W> WgpuRenderer<W>
+where
+    W: HasRawWindowHandle + HasRawDisplayHandle,
+{
+    /// Create a new wgpu renderer which will output to the given window.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there are any problems initializing wgpu or the
+    /// rendering pipeline.
+    pub async fn from_window(
+        window: W,
+        window_size_fn: WindowSizeFn<W>,
         render_config: RendererConfig,
     ) -> anyhow::Result<Self> {
-        // TODO configurable
         let output_buffer = vec![
             0;
             4 * jgnes_core::SCREEN_WIDTH as usize
@@ -144,28 +109,32 @@ impl WgpuRenderer {
         // dropped.
         let surface = unsafe { instance.create_surface(&window) }?;
 
-        let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::HighPerformance,
-            compatible_surface: Some(&surface),
-            force_fallback_adapter: false,
-        }))
-        .ok_or_else(|| anyhow::Error::msg("Unable to obtain wgpu adapter"))?;
+        let adapter = instance
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::HighPerformance,
+                compatible_surface: Some(&surface),
+                force_fallback_adapter: false,
+            })
+            .await
+            .ok_or_else(|| anyhow::Error::msg("Unable to obtain wgpu adapter"))?;
 
         log::info!(
             "Using GPU adapter with backend {:?}",
             adapter.get_info().backend
         );
 
-        let (device, queue) = pollster::block_on(adapter.request_device(
-            &wgpu::DeviceDescriptor {
-                label: Some("device"),
-                features: wgpu::Features::empty(),
-                limits: wgpu::Limits::default(),
-            },
-            None,
-        ))?;
+        let (device, queue) = adapter
+            .request_device(
+                &wgpu::DeviceDescriptor {
+                    label: Some("device"),
+                    features: wgpu::Features::empty(),
+                    limits: wgpu::Limits::default(),
+                },
+                None,
+            )
+            .await?;
 
-        let (window_width, window_height) = window.size();
+        let (window_width, window_height) = window_size_fn(&window);
 
         let surface_capabilities = surface.get_capabilities(&adapter);
         let surface_format = surface_capabilities
@@ -202,7 +171,6 @@ impl WgpuRenderer {
         };
         surface.configure(&device, &surface_config);
 
-        // TODO configurable dimensions
         let texture_size = wgpu::Extent3d {
             width: jgnes_core::SCREEN_WIDTH.into(),
             height: jgnes_core::VISIBLE_SCREEN_HEIGHT.into(),
@@ -222,10 +190,9 @@ impl WgpuRenderer {
 
         let render_scale = match render_config.gpu_filter_mode {
             GpuFilterMode::NearestNeighbor => 1,
-            GpuFilterMode::Linear(render_scale) => render_scale.0,
+            GpuFilterMode::Linear(render_scale) => render_scale.get(),
         };
         let scaled_texture_size = wgpu::Extent3d {
-            // TODO configurable
             width: render_scale * u32::from(jgnes_core::SCREEN_WIDTH),
             height: render_scale * u32::from(jgnes_core::VISIBLE_SCREEN_HEIGHT),
             depth_or_array_layers: 1,
@@ -429,15 +396,16 @@ impl WgpuRenderer {
             vertices,
             vertex_buffer,
             window,
+            window_size_fn,
         })
     }
 
-    pub(crate) fn window_mut(&mut self) -> &mut Window {
+    pub fn window_mut(&mut self) -> &mut W {
         &mut self.window
     }
 
-    pub(crate) fn reconfigure_surface(&mut self) {
-        let (window_width, window_height) = self.window.size();
+    pub fn reconfigure_surface(&mut self) {
+        let (window_width, window_height) = (self.window_size_fn)(&self.window);
         self.surface_config.width = window_width;
         self.surface_config.height = window_height;
 
@@ -452,7 +420,7 @@ fn compute_vertices(
     window_height: u32,
     render_config: &RendererConfig,
 ) -> Vec<Vertex2d> {
-    let display_area = super::determine_display_area(
+    let display_area = crate::determine_display_area(
         window_width,
         window_height,
         render_config.aspect_ratio,
@@ -472,7 +440,7 @@ fn compute_vertices(
         .collect()
 }
 
-impl Renderer for WgpuRenderer {
+impl<W> Renderer for WgpuRenderer<W> {
     type Err = anyhow::Error;
 
     fn render_frame(
@@ -500,7 +468,6 @@ impl Renderer for WgpuRenderer {
             &self.output_buffer,
             wgpu::ImageDataLayout {
                 offset: 0,
-                // TODO configurable
                 bytes_per_row: Some(4 * u32::from(jgnes_core::SCREEN_WIDTH)),
                 rows_per_image: Some(jgnes_core::VISIBLE_SCREEN_HEIGHT.into()),
             },
@@ -526,7 +493,6 @@ impl Renderer for WgpuRenderer {
             compute_pass.set_pipeline(compute_pipeline);
             compute_pass.set_bind_group(0, &self.compute_bind_group, &[]);
 
-            // TODO configurable
             compute_pass.dispatch_workgroups(
                 jgnes_core::SCREEN_WIDTH.into(),
                 jgnes_core::VISIBLE_SCREEN_HEIGHT.into(),

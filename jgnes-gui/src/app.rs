@@ -9,9 +9,11 @@ use egui::{
 };
 use egui_extras::{Column, TableBuilder};
 use jgnes_native_driver::{
-    AspectRatio, GpuFilterMode, HotkeyConfig, InputConfig, InputConfigBase, JgnesDynamicConfig,
-    JgnesNativeConfig, JoystickInput, KeyboardInput, NativeRenderer, Overscan, RenderScale,
-    VSyncMode, WgpuBackend,
+    HotkeyConfig, InputConfig, InputConfigBase, JgnesDynamicConfig, JgnesNativeConfig,
+    JoystickInput, KeyboardInput, NativeRenderer,
+};
+use jgnes_renderer::config::{
+    AspectRatio, GpuFilterMode, Overscan, RenderScale, VSyncMode, WgpuBackend,
 };
 use rfd::FileDialog;
 use serde::{Deserialize, Serialize};

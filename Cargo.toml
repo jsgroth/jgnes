@@ -2,6 +2,7 @@
 members = [
     "jgnes-proc-macros",
     "jgnes-core",
+    "jgnes-renderer",
     "jgnes-native-driver",
     "jgnes-cli",
     "jgnes-gui",

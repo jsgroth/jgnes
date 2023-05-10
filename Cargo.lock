@@ -1559,6 +1559,7 @@ dependencies = [
  "clap",
  "env_logger",
  "jgnes-native-driver",
+ "jgnes-renderer",
 ]
 
 [[package]]
@@ -1585,6 +1586,7 @@ dependencies = [
  "egui_extras",
  "env_logger",
  "jgnes-native-driver",
+ "jgnes-renderer",
  "log",
  "rand",
  "rfd",
@@ -1600,6 +1602,7 @@ dependencies = [
  "anyhow",
  "bytemuck",
  "jgnes-core",
+ "jgnes-renderer",
  "log",
  "pollster",
  "sdl2",
@@ -1614,6 +1617,19 @@ version = "0.2.0"
 dependencies = [
  "quote",
  "syn 2.0.15",
+]
+
+[[package]]
+name = "jgnes-renderer"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "bytemuck",
+ "jgnes-core",
+ "log",
+ "raw-window-handle",
+ "serde",
+ "wgpu",
 ]
 
 [[package]]

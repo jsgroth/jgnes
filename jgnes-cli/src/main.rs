@@ -1,9 +1,7 @@
 use clap::Parser;
 use env_logger::Env;
-use jgnes_native_driver::{
-    AspectRatio, GpuFilterMode, InputConfig, JgnesDynamicConfig, JgnesNativeConfig, NativeRenderer,
-    Overscan, VSyncMode, WgpuBackend,
-};
+use jgnes_native_driver::{InputConfig, JgnesDynamicConfig, JgnesNativeConfig, NativeRenderer};
+use jgnes_renderer::config::{AspectRatio, GpuFilterMode, Overscan, VSyncMode, WgpuBackend};
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 use std::sync::atomic::AtomicBool;

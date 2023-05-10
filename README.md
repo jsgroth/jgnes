@@ -7,7 +7,6 @@ A cross-platform NES emulator.
 Implemented:
 * Cycle-based 6502 CPU emulation, PPU emulation (graphics), and APU emulation (audio)
   * Unofficial CPU opcodes not implemented, aside from some of the unofficial NOPs that a few games use
-  * CPU open bus is not implemented; CPU open bus reads always return $FF (or $40 for the high 3 bits of JOY1/JOY2)
   * Rendering effects of certain mid-scanline writes may not be cycle-accurate based on non-binary test ROMs (nmi\_sync / scanline)
   * DMC DMA cycle stealing and dummy reads are not implemented
   * DMC IRQ timing is slightly off based on non-binary test ROMs (dpcmletterbox), almost certainly due to lack of DMC DMA cycle stealing
@@ -98,7 +97,7 @@ cargo run --release --bin jgnes-gui
 | cpu_dummy_reads/cpu_dummy_reads.nes | ✅ | |
 | cpu_dummy_writes/cpu_dummy_writes_oam.nes | ❌ | Panic due to unofficial opcodes |
 | cpu_dummy_writes/cpu_dummy_writes_ppumem.nes | ❌ | Panic due to unofficial opcodes |
-| cpu_exec_space/test_cpu_exec_space_apu.nes | ❌ | Panic due to CPU open bus not being implemented, leading to invalid opcode execution |
+| cpu_exec_space/test_cpu_exec_space_apu.nes | ✅ | |
 | cpu_exec_space/test_cpu_exec_space_ppuio.nes | ✅ | |
 | cpu_interrupts_v2/cpu_interrupts.nes | ✅ | |
 | cpu_timing_test6/cpu_timing_test.nes | ✅ | |

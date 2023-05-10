@@ -457,6 +457,7 @@ where
                 EmulationError::Render(err)
                 | EmulationError::Audio(err)
                 | EmulationError::Save(err) => Err(err),
+                EmulationError::CpuInvalidOpcode(..) => Err(anyhow::Error::msg(err.to_string())),
             };
         }
 

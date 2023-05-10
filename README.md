@@ -21,7 +21,7 @@ Implemented:
   * Konami VRC2 / VRC4 / VRC6 / VRC7
     * VRC7 FM synth expansion audio is not implemented; only one game used it, _Lagrange Point_
   * Sunsoft 5A / 5B / FME-7
-    * The additional audio channels in 5B are not implemented; these were only used in one game, _Gimmick!_ (JP version)
+    * Sunsoft 5B expansion audio is implemented but volume is implemented linearly rather than logarithmically, which is not correct
   * Codemasters unlicensed board
   * Color Dreams unlicensed board
 * P1 & P2 input with support for keyboard input and DirectInput gamepad input

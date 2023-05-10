@@ -17,11 +17,10 @@ Implemented:
   * MMC3/MMC6
 * Some less commonly used cartridge boards
   * MMC2/MMC4
-  * MMC5
-  * Konami VRC2 / VRC4 / VRC6 / VRC7
+  * MMC5 including expansion audio
+  * Konami VRC2 / VRC4 / VRC6 / VRC7, including VRC6 expansion audio
     * VRC7 FM synth expansion audio is not implemented; only one game used it, _Lagrange Point_
-  * Sunsoft 5A / 5B / FME-7
-    * Sunsoft 5B expansion audio is implemented but volume is implemented linearly rather than logarithmically, which is not correct
+  * Sunsoft 5A / 5B / FME-7, including 5B expansion audio
   * Codemasters unlicensed board
   * Color Dreams unlicensed board
 * P1 & P2 input with support for keyboard input and DirectInput gamepad input

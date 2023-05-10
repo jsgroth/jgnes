@@ -178,6 +178,19 @@ cargo run --release --bin jgnes-gui
 | mmc3_test_2/5-MMC3.nes | ✅ | |
 | mmc3_test_2/6-MMC3_alt.nes | ❌ | #2: IRQ shouldn't be set when reloading to 0 due to counter naturally reaching 0 previously |
 
+### Reset Test ROMs
+
+| Test | Result | Failure Reason |
+| --- | --- | --- |
+| apu_reset/4015_cleared.nes | ✅ | |
+| apu_reset/4017_timing.nes | ✅ | |
+| apu_reset/4017_written.nes | ✅ | |
+| apu_reset/irq_flag_cleared.nes | ✅ | |
+| apu_reset/len_ctrs_enabled.nes | ✅ | |
+| apu_reset/works_immediately.nes | ✅ | |
+| cpu_reset/ram_after_reset.nes | ✅ | |
+| cpu_reset/registers.nes | ✅ | |
+
 ## Screenshots
 
 ![Screenshot from 2023-05-06 23-12-07](https://user-images.githubusercontent.com/1137683/236657493-07f070d7-4cc8-4db4-ae0b-196e2c67216e.png)

@@ -257,6 +257,7 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
         aspect_ratio: config.aspect_ratio,
         overscan: config.overscan,
         forced_integer_height_scaling: config.forced_integer_height_scaling,
+        use_webgl2_limits: false,
     };
 
     let audio_queue = audio_subsystem

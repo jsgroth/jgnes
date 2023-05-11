@@ -65,8 +65,7 @@ pub struct WgpuRenderer<W> {
     surface: wgpu::Surface,
     surface_config: wgpu::SurfaceConfiguration,
     texture: wgpu::Texture,
-    compute_bind_group: wgpu::BindGroup,
-    compute_pipeline: Option<wgpu::ComputePipeline>,
+    compute_resources: Option<(wgpu::BindGroup, wgpu::ComputePipeline)>,
     render_bind_group: wgpu::BindGroup,
     render_pipeline: wgpu::RenderPipeline,
     vertices: Vec<Vertex2d>,
@@ -128,7 +127,11 @@ where
                 &wgpu::DeviceDescriptor {
                     label: Some("device"),
                     features: wgpu::Features::empty(),
-                    limits: wgpu::Limits::default(),
+                    limits: if render_config.use_webgl2_limits {
+                        wgpu::Limits::downlevel_webgl2_defaults()
+                    } else {
+                        wgpu::Limits::default()
+                    },
                 },
                 None,
             )
@@ -234,66 +237,69 @@ where
 
         let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
 
-        let compute_bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some("compute_bind_group_layout"),
+        // Compute pipeline is for texture scaling and is only needed if render scale is higher than 1
+        let compute_resources = (render_scale > 1).then(|| {
+            let compute_bind_group_layout =
+                device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    label: Some("compute_bind_group_layout"),
+                    entries: &[
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 0,
+                            visibility: wgpu::ShaderStages::COMPUTE,
+                            ty: wgpu::BindingType::Texture {
+                                sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                                view_dimension: wgpu::TextureViewDimension::D2,
+                                multisampled: false,
+                            },
+                            count: None,
+                        },
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 1,
+                            visibility: wgpu::ShaderStages::COMPUTE,
+                            ty: wgpu::BindingType::StorageTexture {
+                                access: wgpu::StorageTextureAccess::WriteOnly,
+                                format: scaled_texture.format(),
+                                view_dimension: wgpu::TextureViewDimension::D2,
+                            },
+                            count: None,
+                        },
+                    ],
+                });
+            let compute_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("compute_bind_group"),
+                layout: &compute_bind_group_layout,
                 entries: &[
-                    wgpu::BindGroupLayoutEntry {
+                    wgpu::BindGroupEntry {
                         binding: 0,
-                        visibility: wgpu::ShaderStages::COMPUTE,
-                        ty: wgpu::BindingType::Texture {
-                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                            view_dimension: wgpu::TextureViewDimension::D2,
-                            multisampled: false,
-                        },
-                        count: None,
+                        resource: wgpu::BindingResource::TextureView(&texture_view),
                     },
-                    wgpu::BindGroupLayoutEntry {
+                    wgpu::BindGroupEntry {
                         binding: 1,
-                        visibility: wgpu::ShaderStages::COMPUTE,
-                        ty: wgpu::BindingType::StorageTexture {
-                            access: wgpu::StorageTextureAccess::WriteOnly,
-                            format: scaled_texture.format(),
-                            view_dimension: wgpu::TextureViewDimension::D2,
-                        },
-                        count: None,
+                        resource: wgpu::BindingResource::TextureView(&scaled_texture_view),
                     },
                 ],
             });
-        let compute_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("compute_bind_group"),
-            layout: &compute_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&texture_view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::TextureView(&scaled_texture_view),
-                },
-            ],
-        });
 
-        let compute_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("compute_pipeline_layout"),
-                bind_group_layouts: &[&compute_bind_group_layout],
-                push_constant_ranges: &[],
-            });
+            let compute_pipeline_layout =
+                device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                    label: Some("compute_pipeline_layout"),
+                    bind_group_layouts: &[&compute_bind_group_layout],
+                    push_constant_ranges: &[],
+                });
 
-        let texture_scale_shader =
-            device.create_shader_module(wgpu::include_wgsl!("texture_scale.wgsl"));
+            let texture_scale_shader =
+                device.create_shader_module(wgpu::include_wgsl!("texture_scale.wgsl"));
 
-        // Compute pipeline is for texture scaling and is only needed if render scale is higher than 1
-        let compute_pipeline = (render_scale > 1).then(|| {
             let compute_entry_point = format!("texture_scale_{render_scale}x");
-            device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-                label: Some("compute_pipeline"),
-                layout: Some(&compute_pipeline_layout),
-                module: &texture_scale_shader,
-                entry_point: &compute_entry_point,
-            })
+            let compute_pipeline =
+                device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                    label: Some("compute_pipeline"),
+                    layout: Some(&compute_pipeline_layout),
+                    module: &texture_scale_shader,
+                    entry_point: &compute_entry_point,
+                });
+
+            (compute_bind_group, compute_pipeline)
         });
 
         let render_bind_group_layout =
@@ -389,8 +395,7 @@ where
             surface,
             surface_config,
             texture,
-            compute_bind_group,
-            compute_pipeline,
+            compute_resources,
             render_bind_group,
             render_pipeline,
             vertices,
@@ -485,13 +490,13 @@ impl<W> Renderer for WgpuRenderer<W> {
                 label: Some("command_encoder"),
             });
 
-        if let Some(compute_pipeline) = &self.compute_pipeline {
+        if let Some((compute_bind_group, compute_pipeline)) = &self.compute_resources {
             let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
                 label: Some("compute_pass"),
             });
 
             compute_pass.set_pipeline(compute_pipeline);
-            compute_pass.set_bind_group(0, &self.compute_bind_group, &[]);
+            compute_pass.set_bind_group(0, compute_bind_group, &[]);
 
             compute_pass.dispatch_workgroups(
                 jgnes_core::SCREEN_WIDTH.into(),

@@ -9,6 +9,9 @@ pub enum WgpuBackend {
     Vulkan,
     Direct3d12,
     Metal,
+    BrowserAuto,
+    WebGpu,
+    OpenGl,
 }
 
 impl Display for WgpuBackend {
@@ -18,6 +21,9 @@ impl Display for WgpuBackend {
             Self::Vulkan => write!(f, "Vulkan"),
             Self::Direct3d12 => write!(f, "Direct3d12"),
             Self::Metal => write!(f, "Metal"),
+            Self::BrowserAuto => write!(f, "BrowserAuto"),
+            Self::WebGpu => write!(f, "WebGpu"),
+            Self::OpenGl => write!(f, "OpenGl"),
         }
     }
 }
@@ -31,6 +37,9 @@ impl FromStr for WgpuBackend {
             "Vulkan" => Ok(Self::Vulkan),
             "Direct3d12" => Ok(Self::Direct3d12),
             "Metal" => Ok(Self::Metal),
+            "BrowserAuto" => Ok(Self::BrowserAuto),
+            "WebGpu" => Ok(Self::WebGpu),
+            "OpenGl" => Ok(Self::OpenGl),
             _ => Err(format!("invalid wgpu backend string: {s}")),
         }
     }
@@ -43,6 +52,9 @@ impl WgpuBackend {
             Self::Vulkan => wgpu::Backends::VULKAN,
             Self::Direct3d12 => wgpu::Backends::DX12,
             Self::Metal => wgpu::Backends::METAL,
+            Self::BrowserAuto => wgpu::Backends::BROWSER_WEBGPU | wgpu::Backends::GL,
+            Self::WebGpu => wgpu::Backends::BROWSER_WEBGPU,
+            Self::OpenGl => wgpu::Backends::GL,
         }
     }
 }
@@ -188,4 +200,5 @@ pub struct RendererConfig {
     pub aspect_ratio: AspectRatio,
     pub overscan: Overscan,
     pub forced_integer_height_scaling: bool,
+    pub use_webgl2_limits: bool,
 }

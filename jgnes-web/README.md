@@ -13,14 +13,9 @@ The WASM frontend requires a nightly version of the Rust toolchain because the s
 sharing memory between the main thread and worker threads in WASM. (Presumably because that isn't supported in all WASM
 runtimes, although all major browsers support it.)
 
-To install the latest nightly toolchain:
+To install the latest nightly toolchain, including the standard library source (required for the build):
 ```shell
-rustup toolchain add nightly
-```
-
-You may need to explicitly install the standard library source for the nightly toolchain:
-```shell
-rustup component add rust-src --toolchain nightly
+rustup toolchain add nightly --component rust-src
 ```
 
 ### wasm-pack

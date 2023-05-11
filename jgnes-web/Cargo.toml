@@ -13,7 +13,6 @@ jgnes-core = { path = "../jgnes-core" }
 jgnes-renderer = { path = "../jgnes-renderer" }
 
 cfg-if = "1"
-instant = "0.1"
 log = "0.4"
 pollster = "0.3"
 rfd = "0.11"

@@ -1656,14 +1656,13 @@ dependencies = [
 
 [[package]]
 name = "jgnes-web"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "cfg-if",
  "console_error_panic_hook",
  "console_log",
  "env_logger",
  "getrandom",
- "instant",
  "jgnes-core",
  "jgnes-renderer",
  "log",

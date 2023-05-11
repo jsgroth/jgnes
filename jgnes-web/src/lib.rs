@@ -182,20 +182,8 @@ pub async fn run() {
         } if window_id == state.window().id() => {
             state.input_handler.handle_window_event(&win_event);
 
-            match win_event {
-                WindowEvent::CloseRequested
-                | WindowEvent::KeyboardInput {
-                    input:
-                        KeyboardInput {
-                            virtual_keycode: Some(VirtualKeyCode::Escape),
-                            state: ElementState::Pressed,
-                            ..
-                        },
-                    ..
-                } => {
-                    *control_flow = ControlFlow::Exit;
-                }
-                _ => {}
+            if let WindowEvent::CloseRequested = win_event {
+                *control_flow = ControlFlow::Exit;
             }
         }
         Event::MainEventsCleared => {

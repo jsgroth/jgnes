@@ -54,6 +54,18 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: test
+
+    - name: Add wasm32 target
+      run: |
+        rustup target add wasm32-unknown-unknown
+
+    - name: Build web
+      run: |
+        cd jgnes-web && cargo build --target wasm32-unknown-unknown && cargo test --target wasm32-unknown-unknown
+
+    - name: Check warnings in jgnes-web
+      run: |
+        cd jgnes-web && cargo cranky --target wasm32-unknown-unknown
   linux-release:
     runs-on: ubuntu-latest
 

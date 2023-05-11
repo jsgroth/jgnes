@@ -1656,15 +1656,12 @@ dependencies = [
 name = "jgnes-web"
 version = "0.3.0"
 dependencies = [
- "cfg-if",
  "console_error_panic_hook",
  "console_log",
- "env_logger",
  "getrandom",
  "jgnes-core",
  "jgnes-renderer",
  "log",
- "pollster",
  "rfd",
  "wasm-bindgen",
  "wasm-bindgen-futures",

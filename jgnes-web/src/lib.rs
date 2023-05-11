@@ -1,4 +1,5 @@
-use cfg_if::cfg_if;
+#![cfg(target_arch = "wasm32")]
+
 use jgnes_core::{AudioPlayer, Emulator, InputPoller, JoypadState, SaveWriter, TickEffect};
 use jgnes_renderer::config::{
     AspectRatio, GpuFilterMode, Overscan, RendererConfig, VSyncMode, WgpuBackend,
@@ -7,23 +8,12 @@ use jgnes_renderer::WgpuRenderer;
 use rfd::AsyncFileDialog;
 use std::cell::RefCell;
 use std::rc::Rc;
-#[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 use winit::dpi::PhysicalSize;
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
+use winit::platform::web::WindowExtWebSys;
 use winit::window::{Window, WindowBuilder};
-
-fn init_logger() {
-    cfg_if! {
-        if #[cfg(target_arch = "wasm32")] {
-            std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-            console_log::init_with_level(log::Level::Info).expect("Unable to initialize logger");
-        } else {
-            env_logger::init();
-        }
-    }
-}
 
 fn window_size(window: &Window) -> (u32, u32) {
     let PhysicalSize { width, height } = window.inner_size();
@@ -114,31 +104,27 @@ impl State {
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
+#[wasm_bindgen(start)]
 pub async fn run() {
-    init_logger();
+    std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+    console_log::init_with_level(log::Level::Info).expect("Unable to initialize logger");
 
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
         .build(&event_loop)
         .expect("Unable to create window");
 
-    #[cfg(target_arch = "wasm32")]
-    {
-        use winit::platform::web::WindowExtWebSys;
+    window.set_inner_size(PhysicalSize::new(768, 672));
 
-        window.set_inner_size(PhysicalSize::new(768, 672));
-
-        web_sys::window()
-            .and_then(|win| win.document())
-            .and_then(|doc| {
-                let dst = doc.get_element_by_id("jgnes-wasm")?;
-                let canvas = web_sys::Element::from(window.canvas());
-                dst.append_child(&canvas).ok()?;
-                Some(())
-            })
-            .expect("Couldn't append canvas to document body");
-    }
+    web_sys::window()
+        .and_then(|win| win.document())
+        .and_then(|doc| {
+            let dst = doc.get_element_by_id("jgnes-wasm")?;
+            let canvas = web_sys::Element::from(window.canvas());
+            dst.append_child(&canvas).ok()?;
+            Some(())
+        })
+        .expect("Couldn't append canvas to document body");
 
     let renderer = WgpuRenderer::from_window(
         window,

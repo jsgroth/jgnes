@@ -2,16 +2,6 @@
 
 A cross-platform NES emulator.
 
-## Crate Structure
-
-* `jgnes-proc-macros`: Custom derive macros used in `jgnes-core`.
-* `jgnes-core`: The emulation core. Has few dependencies and requires external code to drive it. Uses callbacks for rendering frames, playing audio, polling for input, and writing save files.
-* `jgnes-renderer`: Code for the GPU-backed renderer, as well as some common configuration code that is shared by both renderers.
-* `jgnes-native-driver`: Emulator driver that uses SDL2 to handle everything related to video/audio/input, with an option to use either the GPU renderer or an SDL2 software renderer for rendering emulator output into the window.
-* `jgnes-cli`: A command-line interface that invokes `jgnes-native-driver`.
-* `jgnes-gui`: A graphical user interface that invokes `jgnes-native-driver`.
-* `jgnes-web`: An experimental WASM+WebGL2 frontend for `jgnes-core` that runs in the browser. Uses `winit` to create the frame and `jgnes-renderer` to render emulator output.
-
 ## Feature Status
 
 Implemented:
@@ -45,6 +35,16 @@ Not Implemented:
 * Fast forward or rewind
 * Support for PAL/EU releases (the processor timings are different compared to NTSC US/JP)
 * Support for any controller port peripherals (e.g. the Zapper)
+
+## Crate Structure
+
+* `jgnes-proc-macros`: Custom derive macros used in `jgnes-core`.
+* `jgnes-core`: The emulation core. Has few dependencies and requires external code to drive it. Uses callbacks for rendering frames, playing audio, polling for input, and writing save files.
+* `jgnes-renderer`: Code for the GPU-backed renderer, as well as some common configuration code that is shared by both renderers.
+* `jgnes-native-driver`: Emulator driver that uses SDL2 to handle everything related to video/audio/input, with an option to use either the GPU renderer or an SDL2 software renderer for rendering emulator output into the window.
+* `jgnes-cli`: A command-line interface that invokes `jgnes-native-driver`.
+* `jgnes-gui`: A graphical user interface that invokes `jgnes-native-driver`.
+* `jgnes-web`: An experimental WASM+WebGL2 frontend for `jgnes-core` that runs in the browser. Uses `winit` to create the frame and `jgnes-renderer` to render emulator output.
 
 ## Requirements
 

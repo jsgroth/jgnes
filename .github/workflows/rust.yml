@@ -55,11 +55,11 @@ jobs:
       with:
         command: test
 
-    - name: Add nightly toolchain and wasm32 target, and download std src
-      run: |
-        rustup toolchain add nightly && \ 
-        rustup component add rust-src --toolchain nightly-x86_x64-unknown-linux-gnu && \
-        rustup target add wasm32-unknown-unknown
+    - name: Add nightly toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: nightly
+        components: rust-src
 
     - name: Install wasm-pack
       run: |

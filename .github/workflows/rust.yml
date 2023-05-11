@@ -55,17 +55,13 @@ jobs:
       with:
         command: test
 
-    - name: Add wasm32 target
+    - name: Add nightly toolchain and wasm32 target
       run: |
-        rustup target add wasm32-unknown-unknown
+        rustup toolchain add nightly && rustup target add wasm32-unknown-unknown
 
     - name: Build web
       run: |
-        cd jgnes-web && cargo build --target wasm32-unknown-unknown
-
-    - name: Check warnings in jgnes-web
-      run: |
-        cd jgnes-web && cargo cranky --target wasm32-unknown-unknown
+        cd jgnes-web && ./build.sh
   linux-release:
     runs-on: ubuntu-latest
 

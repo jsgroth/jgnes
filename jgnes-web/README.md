@@ -2,28 +2,50 @@
 
 An experimental WASM+WebGL2 frontend for jgnes that runs in the browser.
 
-Audio and persistent save files are not implemented, nor is any form of video customization (e.g. aspect ratio / overscan), but the emulation core is identical to the native version.
+Audio and persistent save files are not implemented, nor is any form of video customization (e.g. aspect ratio / overscan),
+but the emulation core is identical to the native version.
 
 ## Requirements
 
-[wasm-pack](https://rustwasm.github.io/wasm-pack/installer/)
+### Rust Nightly
+
+The WASM frontend requires a nightly version of the Rust toolchain because the stable standard library does not support
+sharing memory between the main thread and worker threads in WASM. (Presumably because that isn't supported in all WASM
+runtimes, although all major browsers support it.)
+
+To install the latest nightly toolchain:
+```shell
+rustup toolchain add nightly
+```
+
+### wasm-pack
+
+[wasm-pack](https://rustwasm.github.io/wasm-pack/installer/) is required to build a WASM/JavaScript package that can run
+in the browser.
 
 ## Build
 
+Building requires the following incantation in order to enable shared memory in WASM during the build:
 ```shell
-wasm-pack build --target web
+RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals" \
+rustup run nightly \
+wasm-pack build --target web . -- -Z build-std=panic_abort,std
+```
+
+Alternatively, you can just run the provided `build.sh` script which runs that command:
+```shell
+./build.sh
 ```
 
 ## Run
 
 Host `index.html` and the `pkg` directory in the webserver of your choice.
 
-For the simplest option, you can run a local PHP server in the `jgnes-web` directory:
+For the simplest option, you can use the provided `webserver.py`:
 ```shell
-php -S localhost:8080
+./webserver.py localhost:8080
 ```
 
-If you don't have PHP installed:
-```shell
-sudo apt install php8.1-cli
-```
+This script extends Python's `http.server` builtin to additionally set the `Cross-Origin-Opener-Policy` and
+`Cross-Origin-Embedder-Policy` HTTP headers on every request, as the WASM frontend will not work in some browsers if
+these headers are not set.

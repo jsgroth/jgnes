@@ -19,6 +19,14 @@ log = "0.4"
 rfd = "0.11"
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
-web-sys = { version = "0.3", features = ["Document", "Window", "Element"] }
 wgpu = { version = "0.16", features = ["webgl"] }
 winit = "0.28"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies.web-sys]
+version = "0.3"
+features = [
+    "Window",
+    "Document",
+    "Element",
+    "Worker",
+]

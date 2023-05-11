@@ -1,7 +1,7 @@
-mod audio;
 mod config;
 mod input;
 
+use jgnes_core::audio::LowPassFilter;
 use jgnes_core::{
     AudioPlayer, ColorEmphasis, EmulationError, Emulator, FrameBuffer, InputPoller, JoypadState,
     Renderer, SaveWriter,
@@ -22,7 +22,6 @@ use std::sync::atomic::Ordering;
 use std::time::Duration;
 use std::{fs, thread};
 
-use crate::audio::LowPassFilter;
 pub use crate::config::{
     AxisDirection, HatDirection, HotkeyConfig, InputConfig, InputConfigBase, JgnesDynamicConfig,
     JgnesNativeConfig, JoystickInput, JoystickInputConfig, KeyboardInput, KeyboardInputConfig,

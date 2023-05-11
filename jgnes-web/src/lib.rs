@@ -15,6 +15,16 @@ use winit::event_loop::{ControlFlow, EventLoop};
 use winit::platform::web::WindowExtWebSys;
 use winit::window::{Window, WindowBuilder};
 
+#[wasm_bindgen]
+extern "C" {
+    fn alert(s: &str);
+}
+
+fn alert_and_panic(s: &str) -> ! {
+    alert(s);
+    panic!("{s}")
+}
+
 fn window_size(window: &Window) -> (u32, u32) {
     let PhysicalSize { width, height } = window.inner_size();
     (width, height)
@@ -105,7 +115,7 @@ impl State {
 }
 
 #[wasm_bindgen(start)]
-pub async fn run() {
+async fn run() {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     console_log::init_with_level(log::Level::Info).expect("Unable to initialize logger");
 
@@ -140,7 +150,8 @@ pub async fn run() {
         },
     )
     .await
-    .expect("Unable to create wgpu renderer");
+    .map_err(|err| alert_and_panic(&err.to_string()))
+    .unwrap();
 
     let input_handler = InputHandler {
         p1_joypad_state: Rc::default(),
@@ -152,9 +163,10 @@ pub async fn run() {
     let file = AsyncFileDialog::new()
         .pick_file()
         .await
-        .expect("no file selected");
+        .unwrap_or_else(|| alert_and_panic("no file selected"));
     let emulator = Emulator::create(file.read().await, None, renderer, Null, input_poller, Null)
-        .expect("unable to create emulator");
+        .map_err(|err| alert_and_panic(&err.to_string()))
+        .unwrap();
 
     let mut state = State {
         emulator,

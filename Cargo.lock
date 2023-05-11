@@ -1622,7 +1622,6 @@ name = "jgnes-native-driver"
 version = "0.3.0"
 dependencies = [
  "anyhow",
- "bytemuck",
  "jgnes-core",
  "jgnes-renderer",
  "log",
@@ -1630,7 +1629,6 @@ dependencies = [
  "sdl2",
  "serde",
  "tinyvec",
- "wgpu",
 ]
 
 [[package]]

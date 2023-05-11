@@ -18,6 +18,11 @@ To install the latest nightly toolchain:
 rustup toolchain add nightly
 ```
 
+You may need to explicitly install the standard library source for the nightly toolchain:
+```shell
+rustup component add rust-src --toolchain nightly
+```
+
 ### wasm-pack
 
 [wasm-pack](https://rustwasm.github.io/wasm-pack/installer/) is required to build a WASM/JavaScript package that can run

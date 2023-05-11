@@ -46,6 +46,6 @@ For the simplest option, you can use the provided `webserver.py`:
 ./webserver.py localhost:8080
 ```
 
-This script extends Python's `http.server` builtin to additionally set the `Cross-Origin-Opener-Policy` and
-`Cross-Origin-Embedder-Policy` HTTP headers on every request, as the WASM frontend will not work in some browsers if
+This script extends Python's `http.server` builtin to additionally set the `Cross-Origin-Opener-Policy: same-origin` and
+`Cross-Origin-Embedder-Policy: require-corp` HTTP headers on every request, as the WASM frontend will not work in some browsers if
 these headers are not set.

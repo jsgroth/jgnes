@@ -6,6 +6,7 @@ members = [
     "jgnes-native-driver",
     "jgnes-cli",
     "jgnes-gui",
+    "jgnes-web",
 ]
 
 [profile.release-with-debug]

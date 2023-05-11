@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>jgnes web</title>
+        <meta charset="UTF-8">
+    </head>
+    <body>
+        <script type="module">
+            import init from "./pkg/jgnes_web.js";
+            init().then(() => {
+                console.log("WASM loaded");
+            });
+        </script>
+        <div id="jgnes-wasm"></div>
+        <p>Click on the emulator display for keyboard controls to work</p>
+        <ul>
+            <li>Up/Left/Right/Down: Arrow keys</li>
+            <li>A: Z key</li>
+            <li>B: X key</li>
+            <li>Start: Return key</li>
+            <li>Select: Right Shift key</li>
+        </ul>
+    </body>
+</html>

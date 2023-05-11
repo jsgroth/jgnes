@@ -405,6 +405,10 @@ where
         })
     }
 
+    pub fn window(&self) -> &W {
+        &self.window
+    }
+
     pub fn window_mut(&mut self) -> &mut W {
         &mut self.window
     }

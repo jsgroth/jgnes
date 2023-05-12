@@ -6,10 +6,9 @@
     </head>
     <body>
         <script type="module">
-            import init from "./pkg/jgnes_web.js";
-            init().then(() => {
-                console.log("WASM loaded");
-            });
+            import init, { run } from "./pkg/jgnes_web.js";
+            await init();
+            run();
         </script>
         <div id="jgnes-wasm"></div>
         <p>Click on the emulator display for keyboard controls to work</p>

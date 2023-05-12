@@ -1,5 +1,9 @@
 #![cfg(target_arch = "wasm32")]
 
+mod audio;
+
+use crate::audio::{AudioQueue, EnqueueResult};
+use jgnes_core::audio::LowPassFilter;
 use jgnes_core::{AudioPlayer, Emulator, InputPoller, JoypadState, SaveWriter, TickEffect};
 use jgnes_renderer::config::{
     AspectRatio, GpuFilterMode, Overscan, RendererConfig, VSyncMode, WgpuBackend,
@@ -9,6 +13,7 @@ use rfd::AsyncFileDialog;
 use std::cell::RefCell;
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
+use web_sys::{AudioContext, AudioContextOptions};
 use winit::dpi::PhysicalSize;
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
@@ -32,13 +37,6 @@ fn window_size(window: &Window) -> (u32, u32) {
 
 struct Null;
 
-impl AudioPlayer for Null {
-    type Err = ();
-
-    fn push_sample(&mut self, _sample: f64) -> Result<(), Self::Err> {
-        Ok(())
-    }
-}
 impl SaveWriter for Null {
     type Err = ();
 
@@ -103,8 +101,46 @@ impl InputPoller for WebInputPoller {
     }
 }
 
+struct WebAudioPlayer {
+    audio_queue: AudioQueue,
+    low_pass_filter: LowPassFilter,
+    sample_count: u64,
+}
+
+impl WebAudioPlayer {
+    fn new(audio_queue: AudioQueue) -> Self {
+        Self {
+            audio_queue,
+            low_pass_filter: LowPassFilter::new(),
+            sample_count: 0,
+        }
+    }
+}
+
+impl AudioPlayer for WebAudioPlayer {
+    type Err = JsValue;
+
+    fn push_sample(&mut self, sample: f64) -> Result<(), Self::Err> {
+        self.low_pass_filter.collect_sample(sample);
+
+        let prev_count = self.sample_count;
+        self.sample_count += 1;
+        if (prev_count as f64 * 48000.0 / 1789772.72727273 * 60.0988 / 60.0).round() as u64
+            != (self.sample_count as f64 * 48000.0 / 1789772.72727273 * 60.0988 / 60.0).round()
+                as u64
+        {
+            let output_sample = self.low_pass_filter.output_sample();
+            if self.audio_queue.push_if_space(output_sample as f32)? == EnqueueResult::BufferFull {
+                log::warn!("Audio queue is full, dropping sample");
+            }
+        }
+
+        Ok(())
+    }
+}
+
 struct State {
-    emulator: Emulator<WgpuRenderer<Window>, Null, WebInputPoller, Null>,
+    emulator: Emulator<WgpuRenderer<Window>, WebAudioPlayer, WebInputPoller, Null>,
     input_handler: InputHandler,
 }
 
@@ -115,10 +151,14 @@ impl State {
 }
 
 #[wasm_bindgen(start)]
-async fn run() {
+pub fn init_logger() {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     console_log::init_with_level(log::Level::Info).expect("Unable to initialize logger");
+}
 
+#[allow(clippy::missing_panics_doc)]
+#[wasm_bindgen]
+pub async fn run() {
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
         .build(&event_loop)
@@ -164,9 +204,27 @@ async fn run() {
         .pick_file()
         .await
         .unwrap_or_else(|| alert_and_panic("no file selected"));
-    let emulator = Emulator::create(file.read().await, None, renderer, Null, input_poller, Null)
-        .map_err(|err| alert_and_panic(&err.to_string()))
+
+    let audio_ctx =
+        AudioContext::new_with_context_options(AudioContextOptions::new().sample_rate(48000.0))
+            .unwrap();
+    let audio_queue = AudioQueue::new();
+    let _audio_worklet = audio::initialize_audio_worklet(&audio_ctx, &audio_queue)
+        .await
         .unwrap();
+
+    let audio_player = WebAudioPlayer::new(audio_queue);
+
+    let emulator = Emulator::create(
+        file.read().await,
+        None,
+        renderer,
+        audio_player,
+        input_poller,
+        Null,
+    )
+    .map_err(|err| alert_and_panic(&err.to_string()))
+    .unwrap();
 
     let mut state = State {
         emulator,

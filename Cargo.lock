@@ -1661,6 +1661,7 @@ dependencies = [
  "getrandom",
  "jgnes-core",
  "jgnes-renderer",
+ "js-sys",
  "log",
  "rfd",
  "wasm-bindgen",

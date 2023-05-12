@@ -19,7 +19,7 @@ pub enum EnqueueResult {
 }
 
 // A very simple lock-free queue implemented using a circular buffer.
-// The header contains two 32-bit integers containing the current start and exclusive end indices.
+// The header contains two 32-bit integers containing the current start and inclusive end indices.
 #[wasm_bindgen]
 pub struct AudioQueue {
     header: SharedArrayBuffer,

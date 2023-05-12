@@ -1,4 +1,4 @@
-// Polyfill necessary because the wasm-pack JS requires TextEncoder and TextDecoder,
+// Polyfill necessary because the generated wasm-bindgen JS requires TextEncoder and TextDecoder,
 // but they are not defined in the worklet thread
 import "./TextEncoder.js";
 

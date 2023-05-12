@@ -142,7 +142,7 @@ pub async fn initialize_audio_worklet(
     JsFuture::from(
         audio_ctx
             .audio_worklet()?
-            .add_module("./audio-processor.js")?,
+            .add_module("./js/audio-processor.js")?,
     )
     .await?;
 

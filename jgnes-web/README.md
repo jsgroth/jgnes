@@ -44,7 +44,7 @@ Alternatively, you can just run the provided `build.sh` script which runs that c
 
 ## Run
 
-Host `index.html` and the `pkg` directory in the webserver of your choice.
+Host `index.html`, the `js` directory, and the `pkg` directory in the webserver of your choice.
 
 For the simplest option, you can use the provided `webserver.py`:
 ```shell

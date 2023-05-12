@@ -2,7 +2,7 @@
 // but they are not defined in the worklet thread
 import "./TextEncoder.js";
 
-import { initSync, AudioProcessor } from "./pkg/jgnes_web.js";
+import { initSync, AudioProcessor } from "../pkg/jgnes_web.js";
 
 class JgnesAudioProcessor extends AudioWorkletProcessor {
     constructor(options) {

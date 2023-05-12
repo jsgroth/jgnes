@@ -9,9 +9,10 @@ members = [
     "jgnes-web",
 ]
 
-[profile.release]
+[profile.release-lto]
+inherits = "release"
 lto = true
 
-[profile.release-with-debug]
+[profile.profiling]
 inherits = "release"
 debug = true

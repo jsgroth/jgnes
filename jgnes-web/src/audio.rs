@@ -8,6 +8,9 @@ use web_sys::{AudioContext, AudioWorkletNode, AudioWorkletNodeOptions, ChannelCo
 
 const HEADER_LEN: u32 = 2;
 const HEADER_LEN_BYTES: u32 = HEADER_LEN * 4;
+const START_INDEX: u32 = 0;
+const END_INDEX: u32 = 1;
+
 const BUFFER_LEN: u32 = 8192;
 const BUFFER_LEN_BYTES: u32 = BUFFER_LEN * 4;
 const BUFFER_INDEX_MASK: u32 = BUFFER_LEN - 1;
@@ -19,7 +22,7 @@ pub enum EnqueueResult {
 }
 
 // A very simple lock-free queue implemented using a circular buffer.
-// The header contains two 32-bit integers containing the current start and inclusive end indices.
+// The header contains two 32-bit integers containing the current start and exclusive end indices.
 #[wasm_bindgen]
 pub struct AudioQueue {
     header: SharedArrayBuffer,
@@ -64,8 +67,8 @@ impl AudioQueue {
     }
 
     pub fn push_if_space(&self, sample: f32) -> Result<EnqueueResult, JsValue> {
-        let end = Atomics::load(&self.header_typed, 1)? as u32;
-        let start = Atomics::load(&self.header_typed, 0)? as u32;
+        let end = Atomics::load(&self.header_typed, END_INDEX)? as u32;
+        let start = Atomics::load(&self.header_typed, START_INDEX)? as u32;
 
         if end == start.wrapping_sub(1) & BUFFER_INDEX_MASK {
             return Ok(EnqueueResult::BufferFull);
@@ -73,25 +76,28 @@ impl AudioQueue {
 
         Atomics::store(&self.buffer_typed, end, sample.to_bits() as i32)?;
         let new_end = (end + 1) & BUFFER_INDEX_MASK;
-        Atomics::store(&self.header_typed, 1, new_end as i32)?;
+        Atomics::store(&self.header_typed, END_INDEX, new_end as i32)?;
 
         Ok(EnqueueResult::Successful)
     }
 
-    pub fn pop(&self) -> Result<Option<f32>, JsValue> {
-        let start = Atomics::load(&self.header_typed, 0)? as u32;
-        let end = Atomics::load(&self.header_typed, 1)? as u32;
+    pub fn drain_into(&self, out: &mut VecDeque<f32>) -> Result<(), JsValue> {
+        let loaded_start = Atomics::load(&self.header_typed, START_INDEX)? as u32;
+        let end = Atomics::load(&self.header_typed, END_INDEX)? as u32;
 
-        if start == end {
-            return Ok(None);
+        let mut start = loaded_start;
+        while start != end {
+            let value = Atomics::load(&self.buffer_typed, start)?;
+            let sample = f32::from_bits(value as u32);
+            out.push_back(sample);
+            start = (start + 1) & BUFFER_INDEX_MASK;
         }
 
-        let value = Atomics::load(&self.buffer_typed, start)?;
-        let new_start = (start + 1) & BUFFER_INDEX_MASK;
-        Atomics::store(&self.header_typed, 0, new_start as i32)?;
+        if start != loaded_start {
+            Atomics::store(&self.header_typed, START_INDEX, start as i32)?;
+        }
 
-        let sample = f32::from_bits(value as u32);
-        Ok(Some(sample))
+        Ok(())
     }
 
     fn to_js_value(&self) -> JsValue {
@@ -120,9 +126,9 @@ impl AudioProcessor {
     }
 
     pub fn process(&mut self, output: &mut [f32]) {
-        while let Some(sample) = self.audio_queue.pop().unwrap() {
-            self.output_buffer.push_back(sample);
-        }
+        self.audio_queue
+            .drain_into(&mut self.output_buffer)
+            .unwrap();
 
         let len = cmp::min(self.output_buffer.len(), output.len());
         for value in output.iter_mut().take(len) {

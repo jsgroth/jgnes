@@ -3,8 +3,8 @@ mod input;
 
 use jgnes_core::audio::LowPassFilter;
 use jgnes_core::{
-    AudioPlayer, ColorEmphasis, EmulationError, Emulator, FrameBuffer, InputPoller, JoypadState,
-    Renderer, SaveWriter,
+    audio, AudioPlayer, ColorEmphasis, EmulationError, Emulator, FrameBuffer, InputPoller,
+    JoypadState, Renderer, SaveWriter,
 };
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
 use sdl2::event::{Event, EventType, WindowEvent};
@@ -115,20 +115,17 @@ impl SdlAudioPlayer {
     }
 }
 
+const AUDIO_OUTPUT_FREQUENCY: f64 = 48000.0;
+const DISPLAY_RATE: f64 = 60.0;
+
 impl AudioPlayer for SdlAudioPlayer {
     type Err = anyhow::Error;
 
     fn push_sample(&mut self, sample: f64) -> Result<(), Self::Err> {
-        let prev_count = self.sample_count;
-        self.sample_count += 1;
-
         self.low_pass_filter.collect_sample(sample);
 
-        // TODO don't hardcode frequencies
-        if (prev_count as f64 * 48000.0 / 1789772.72727273 * 60.0988 / 60.0).round() as u64
-            != (self.sample_count as f64 * 48000.0 / 1789772.72727273 * 60.0988 / 60.0).round()
-                as u64
-        {
+        self.sample_count += 1;
+        if audio::should_output_sample(self.sample_count, AUDIO_OUTPUT_FREQUENCY, DISPLAY_RATE) {
             self.sample_queue
                 .push(self.low_pass_filter.output_sample() as f32);
         }
@@ -263,7 +260,7 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
         .open_queue(
             None,
             &AudioSpecDesired {
-                freq: Some(48000),
+                freq: Some(AUDIO_OUTPUT_FREQUENCY as i32),
                 channels: Some(1),
                 samples: Some(1024),
             },

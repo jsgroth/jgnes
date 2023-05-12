@@ -117,18 +117,21 @@ impl WebAudioPlayer {
     }
 }
 
+const AUDIO_OUTPUT_FREQUENCY: f64 = 48000.0;
+const DISPLAY_RATE: f64 = 60.0;
+
 impl AudioPlayer for WebAudioPlayer {
     type Err = JsValue;
 
     fn push_sample(&mut self, sample: f64) -> Result<(), Self::Err> {
         self.low_pass_filter.collect_sample(sample);
 
-        let prev_count = self.sample_count;
         self.sample_count += 1;
-        if (prev_count as f64 * 48000.0 / 1789772.72727273 * 60.0988 / 60.0).round() as u64
-            != (self.sample_count as f64 * 48000.0 / 1789772.72727273 * 60.0988 / 60.0).round()
-                as u64
-        {
+        if jgnes_core::audio::should_output_sample(
+            self.sample_count,
+            AUDIO_OUTPUT_FREQUENCY,
+            DISPLAY_RATE,
+        ) {
             let output_sample = self.low_pass_filter.output_sample();
             if self.audio_queue.push_if_space(output_sample as f32)? == EnqueueResult::BufferFull {
                 log::warn!("Audio queue is full, dropping sample");
@@ -205,9 +208,10 @@ pub async fn run() {
         .await
         .unwrap_or_else(|| alert_and_panic("no file selected"));
 
-    let audio_ctx =
-        AudioContext::new_with_context_options(AudioContextOptions::new().sample_rate(48000.0))
-            .unwrap();
+    let audio_ctx = AudioContext::new_with_context_options(
+        AudioContextOptions::new().sample_rate(AUDIO_OUTPUT_FREQUENCY as f32),
+    )
+    .unwrap();
     let audio_queue = AudioQueue::new();
     let _audio_worklet = audio::initialize_audio_worklet(&audio_ctx, &audio_queue)
         .await

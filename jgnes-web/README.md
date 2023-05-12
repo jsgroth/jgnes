@@ -20,8 +20,13 @@ rustup toolchain add nightly --component rust-src
 
 ### wasm-pack
 
-[wasm-pack](https://rustwasm.github.io/wasm-pack/installer/) is required to build a WASM/JavaScript package that can run
+wasm-pack is required to build a WASM/JavaScript package that can run
 in the browser.
+
+To install:
+```shell
+cargo install wasm-pack
+```
 
 ## Build
 

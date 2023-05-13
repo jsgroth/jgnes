@@ -9,7 +9,7 @@ This frontend does not have as many configuration features as the native version
 ### Rust Nightly
 
 The WASM frontend requires a nightly version of the Rust toolchain because the stable standard library does not support
-sharing memory between the main thread and worker threads in WASM. (Presumably because that isn't supported in all WASM
+sharing memory between the main thread and worker threads in WASM. (Presumably because this isn't supported in all WASM
 runtimes, although all major browsers support it.)
 
 To install the latest nightly toolchain, including the standard library source (required for the build):
@@ -19,8 +19,9 @@ rustup toolchain add nightly --component rust-src
 
 ### wasm-pack
 
-wasm-pack is required to build a WASM/JavaScript package that can run
-in the browser.
+wasm-pack is required to build a WASM/JavaScript package that can run in the browser. It's possible
+to do so manually using `wasm-bindgen-cli` and `wasm-opt` directly, but
+`wasm-pack` makes it more convenient and includes a `wasm-bindgen` version safety check.
 
 To install:
 ```shell

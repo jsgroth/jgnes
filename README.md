@@ -6,10 +6,6 @@ A cross-platform NES emulator. Has a native frontend built using SDL2 as well as
 
 Implemented:
 * Cycle-based 6502 CPU emulation, PPU emulation (graphics), and APU emulation (audio)
-  * Unofficial CPU opcodes not implemented, aside from some of the unofficial NOPs that a few games use
-  * Rendering effects of certain mid-scanline writes may not be cycle-accurate based on non-binary test ROMs (nmi\_sync / scanline)
-  * DMC DMA cycle stealing and dummy reads are not implemented
-  * DMC IRQ timing is slightly off based on non-binary test ROMs (dpcmletterbox), almost certainly due to lack of DMC DMA cycle stealing
 * The most commonly used cartridge boards (aka mappers)
   * NROM
   * The most common NROM variants (UxROM / CNROM / AxROM)
@@ -36,6 +32,9 @@ Implemented:
 * Save & load state
 
 Not Implemented:
+* Unofficial CPU opcodes
+* Cycle-accurate rendering effects of enabling rendering mid-scanline
+* DMC DMA cycle stealing and dummy reads, an obscure hardware quirk affects very very few if any games
 * Color palette customization; the NES hardware directly outputs an NTSC video signal rather than RGB pixel grids, so any mapping from NES colors to RGB colors is an approximation at best
 * Lots of mappers, most notably Namco's custom mappers
 * Fast forward or rewind

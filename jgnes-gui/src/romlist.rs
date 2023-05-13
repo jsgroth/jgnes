@@ -124,6 +124,10 @@ fn mapper_name(mapper_number: u16, sub_mapper_number: u8) -> &'static str {
         },
         22 => "VRC2",
         24 | 26 => "VRC6",
+        34 => match sub_mapper_number {
+            1 => "NINA-001",
+            _ => "BNROM",
+        },
         66 => "GxROM",
         69 => "Sunsoft FME-7",
         71 => "Codemasters",

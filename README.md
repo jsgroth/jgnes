@@ -14,7 +14,6 @@ Implemented:
 * Some less commonly used cartridge boards
   * MMC2/MMC4
   * MMC5 including expansion audio
-  * GxROM
   * Konami VRC2 / VRC4 / VRC6 / VRC7, including VRC6 expansion audio
     * VRC7 FM synth expansion audio is not implemented; only one game used it, _Lagrange Point_
   * Sunsoft 5A / 5B / FME-7, including 5B expansion audio
@@ -23,6 +22,7 @@ Implemented:
   * Bandai FCG-1 / FCG-2 / LZ93D50
     * The LZ93D50 variant that uses the Datach Joint ROM system is not implemented (iNES mapper 157)
   * Jaleco JF-11 / JF-14
+  * GxROM
   * BNROM
   * NINA-001
 * P1 & P2 input with support for keyboard input and DirectInput gamepad input

@@ -21,7 +21,7 @@ rustup toolchain add nightly --component rust-src
 
 wasm-pack is required to build a WASM/JavaScript package that can run in the browser. It's possible
 to do so manually using `wasm-bindgen-cli` and `wasm-opt` directly, but
-`wasm-pack` makes it more convenient and includes a `wasm-bindgen` version safety check.
+wasm-pack makes it more convenient and includes a `wasm-bindgen` version safety check.
 
 To install:
 ```shell

@@ -1,1 +1,1 @@
-doc-valid-idents = ["MHz", ".."]
+doc-valid-idents = ["AxROM", "GxROM", "iNES", "MHz", "UxROM", "VBlank", ".."]

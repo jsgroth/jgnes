@@ -2,7 +2,7 @@
 #![allow(clippy::let_underscore_untyped)]
 
 use crate::colors;
-use crate::config::{GpuFilterMode, RendererConfig, VSyncMode};
+use crate::config::{AspectRatio, GpuFilterMode, Overscan, RendererConfig, VSyncMode};
 use jgnes_core::{ColorEmphasis, FrameBuffer, Renderer};
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 use std::{iter, mem};
@@ -60,6 +60,7 @@ pub type WindowSizeFn<W> = fn(&W) -> (u32, u32);
 pub struct WgpuRenderer<W> {
     render_config: RendererConfig,
     output_buffer: Vec<u8>,
+    cpu_scale_output_buffer: Vec<u8>,
     device: wgpu::Device,
     queue: wgpu::Queue,
     surface: wgpu::Surface,
@@ -67,6 +68,7 @@ pub struct WgpuRenderer<W> {
     texture: wgpu::Texture,
     compute_resources: Option<(wgpu::BindGroup, wgpu::ComputePipeline)>,
     render_bind_group: wgpu::BindGroup,
+    render_bind_group_layout: wgpu::BindGroupLayout,
     render_pipeline: wgpu::RenderPipeline,
     vertices: Vec<Vertex2d>,
     vertex_buffer: wgpu::Buffer,
@@ -96,6 +98,10 @@ where
             4 * jgnes_core::SCREEN_WIDTH as usize
                 * jgnes_core::VISIBLE_SCREEN_HEIGHT as usize
         ];
+
+        let cpu_render_scale = render_config.gpu_filter_mode.cpu_render_scale() as usize;
+        let cpu_scale_output_buffer =
+            vec![0; output_buffer.len() * cpu_render_scale * cpu_render_scale];
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: render_config.wgpu_backend.to_wgpu_backends(),
@@ -174,9 +180,10 @@ where
         };
         surface.configure(&device, &surface_config);
 
+        let cpu_render_scale = render_config.gpu_filter_mode.cpu_render_scale();
         let texture_size = wgpu::Extent3d {
-            width: jgnes_core::SCREEN_WIDTH.into(),
-            height: jgnes_core::VISIBLE_SCREEN_HEIGHT.into(),
+            width: cpu_render_scale * u32::from(jgnes_core::SCREEN_WIDTH),
+            height: cpu_render_scale * u32::from(jgnes_core::VISIBLE_SCREEN_HEIGHT),
             depth_or_array_layers: 1,
         };
         let texture = device.create_texture(&wgpu::TextureDescriptor {
@@ -191,10 +198,7 @@ where
         });
         let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        let render_scale = match render_config.gpu_filter_mode {
-            GpuFilterMode::NearestNeighbor => 1,
-            GpuFilterMode::Linear(render_scale) => render_scale.get(),
-        };
+        let render_scale = render_config.gpu_filter_mode.gpu_render_scale();
         let scaled_texture_size = wgpu::Extent3d {
             width: render_scale * u32::from(jgnes_core::SCREEN_WIDTH),
             height: render_scale * u32::from(jgnes_core::VISIBLE_SCREEN_HEIGHT),
@@ -213,20 +217,7 @@ where
         let scaled_texture_view =
             scaled_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        let sampler_filter_mode = match render_config.gpu_filter_mode {
-            GpuFilterMode::NearestNeighbor => wgpu::FilterMode::Nearest,
-            GpuFilterMode::Linear(_) => wgpu::FilterMode::Linear,
-        };
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("sampler"),
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: sampler_filter_mode,
-            min_filter: sampler_filter_mode,
-            mipmap_filter: sampler_filter_mode,
-            ..wgpu::SamplerDescriptor::default()
-        });
+        let sampler = create_sampler(&device, render_config.gpu_filter_mode);
 
         let vertices = compute_vertices(window_width, window_height, &render_config);
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -390,6 +381,7 @@ where
         Ok(Self {
             render_config,
             output_buffer,
+            cpu_scale_output_buffer,
             device,
             queue,
             surface,
@@ -397,6 +389,7 @@ where
             texture,
             compute_resources,
             render_bind_group,
+            render_bind_group_layout,
             render_pipeline,
             vertices,
             vertex_buffer,
@@ -422,6 +415,104 @@ where
 
         self.vertices = compute_vertices(window_width, window_height, &self.render_config);
     }
+
+    pub fn update_aspect_ratio(&mut self, aspect_ratio: AspectRatio) {
+        self.render_config.aspect_ratio = aspect_ratio;
+        self.reconfigure_surface();
+    }
+
+    /// # Panics
+    ///
+    /// This method will panic if called with `GpuFilterMode::Linear` with a render scale greater
+    /// than 1, which is not currently supported.
+    pub fn update_filter_mode(&mut self, filter_mode: GpuFilterMode) {
+        if let GpuFilterMode::Linear(render_scale) = filter_mode {
+            assert_eq!(
+                render_scale.get(),
+                1,
+                "updating filter mode to GPU scaling + linear interpolation is not supported"
+            );
+        }
+
+        self.render_config.gpu_filter_mode = filter_mode;
+
+        if let GpuFilterMode::LinearCpuScaled(render_scale) = filter_mode {
+            let render_scale = render_scale.get() as usize;
+            self.cpu_scale_output_buffer =
+                vec![0; self.output_buffer.len() * render_scale * render_scale];
+
+            self.texture = self.device.create_texture(&wgpu::TextureDescriptor {
+                label: Some("texture"),
+                size: wgpu::Extent3d {
+                    width: render_scale as u32 * u32::from(jgnes_core::SCREEN_WIDTH),
+                    height: render_scale as u32 * u32::from(jgnes_core::VISIBLE_SCREEN_HEIGHT),
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Rgba8UnormSrgb,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                view_formats: &[],
+            });
+        } else {
+            self.texture = self.device.create_texture(&wgpu::TextureDescriptor {
+                label: Some("texture"),
+                size: wgpu::Extent3d {
+                    width: u32::from(jgnes_core::SCREEN_WIDTH),
+                    height: u32::from(jgnes_core::VISIBLE_SCREEN_HEIGHT),
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Rgba8UnormSrgb,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                view_formats: &[],
+            });
+        }
+
+        let sampler = create_sampler(&self.device, filter_mode);
+
+        let texture_view = self
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+        self.render_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("render_bind_group"),
+            layout: &self.render_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&sampler),
+                },
+            ],
+        });
+    }
+
+    pub fn update_overscan(&mut self, overscan: Overscan) {
+        self.render_config.overscan = overscan;
+    }
+}
+
+fn create_sampler(device: &wgpu::Device, filter_mode: GpuFilterMode) -> wgpu::Sampler {
+    let sampler_filter_mode = match filter_mode {
+        GpuFilterMode::NearestNeighbor => wgpu::FilterMode::Nearest,
+        GpuFilterMode::Linear(_) | GpuFilterMode::LinearCpuScaled(_) => wgpu::FilterMode::Linear,
+    };
+    device.create_sampler(&wgpu::SamplerDescriptor {
+        label: Some("sampler"),
+        address_mode_u: wgpu::AddressMode::ClampToEdge,
+        address_mode_v: wgpu::AddressMode::ClampToEdge,
+        address_mode_w: wgpu::AddressMode::ClampToEdge,
+        mag_filter: sampler_filter_mode,
+        min_filter: sampler_filter_mode,
+        mipmap_filter: sampler_filter_mode,
+        ..wgpu::SamplerDescriptor::default()
+    })
 }
 
 fn compute_vertices(
@@ -449,6 +540,27 @@ fn compute_vertices(
         .collect()
 }
 
+fn cpu_scale_texture(output_buffer: &[u8], scaled_buffer: &mut [u8], cpu_render_scale: u32) {
+    for j in 0..u32::from(jgnes_core::SCREEN_WIDTH) {
+        for i in 0..u32::from(jgnes_core::VISIBLE_SCREEN_HEIGHT) {
+            let from_start = (i * 4 * u32::from(jgnes_core::SCREEN_WIDTH) + j * 4) as usize;
+
+            for jj in 0..cpu_render_scale {
+                for ii in 0..cpu_render_scale {
+                    let to_start = ((cpu_render_scale * i + ii)
+                        * 4
+                        * cpu_render_scale
+                        * u32::from(jgnes_core::SCREEN_WIDTH)
+                        + (cpu_render_scale * j + jj) * 4)
+                        as usize;
+                    scaled_buffer[to_start..to_start + 4]
+                        .copy_from_slice(&output_buffer[from_start..from_start + 4]);
+                }
+            }
+        }
+    }
+}
+
 impl<W> Renderer for WgpuRenderer<W> {
     type Err = anyhow::Error;
 
@@ -467,6 +579,18 @@ impl<W> Renderer for WgpuRenderer<W> {
             &mut self.output_buffer,
         );
 
+        let cpu_render_scale = self.render_config.gpu_filter_mode.cpu_render_scale();
+        let render_buffer = if cpu_render_scale > 1 {
+            cpu_scale_texture(
+                &self.output_buffer,
+                &mut self.cpu_scale_output_buffer,
+                cpu_render_scale,
+            );
+            &self.cpu_scale_output_buffer
+        } else {
+            &self.output_buffer
+        };
+
         self.queue.write_texture(
             wgpu::ImageCopyTexture {
                 texture: &self.texture,
@@ -474,11 +598,13 @@ impl<W> Renderer for WgpuRenderer<W> {
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
             },
-            &self.output_buffer,
+            render_buffer,
             wgpu::ImageDataLayout {
                 offset: 0,
-                bytes_per_row: Some(4 * u32::from(jgnes_core::SCREEN_WIDTH)),
-                rows_per_image: Some(jgnes_core::VISIBLE_SCREEN_HEIGHT.into()),
+                bytes_per_row: Some(4 * cpu_render_scale * u32::from(jgnes_core::SCREEN_WIDTH)),
+                rows_per_image: Some(
+                    cpu_render_scale * u32::from(jgnes_core::VISIBLE_SCREEN_HEIGHT),
+                ),
             },
             self.texture.size(),
         );

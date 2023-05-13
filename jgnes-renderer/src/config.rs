@@ -149,6 +149,7 @@ impl FromStr for VSyncMode {
 pub struct RenderScale(u32);
 
 impl RenderScale {
+    pub const ONE: Self = Self(1);
     pub const TWO: Self = Self(2);
     pub const THREE: Self = Self(3);
 
@@ -181,6 +182,25 @@ impl TryFrom<u32> for RenderScale {
 pub enum GpuFilterMode {
     NearestNeighbor,
     Linear(RenderScale),
+    LinearCpuScaled(RenderScale),
+}
+
+impl GpuFilterMode {
+    #[must_use]
+    pub fn cpu_render_scale(self) -> u32 {
+        match self {
+            Self::NearestNeighbor | Self::Linear(_) => 1,
+            Self::LinearCpuScaled(render_scale) => render_scale.get(),
+        }
+    }
+
+    #[must_use]
+    pub fn gpu_render_scale(self) -> u32 {
+        match self {
+            Self::NearestNeighbor | Self::LinearCpuScaled(_) => 1,
+            Self::Linear(render_scale) => render_scale.get(),
+        }
+    }
 }
 
 impl Display for GpuFilterMode {
@@ -188,6 +208,9 @@ impl Display for GpuFilterMode {
         match self {
             Self::NearestNeighbor => write!(f, "NearestNeighbor"),
             Self::Linear(render_scale) => write!(f, "Linear {}x", render_scale.0),
+            Self::LinearCpuScaled(render_scale) => {
+                write!(f, "Linear {}x (CPU scaled)", render_scale.0)
+            }
         }
     }
 }

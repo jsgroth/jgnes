@@ -37,4 +37,5 @@ features = [
     "ChannelCountMode",
     "AudioWorkletProcessor",
     "AudioDestinationNode",
+    "HtmlParagraphElement",
 ]

@@ -6,7 +6,7 @@ use crate::audio::{AudioQueue, EnqueueResult};
 use jgnes_core::audio::LowPassFilter;
 use jgnes_core::{AudioPlayer, Emulator, InputPoller, JoypadState, SaveWriter, TickEffect};
 use jgnes_renderer::config::{
-    AspectRatio, GpuFilterMode, Overscan, RendererConfig, VSyncMode, WgpuBackend,
+    AspectRatio, GpuFilterMode, Overscan, RenderScale, RendererConfig, VSyncMode, WgpuBackend,
 };
 use jgnes_renderer::WgpuRenderer;
 use rfd::AsyncFileDialog;
@@ -105,14 +105,16 @@ struct WebAudioPlayer {
     audio_queue: AudioQueue,
     low_pass_filter: LowPassFilter,
     sample_count: u64,
+    audio_enabled: Rc<RefCell<bool>>,
 }
 
 impl WebAudioPlayer {
-    fn new(audio_queue: AudioQueue) -> Self {
+    fn new(audio_queue: AudioQueue, audio_enabled: Rc<RefCell<bool>>) -> Self {
         Self {
             audio_queue,
             low_pass_filter: LowPassFilter::new(),
             sample_count: 0,
+            audio_enabled,
         }
     }
 }
@@ -124,6 +126,10 @@ impl AudioPlayer for WebAudioPlayer {
     type Err = JsValue;
 
     fn push_sample(&mut self, sample: f64) -> Result<(), Self::Err> {
+        if !*self.audio_enabled.borrow() {
+            return Ok(());
+        }
+
         self.low_pass_filter.collect_sample(sample);
 
         self.sample_count += 1;
@@ -145,6 +151,9 @@ impl AudioPlayer for WebAudioPlayer {
 struct State {
     emulator: Emulator<WgpuRenderer<Window>, WebAudioPlayer, WebInputPoller, Null>,
     input_handler: InputHandler,
+    aspect_ratio: AspectRatio,
+    filter_mode: GpuFilterMode,
+    overscan: Overscan,
 }
 
 impl State {
@@ -159,15 +168,85 @@ pub fn init_logger() {
     console_log::init_with_level(log::Level::Info).expect("Unable to initialize logger");
 }
 
+#[derive(Debug, Clone)]
+#[wasm_bindgen]
+pub struct JgnesWebConfig {
+    aspect_ratio: Rc<RefCell<AspectRatio>>,
+    gpu_filter_mode: Rc<RefCell<GpuFilterMode>>,
+    overscan: Rc<RefCell<Overscan>>,
+    audio_enabled: Rc<RefCell<bool>>,
+}
+
+#[wasm_bindgen]
+impl JgnesWebConfig {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> JgnesWebConfig {
+        JgnesWebConfig {
+            aspect_ratio: Rc::new(RefCell::new(AspectRatio::Ntsc)),
+            gpu_filter_mode: Rc::new(RefCell::new(GpuFilterMode::NearestNeighbor)),
+            overscan: Rc::default(),
+            audio_enabled: Rc::new(RefCell::new(true)),
+        }
+    }
+
+    pub fn set_aspect_ratio(&self, aspect_ratio: &str) {
+        let aspect_ratio = match aspect_ratio {
+            "Ntsc" => AspectRatio::Ntsc,
+            "SquarePixels" => AspectRatio::SquarePixels,
+            _ => return,
+        };
+        *self.aspect_ratio.borrow_mut() = aspect_ratio;
+    }
+
+    pub fn set_filter_mode(&self, gpu_filter_mode: &str) {
+        let gpu_filter_mode = match gpu_filter_mode {
+            "NearestNeighbor" => GpuFilterMode::NearestNeighbor,
+            "Linear" => GpuFilterMode::Linear(RenderScale::ONE),
+            "Linear2x" => GpuFilterMode::LinearCpuScaled(RenderScale::TWO),
+            "Linear3x" => GpuFilterMode::LinearCpuScaled(RenderScale::THREE),
+            _ => return,
+        };
+        *self.gpu_filter_mode.borrow_mut() = gpu_filter_mode;
+    }
+
+    pub fn set_overscan_left(&self, value: bool) {
+        set_overscan_field(value, &mut self.overscan.borrow_mut().left);
+    }
+
+    pub fn set_overscan_right(&self, value: bool) {
+        set_overscan_field(value, &mut self.overscan.borrow_mut().right);
+    }
+
+    pub fn set_overscan_top(&self, value: bool) {
+        set_overscan_field(value, &mut self.overscan.borrow_mut().top);
+    }
+
+    pub fn set_overscan_bottom(&self, value: bool) {
+        set_overscan_field(value, &mut self.overscan.borrow_mut().bottom);
+    }
+
+    pub fn set_audio_enabled(&self, value: bool) {
+        *self.audio_enabled.borrow_mut() = value;
+    }
+
+    pub fn clone(&self) -> JgnesWebConfig {
+        <JgnesWebConfig as Clone>::clone(self)
+    }
+}
+
+fn set_overscan_field(value: bool, field: &mut u8) {
+    *field = if value { 8 } else { 0 };
+}
+
 #[allow(clippy::missing_panics_doc)]
 #[wasm_bindgen]
-pub async fn run() {
+pub async fn run(config: JgnesWebConfig) {
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
         .build(&event_loop)
         .expect("Unable to create window");
 
-    window.set_inner_size(PhysicalSize::new(768, 672));
+    window.set_inner_size(PhysicalSize::new(878, 672));
 
     web_sys::window()
         .and_then(|win| win.document())
@@ -185,8 +264,8 @@ pub async fn run() {
         RendererConfig {
             vsync_mode: VSyncMode::Enabled,
             wgpu_backend: WgpuBackend::BrowserAuto,
-            gpu_filter_mode: GpuFilterMode::NearestNeighbor,
-            aspect_ratio: AspectRatio::SquarePixels,
+            gpu_filter_mode: *config.gpu_filter_mode.borrow(),
+            aspect_ratio: *config.aspect_ratio.borrow(),
             overscan: Overscan::default(),
             forced_integer_height_scaling: false,
             use_webgl2_limits: true,
@@ -208,6 +287,15 @@ pub async fn run() {
         .await
         .unwrap_or_else(|| alert_and_panic("no file selected"));
 
+    web_sys::window()
+        .and_then(|win| win.document())
+        .and_then(|doc| {
+            let dst = doc.get_element_by_id("jgnes-init")?;
+            dst.set_text_content(Some(&file.file_name()));
+            Some(())
+        })
+        .expect("Unable to write file name into the DOM");
+
     let audio_ctx = AudioContext::new_with_context_options(
         AudioContextOptions::new().sample_rate(AUDIO_OUTPUT_FREQUENCY as f32),
     )
@@ -217,7 +305,7 @@ pub async fn run() {
         .await
         .unwrap();
 
-    let audio_player = WebAudioPlayer::new(audio_queue);
+    let audio_player = WebAudioPlayer::new(audio_queue, Rc::clone(&config.audio_enabled));
 
     let emulator = Emulator::create(
         file.read().await,
@@ -233,6 +321,9 @@ pub async fn run() {
     let mut state = State {
         emulator,
         input_handler,
+        aspect_ratio: *config.aspect_ratio.borrow(),
+        filter_mode: *config.gpu_filter_mode.borrow(),
+        overscan: *config.overscan.borrow(),
     };
 
     event_loop.run(move |event, _, control_flow| match event {
@@ -247,6 +338,33 @@ pub async fn run() {
             }
         }
         Event::MainEventsCleared => {
+            let config_aspect_ratio = *config.aspect_ratio.borrow();
+            if config_aspect_ratio != state.aspect_ratio {
+                state
+                    .emulator
+                    .get_renderer_mut()
+                    .update_aspect_ratio(config_aspect_ratio);
+                state.aspect_ratio = config_aspect_ratio;
+            }
+
+            let config_filter_mode = *config.gpu_filter_mode.borrow();
+            if config_filter_mode != state.filter_mode {
+                state
+                    .emulator
+                    .get_renderer_mut()
+                    .update_filter_mode(config_filter_mode);
+                state.filter_mode = config_filter_mode;
+            }
+
+            let config_overscan = *config.overscan.borrow();
+            if config_overscan != state.overscan {
+                state
+                    .emulator
+                    .get_renderer_mut()
+                    .update_overscan(config_overscan);
+                state.overscan = config_overscan;
+            }
+
             // Tick the emulator until it renders the next frame
             while state.emulator.tick().expect("emulation error") != TickEffect::FrameRendered {}
         }

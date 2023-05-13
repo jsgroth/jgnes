@@ -38,9 +38,9 @@
         <div id="jgnes-wasm"></div>
         <form id="jgnes-config">
             <div id="jgnes-init">
-                <input id="jgnes-init-button" type="button" value="Open ROM file">
                 <div id="rom-file-name"></div>
-                <input id="jgnes-reset-button" type="button" value="Reset" hidden>
+                <input id="jgnes-init-button" type="button" value="Open ROM file">
+                <input id="jgnes-reset-button" type="button" value="Reset" disabled>
             </div>
             <fieldset>
                 <legend>Aspect ratio</legend>
@@ -100,6 +100,7 @@
             await init();
 
             let config = new JgnesWebConfig();
+            let running = false;
 
             document.querySelectorAll("input[name='aspect-ratio']").forEach((element) => {
                 element.addEventListener("click", () => {
@@ -135,11 +136,15 @@
                 config.set_audio_enabled(event.target.checked);
             });
 
-            document.getElementById("jgnes-init-button").addEventListener("click", (event) => {
-                event.target.hidden = true;
-                document.getElementById("jgnes-reset-button").hidden = false;
+            document.getElementById("jgnes-init-button").addEventListener("click", () => {
+                if (!running) {
+                    document.getElementById("jgnes-reset-button").disabled = false;
 
-                run(config.clone());
+                    running = true;
+                    run(config.clone());
+                } else {
+                    config.open_new_file();
+                }
             });
 
             document.getElementById("jgnes-reset-button").addEventListener("click", () => {

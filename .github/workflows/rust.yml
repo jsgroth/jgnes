@@ -68,6 +68,10 @@ jobs:
     - name: Build web
       run: |
         cd jgnes-web && ./build.sh
+
+    - name: Check warnings for web
+      run: |
+        cd jgnes-web && cargo cranky --target wasm32-unknown-unknown -- -D warnings
   linux-release:
     runs-on: ubuntu-latest
 

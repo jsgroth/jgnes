@@ -16,9 +16,9 @@ use wasm_bindgen::prelude::*;
 use web_sys::{AudioContext, AudioContextOptions};
 use winit::dpi::PhysicalSize;
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
-use winit::event_loop::{ControlFlow, EventLoop};
+use winit::event_loop::{ControlFlow, EventLoopBuilder, EventLoopProxy};
 use winit::platform::web::WindowExtWebSys;
-use winit::window::{Window, WindowBuilder};
+use winit::window::{Window, WindowBuilder, WindowId};
 
 #[wasm_bindgen]
 extern "C" {
@@ -47,7 +47,7 @@ struct WebSaveWriter {
 }
 
 impl SaveWriter for WebSaveWriter {
-    type Err = String;
+    type Err = ();
 
     fn persist_sram(&mut self, sram: &[u8]) -> Result<(), Self::Err> {
         let sram_hex: String = sram
@@ -163,8 +163,15 @@ impl AudioPlayer for WebAudioPlayer {
     }
 }
 
+type WebEmulator = Emulator<
+    Rc<RefCell<WgpuRenderer<Window>>>,
+    Rc<RefCell<WebAudioPlayer>>,
+    WebInputPoller,
+    WebSaveWriter,
+>;
+
 struct State {
-    emulator: Emulator<WgpuRenderer<Window>, WebAudioPlayer, WebInputPoller, WebSaveWriter>,
+    emulator: WebEmulator,
     input_handler: InputHandler,
     aspect_ratio: AspectRatio,
     filter_mode: GpuFilterMode,
@@ -172,8 +179,8 @@ struct State {
 }
 
 impl State {
-    fn window(&self) -> &Window {
-        self.emulator.get_renderer().window()
+    fn window_id(&self) -> WindowId {
+        self.emulator.get_renderer().borrow().window().id()
     }
 }
 
@@ -190,11 +197,13 @@ pub struct JgnesWebConfig {
     gpu_filter_mode: Rc<RefCell<GpuFilterMode>>,
     overscan: Rc<RefCell<Overscan>>,
     audio_enabled: Rc<RefCell<bool>>,
+    open_file_requested: Rc<RefCell<bool>>,
     reset_requested: Rc<RefCell<bool>>,
 }
 
 #[wasm_bindgen]
 impl JgnesWebConfig {
+    #[must_use]
     #[wasm_bindgen(constructor)]
     pub fn new() -> JgnesWebConfig {
         JgnesWebConfig {
@@ -202,6 +211,7 @@ impl JgnesWebConfig {
             gpu_filter_mode: Rc::new(RefCell::new(GpuFilterMode::NearestNeighbor)),
             overscan: Rc::default(),
             audio_enabled: Rc::new(RefCell::new(true)),
+            open_file_requested: Rc::new(RefCell::new(false)),
             reset_requested: Rc::new(RefCell::new(false)),
         }
     }
@@ -246,12 +256,25 @@ impl JgnesWebConfig {
         *self.audio_enabled.borrow_mut() = value;
     }
 
+    pub fn open_new_file(&self) {
+        *self.open_file_requested.borrow_mut() = true;
+    }
+
     pub fn reset_emulator(&self) {
         *self.reset_requested.borrow_mut() = true;
     }
 
+    // Duplicated definition so clone() can be called from JS
+    #[allow(clippy::should_implement_trait)]
+    #[must_use]
     pub fn clone(&self) -> JgnesWebConfig {
         <JgnesWebConfig as Clone>::clone(self)
+    }
+}
+
+impl Default for JgnesWebConfig {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -259,10 +282,43 @@ fn set_overscan_field(value: bool, field: &mut u8) {
     *field = if value { 8 } else { 0 };
 }
 
+fn load_sav_bytes(file_name: &str) -> Option<Vec<u8>> {
+    loadFromLocalStorage(file_name).map(|hex| {
+        let mut sav_bytes = Vec::with_capacity(hex.len() / 2);
+        for i in 0..hex.len() / 2 {
+            let byte = u8::from_str_radix(&hex[2 * i..2 * i + 2], 16)
+                .expect("invalid hex char in save bytes");
+            sav_bytes.push(byte);
+        }
+        sav_bytes
+    })
+}
+
+fn set_rom_file_name_text(file_name: &str) {
+    web_sys::window()
+        .and_then(|win| win.document())
+        .and_then(|doc| {
+            let dst = doc.get_element_by_id("rom-file-name")?;
+            dst.set_text_content(Some(file_name));
+            Some(())
+        })
+        .expect("Unable to write file name into the DOM");
+}
+
+async fn open_file_in_event_loop(event_loop_proxy: EventLoopProxy<(Vec<u8>, String)>) {
+    let Some(file) = AsyncFileDialog::new().pick_file().await else { return };
+
+    let file_bytes = file.read().await;
+    let file_name = file.file_name();
+    event_loop_proxy
+        .send_event((file_bytes, file_name))
+        .unwrap();
+}
+
 #[allow(clippy::missing_panics_doc)]
 #[wasm_bindgen]
 pub async fn run(config: JgnesWebConfig) {
-    let event_loop = EventLoop::new();
+    let event_loop = EventLoopBuilder::<(Vec<u8>, String)>::with_user_event().build();
     let window = WindowBuilder::new()
         .build(&event_loop)
         .expect("Unable to create window");
@@ -279,14 +335,16 @@ pub async fn run(config: JgnesWebConfig) {
         })
         .expect("Couldn't append canvas to document body");
 
+    let gpu_filter_mode = *config.gpu_filter_mode.borrow();
+    let aspect_ratio = *config.aspect_ratio.borrow();
     let renderer = WgpuRenderer::from_window(
         window,
         window_size,
         RendererConfig {
             vsync_mode: VSyncMode::Enabled,
             wgpu_backend: WgpuBackend::BrowserAuto,
-            gpu_filter_mode: *config.gpu_filter_mode.borrow(),
-            aspect_ratio: *config.aspect_ratio.borrow(),
+            gpu_filter_mode,
+            aspect_ratio,
             overscan: Overscan::default(),
             forced_integer_height_scaling: false,
             use_webgl2_limits: true,
@@ -295,6 +353,7 @@ pub async fn run(config: JgnesWebConfig) {
     .await
     .map_err(|err| alert_and_panic(&err.to_string()))
     .unwrap();
+    let renderer = Rc::new(RefCell::new(renderer));
 
     let input_handler = InputHandler {
         p1_joypad_state: Rc::default(),
@@ -307,25 +366,8 @@ pub async fn run(config: JgnesWebConfig) {
         .pick_file()
         .await
         .unwrap_or_else(|| alert_and_panic("no file selected"));
-
-    let sav_bytes = loadFromLocalStorage(&file.file_name()).map(|hex| {
-        let mut sav_bytes = Vec::with_capacity(hex.len() / 2);
-        for i in 0..hex.len() / 2 {
-            let byte = u8::from_str_radix(&hex[2 * i..2 * i + 2], 16)
-                .expect("invalid hex char in save bytes");
-            sav_bytes.push(byte);
-        }
-        sav_bytes
-    });
-
-    web_sys::window()
-        .and_then(|win| win.document())
-        .and_then(|doc| {
-            let dst = doc.get_element_by_id("rom-file-name")?;
-            dst.set_text_content(Some(&file.file_name()));
-            Some(())
-        })
-        .expect("Unable to write file name into the DOM");
+    let sav_bytes = load_sav_bytes(&file.file_name());
+    set_rom_file_name_text(&file.file_name());
 
     let audio_ctx = AudioContext::new_with_context_options(
         AudioContextOptions::new().sample_rate(AUDIO_OUTPUT_FREQUENCY as f32),
@@ -337,12 +379,13 @@ pub async fn run(config: JgnesWebConfig) {
         .unwrap();
 
     let audio_player = WebAudioPlayer::new(audio_queue, Rc::clone(&config.audio_enabled));
+    let audio_player = Rc::new(RefCell::new(audio_player));
 
     let emulator = Emulator::create(
         file.read().await,
         sav_bytes,
-        renderer,
-        audio_player,
+        Rc::clone(&renderer),
+        Rc::clone(&audio_player),
         input_poller,
         WebSaveWriter {
             file_name: file.file_name(),
@@ -359,11 +402,31 @@ pub async fn run(config: JgnesWebConfig) {
         overscan: *config.overscan.borrow(),
     };
 
+    let event_loop_proxy = event_loop.create_proxy();
+
     event_loop.run(move |event, _, control_flow| match event {
+        Event::UserEvent((file_bytes, file_name)) => {
+            let sav_bytes = load_sav_bytes(&file_name);
+            set_rom_file_name_text(&file_name);
+
+            let input_poller = WebInputPoller {
+                p1_joypad_state: Rc::clone(&state.input_handler.p1_joypad_state),
+            };
+            let save_writer = WebSaveWriter { file_name };
+            state.emulator = Emulator::create(
+                file_bytes,
+                sav_bytes,
+                Rc::clone(&renderer),
+                Rc::clone(&audio_player),
+                input_poller,
+                save_writer,
+            )
+            .unwrap();
+        }
         Event::WindowEvent {
             event: win_event,
             window_id,
-        } if window_id == state.window().id() => {
+        } if window_id == state.window_id() => {
             state.input_handler.handle_window_event(&win_event);
 
             if let WindowEvent::CloseRequested = win_event {
@@ -376,6 +439,7 @@ pub async fn run(config: JgnesWebConfig) {
                 state
                     .emulator
                     .get_renderer_mut()
+                    .borrow_mut()
                     .update_aspect_ratio(config_aspect_ratio);
                 state.aspect_ratio = config_aspect_ratio;
             }
@@ -385,6 +449,7 @@ pub async fn run(config: JgnesWebConfig) {
                 state
                     .emulator
                     .get_renderer_mut()
+                    .borrow_mut()
                     .update_filter_mode(config_filter_mode);
                 state.filter_mode = config_filter_mode;
             }
@@ -394,8 +459,17 @@ pub async fn run(config: JgnesWebConfig) {
                 state
                     .emulator
                     .get_renderer_mut()
+                    .borrow_mut()
                     .update_overscan(config_overscan);
                 state.overscan = config_overscan;
+            }
+
+            if *config.open_file_requested.borrow() {
+                *config.open_file_requested.borrow_mut() = false;
+
+                wasm_bindgen_futures::spawn_local(open_file_in_event_loop(
+                    event_loop_proxy.clone(),
+                ));
             }
 
             if *config.reset_requested.borrow() {

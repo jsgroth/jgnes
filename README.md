@@ -33,7 +33,7 @@ Implemented:
 
 Not Implemented:
 * Color palette customization; the NES hardware directly outputs an NTSC video signal rather than RGB pixel grids, so any mapping from NES colors to RGB colors is an approximation at best
-* Lots of mappers, most notably Namco's and Bandai's custom mappers
+* Lots of mappers, most notably Namco's custom mappers
 * Fast forward or rewind
 * Support for PAL/EU releases (the processor timings are different compared to NTSC US/JP)
 * Support for any controller port peripherals (e.g. the Zapper)

@@ -25,6 +25,13 @@ extern "C" {
     fn alert(s: &str);
 }
 
+#[wasm_bindgen(module = "/js/save-writer.js")]
+extern "C" {
+    fn loadFromLocalStorage(key: &str) -> Option<String>;
+
+    fn saveToLocalStorage(key: &str, value: &str);
+}
+
 fn alert_and_panic(s: &str) -> ! {
     alert(s);
     panic!("{s}")
@@ -35,12 +42,20 @@ fn window_size(window: &Window) -> (u32, u32) {
     (width, height)
 }
 
-struct Null;
+struct WebSaveWriter {
+    file_name: String,
+}
 
-impl SaveWriter for Null {
-    type Err = ();
+impl SaveWriter for WebSaveWriter {
+    type Err = String;
 
-    fn persist_sram(&mut self, _sram: &[u8]) -> Result<(), Self::Err> {
+    fn persist_sram(&mut self, sram: &[u8]) -> Result<(), Self::Err> {
+        let sram_hex: String = sram
+            .iter()
+            .copied()
+            .map(|byte| format!("{byte:02X}"))
+            .collect();
+        saveToLocalStorage(&self.file_name, &sram_hex);
         Ok(())
     }
 }
@@ -149,7 +164,7 @@ impl AudioPlayer for WebAudioPlayer {
 }
 
 struct State {
-    emulator: Emulator<WgpuRenderer<Window>, WebAudioPlayer, WebInputPoller, Null>,
+    emulator: Emulator<WgpuRenderer<Window>, WebAudioPlayer, WebInputPoller, WebSaveWriter>,
     input_handler: InputHandler,
     aspect_ratio: AspectRatio,
     filter_mode: GpuFilterMode,
@@ -287,6 +302,16 @@ pub async fn run(config: JgnesWebConfig) {
         .await
         .unwrap_or_else(|| alert_and_panic("no file selected"));
 
+    let sav_bytes = loadFromLocalStorage(&file.file_name()).map(|hex| {
+        let mut sav_bytes = Vec::with_capacity(hex.len() / 2);
+        for i in 0..hex.len() / 2 {
+            let byte = u8::from_str_radix(&hex[2 * i..2 * i + 2], 16)
+                .expect("invalid hex char in save bytes");
+            sav_bytes.push(byte);
+        }
+        sav_bytes
+    });
+
     web_sys::window()
         .and_then(|win| win.document())
         .and_then(|doc| {
@@ -309,11 +334,13 @@ pub async fn run(config: JgnesWebConfig) {
 
     let emulator = Emulator::create(
         file.read().await,
-        None,
+        sav_bytes,
         renderer,
         audio_player,
         input_poller,
-        Null,
+        WebSaveWriter {
+            file_name: file.file_name(),
+        },
     )
     .map_err(|err| alert_and_panic(&err.to_string()))
     .unwrap();

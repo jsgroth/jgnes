@@ -2,8 +2,7 @@
 
 An experimental WASM+WebGL2 frontend for jgnes that runs in the browser.
 
-Persistent save files are not implemented, nor is any form of video customization (e.g. aspect ratio / overscan),
-but the emulation core is identical to the native version.
+This frontend does not have as many configuration features as the native version, but the emulation core is identical.
 
 ## Requirements
 

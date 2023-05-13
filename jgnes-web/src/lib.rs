@@ -163,15 +163,14 @@ impl AudioPlayer for WebAudioPlayer {
     }
 }
 
-type WebEmulator = Emulator<
-    Rc<RefCell<WgpuRenderer<Window>>>,
-    Rc<RefCell<WebAudioPlayer>>,
-    WebInputPoller,
-    WebSaveWriter,
->;
+type WebRenderer = Rc<RefCell<WgpuRenderer<Window>>>;
+
+type WebEmulator =
+    Emulator<WebRenderer, Rc<RefCell<WebAudioPlayer>>, WebInputPoller, WebSaveWriter>;
 
 struct State {
-    emulator: WebEmulator,
+    emulator: Option<WebEmulator>,
+    renderer: WebRenderer,
     input_handler: InputHandler,
     aspect_ratio: AspectRatio,
     filter_mode: GpuFilterMode,
@@ -180,7 +179,7 @@ struct State {
 
 impl State {
     fn window_id(&self) -> WindowId {
-        self.emulator.get_renderer().borrow().window().id()
+        self.renderer.borrow().window().id()
     }
 }
 
@@ -355,20 +354,6 @@ pub async fn run(config: JgnesWebConfig) {
     .unwrap();
     let renderer = Rc::new(RefCell::new(renderer));
 
-    let input_handler = InputHandler {
-        p1_joypad_state: Rc::default(),
-    };
-    let input_poller = WebInputPoller {
-        p1_joypad_state: Rc::clone(&input_handler.p1_joypad_state),
-    };
-
-    let file = AsyncFileDialog::new()
-        .pick_file()
-        .await
-        .unwrap_or_else(|| alert_and_panic("no file selected"));
-    let sav_bytes = load_sav_bytes(&file.file_name());
-    set_rom_file_name_text(&file.file_name());
-
     let audio_ctx = AudioContext::new_with_context_options(
         AudioContextOptions::new().sample_rate(AUDIO_OUTPUT_FREQUENCY as f32),
     )
@@ -381,21 +366,44 @@ pub async fn run(config: JgnesWebConfig) {
     let audio_player = WebAudioPlayer::new(audio_queue, Rc::clone(&config.audio_enabled));
     let audio_player = Rc::new(RefCell::new(audio_player));
 
-    let emulator = Emulator::create(
-        file.read().await,
-        sav_bytes,
-        Rc::clone(&renderer),
-        Rc::clone(&audio_player),
-        input_poller,
-        WebSaveWriter {
-            file_name: file.file_name(),
-        },
-    )
-    .map_err(|err| alert_and_panic(&err.to_string()))
-    .unwrap();
+    let input_handler = InputHandler {
+        p1_joypad_state: Rc::default(),
+    };
+    let input_poller = WebInputPoller {
+        p1_joypad_state: Rc::clone(&input_handler.p1_joypad_state),
+    };
+
+    let emulator = match AsyncFileDialog::new().pick_file().await {
+        Some(file) => {
+            let sav_bytes = load_sav_bytes(&file.file_name());
+
+            match Emulator::create(
+                file.read().await,
+                sav_bytes,
+                Rc::clone(&renderer),
+                Rc::clone(&audio_player),
+                input_poller,
+                WebSaveWriter {
+                    file_name: file.file_name(),
+                },
+            ) {
+                Ok(emulator) => {
+                    set_rom_file_name_text(&file.file_name());
+                    Some(emulator)
+                }
+                Err(err) => {
+                    alert(&format!("Error initializing emulator: {err}"));
+                    log::error!("Error initializing emulator: {err}");
+                    None
+                }
+            }
+        }
+        None => None,
+    };
 
     let mut state = State {
         emulator,
+        renderer,
         input_handler,
         aspect_ratio: *config.aspect_ratio.borrow(),
         filter_mode: *config.gpu_filter_mode.borrow(),
@@ -407,21 +415,31 @@ pub async fn run(config: JgnesWebConfig) {
     event_loop.run(move |event, _, control_flow| match event {
         Event::UserEvent((file_bytes, file_name)) => {
             let sav_bytes = load_sav_bytes(&file_name);
-            set_rom_file_name_text(&file_name);
 
             let input_poller = WebInputPoller {
                 p1_joypad_state: Rc::clone(&state.input_handler.p1_joypad_state),
             };
-            let save_writer = WebSaveWriter { file_name };
-            state.emulator = Emulator::create(
+            let save_writer = WebSaveWriter {
+                file_name: file_name.clone(),
+            };
+
+            match Emulator::create(
                 file_bytes,
                 sav_bytes,
-                Rc::clone(&renderer),
+                Rc::clone(&state.renderer),
                 Rc::clone(&audio_player),
                 input_poller,
                 save_writer,
-            )
-            .unwrap();
+            ) {
+                Ok(emulator) => {
+                    state.emulator = Some(emulator);
+                    set_rom_file_name_text(&file_name);
+                }
+                Err(err) => {
+                    alert(&format!("Error initializing emulator: {err}"));
+                    log::error!("Error initializing emulator: {err}");
+                }
+            }
         }
         Event::WindowEvent {
             event: win_event,
@@ -437,8 +455,7 @@ pub async fn run(config: JgnesWebConfig) {
             let config_aspect_ratio = *config.aspect_ratio.borrow();
             if config_aspect_ratio != state.aspect_ratio {
                 state
-                    .emulator
-                    .get_renderer_mut()
+                    .renderer
                     .borrow_mut()
                     .update_aspect_ratio(config_aspect_ratio);
                 state.aspect_ratio = config_aspect_ratio;
@@ -447,8 +464,7 @@ pub async fn run(config: JgnesWebConfig) {
             let config_filter_mode = *config.gpu_filter_mode.borrow();
             if config_filter_mode != state.filter_mode {
                 state
-                    .emulator
-                    .get_renderer_mut()
+                    .renderer
                     .borrow_mut()
                     .update_filter_mode(config_filter_mode);
                 state.filter_mode = config_filter_mode;
@@ -456,11 +472,7 @@ pub async fn run(config: JgnesWebConfig) {
 
             let config_overscan = *config.overscan.borrow();
             if config_overscan != state.overscan {
-                state
-                    .emulator
-                    .get_renderer_mut()
-                    .borrow_mut()
-                    .update_overscan(config_overscan);
+                state.renderer.borrow_mut().update_overscan(config_overscan);
                 state.overscan = config_overscan;
             }
 
@@ -474,11 +486,15 @@ pub async fn run(config: JgnesWebConfig) {
 
             if *config.reset_requested.borrow() {
                 *config.reset_requested.borrow_mut() = false;
-                state.emulator.soft_reset();
+                if let Some(emulator) = &mut state.emulator {
+                    emulator.soft_reset();
+                }
             }
 
             // Tick the emulator until it renders the next frame
-            while state.emulator.tick().expect("emulation error") != TickEffect::FrameRendered {}
+            if let Some(emulator) = &mut state.emulator {
+                while emulator.tick().expect("emulation error") != TickEffect::FrameRendered {}
+            }
         }
         _ => {}
     });

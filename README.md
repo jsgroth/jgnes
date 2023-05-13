@@ -34,7 +34,7 @@ Implemented:
 Not Implemented:
 * Unofficial CPU opcodes
 * Cycle-accurate rendering effects of enabling rendering mid-scanline
-* DMC DMA cycle stealing and dummy reads, an obscure hardware quirk affects very very few if any games
+* DMC DMA cycle stealing and dummy reads, an obscure hardware quirk that affects very very few if any games
 * Color palette customization; the NES hardware directly outputs an NTSC video signal rather than RGB pixel grids, so any mapping from NES colors to RGB colors is an approximation at best
 * Lots of mappers, most notably Namco's custom mappers
 * Fast forward or rewind

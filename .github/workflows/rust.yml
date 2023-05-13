@@ -59,7 +59,7 @@ jobs:
       uses: actions-rs/toolchain@v1
       with:
         toolchain: nightly
-        components: rust-src
+        components: rust-src, clippy
 
     - name: Install wasm-pack
       run: |

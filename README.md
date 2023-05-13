@@ -23,6 +23,8 @@ Implemented:
   * Sunsoft 5A / 5B / FME-7, including 5B expansion audio
   * Codemasters unlicensed board
   * Color Dreams unlicensed board
+  * Bandai FCG-1 / FCG-2 / LZ93D50
+    * The LZ93D50 variant that uses the Datach Joint ROM system is not implemented (iNES mapper 157)
 * P1 & P2 input with support for keyboard input and DirectInput gamepad input
 * Support for 3 different forced aspect ratios (NTSC, 1:1 pixel aspect ratio, 4:3 screen aspect ratio), plus an option for stretched/none
 * Overscan customization

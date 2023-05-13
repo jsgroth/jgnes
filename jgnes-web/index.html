@@ -15,6 +15,15 @@
                 margin-right: auto;
             }
 
+            #jgnes-web-text {
+                margin-left: auto;
+                margin-right: auto;
+                width: 878px;
+                font-size: 24px;
+                text-align: center;
+                color: white;
+            }
+
             #rom-file-name {
                 margin-bottom: 6px;
             }
@@ -35,6 +44,7 @@
         </style>
     </head>
     <body>
+        <div id="jgnes-web-text">jgnes web</div>
         <div id="jgnes-wasm"></div>
         <form id="jgnes-config">
             <div id="jgnes-init">
@@ -138,6 +148,7 @@
 
             document.getElementById("jgnes-init-button").addEventListener("click", () => {
                 if (!running) {
+                    document.getElementById("jgnes-web-text").remove();
                     document.getElementById("jgnes-reset-button").disabled = false;
 
                     running = true;

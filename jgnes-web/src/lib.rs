@@ -190,6 +190,7 @@ pub struct JgnesWebConfig {
     gpu_filter_mode: Rc<RefCell<GpuFilterMode>>,
     overscan: Rc<RefCell<Overscan>>,
     audio_enabled: Rc<RefCell<bool>>,
+    reset_requested: Rc<RefCell<bool>>,
 }
 
 #[wasm_bindgen]
@@ -201,6 +202,7 @@ impl JgnesWebConfig {
             gpu_filter_mode: Rc::new(RefCell::new(GpuFilterMode::NearestNeighbor)),
             overscan: Rc::default(),
             audio_enabled: Rc::new(RefCell::new(true)),
+            reset_requested: Rc::new(RefCell::new(false)),
         }
     }
 
@@ -242,6 +244,10 @@ impl JgnesWebConfig {
 
     pub fn set_audio_enabled(&self, value: bool) {
         *self.audio_enabled.borrow_mut() = value;
+    }
+
+    pub fn reset_emulator(&self) {
+        *self.reset_requested.borrow_mut() = true;
     }
 
     pub fn clone(&self) -> JgnesWebConfig {
@@ -315,7 +321,7 @@ pub async fn run(config: JgnesWebConfig) {
     web_sys::window()
         .and_then(|win| win.document())
         .and_then(|doc| {
-            let dst = doc.get_element_by_id("jgnes-init")?;
+            let dst = doc.get_element_by_id("rom-file-name")?;
             dst.set_text_content(Some(&file.file_name()));
             Some(())
         })
@@ -390,6 +396,11 @@ pub async fn run(config: JgnesWebConfig) {
                     .get_renderer_mut()
                     .update_overscan(config_overscan);
                 state.overscan = config_overscan;
+            }
+
+            if *config.reset_requested.borrow() {
+                *config.reset_requested.borrow_mut() = false;
+                state.emulator.soft_reset();
             }
 
             // Tick the emulator until it renders the next frame

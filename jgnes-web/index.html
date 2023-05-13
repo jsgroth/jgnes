@@ -10,10 +10,13 @@
 
             #jgnes-wasm {
                 width: 878px;
-                height: 672px;
                 margin-bottom: 15px;
                 margin-left: auto;
                 margin-right: auto;
+            }
+
+            #rom-file-name {
+                margin-bottom: 6px;
             }
 
             #jgnes-config {
@@ -36,6 +39,8 @@
         <form id="jgnes-config">
             <div id="jgnes-init">
                 <input id="jgnes-init-button" type="button" value="Open ROM file">
+                <div id="rom-file-name"></div>
+                <input id="jgnes-reset-button" type="button" value="Reset" hidden>
             </div>
             <fieldset>
                 <legend>Aspect ratio</legend>
@@ -88,6 +93,7 @@
                 <li>Start: Return key</li>
                 <li>Select: Right Shift key</li>
             </ul>
+            <p>Download the native version and/or source code: <a href="https://github.com/jsgroth/jgnes">https://github.com/jsgroth/jgnes</a></p>
         </div>
         <script type="module">
             import init, { run, JgnesWebConfig } from "./pkg/jgnes_web.js";
@@ -131,7 +137,13 @@
 
             document.getElementById("jgnes-init-button").addEventListener("click", (event) => {
                 event.target.hidden = true;
+                document.getElementById("jgnes-reset-button").hidden = false;
+
                 run(config.clone());
+            });
+
+            document.getElementById("jgnes-reset-button").addEventListener("click", () => {
+                config.reset_emulator();
             });
         </script>
     </body>

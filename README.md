@@ -23,6 +23,8 @@ Implemented:
   * Sunsoft 5A / 5B / FME-7, including 5B expansion audio
   * Codemasters unlicensed board
   * Color Dreams unlicensed board
+  * Bandai FCG-1 / FCG-2 / LZ93D50
+    * The LZ93D50 variant that uses the Datach Joint ROM system is not implemented (iNES mapper 157)
 * P1 & P2 input with support for keyboard input and DirectInput gamepad input
 * Support for 3 different forced aspect ratios (NTSC, 1:1 pixel aspect ratio, 4:3 screen aspect ratio), plus an option for stretched/none
 * Overscan customization
@@ -31,7 +33,7 @@ Implemented:
 
 Not Implemented:
 * Color palette customization; the NES hardware directly outputs an NTSC video signal rather than RGB pixel grids, so any mapping from NES colors to RGB colors is an approximation at best
-* Lots of mappers, most notably Namco's and Bandai's custom mappers
+* Lots of mappers, most notably Namco's custom mappers
 * Fast forward or rewind
 * Support for PAL/EU releases (the processor timings are different compared to NTSC US/JP)
 * Support for any controller port peripherals (e.g. the Zapper)

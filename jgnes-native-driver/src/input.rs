@@ -237,10 +237,16 @@ impl<'a> SdlInputHandler<'a> {
             _ => {}
         }
 
-        *self.p1_joypad_state.borrow_mut() =
-            sanitize_joypad_state(self.raw_p1_joypad_state, self.allow_opposite_directions);
-        *self.p2_joypad_state.borrow_mut() =
-            sanitize_joypad_state(self.raw_p2_joypad_state, self.allow_opposite_directions);
+        *self.p1_joypad_state.borrow_mut() = if self.allow_opposite_directions {
+            self.raw_p1_joypad_state
+        } else {
+            self.raw_p1_joypad_state.sanitize_opposing_directions()
+        };
+        *self.p2_joypad_state.borrow_mut() = if self.allow_opposite_directions {
+            self.raw_p2_joypad_state
+        } else {
+            self.raw_p2_joypad_state.sanitize_opposing_directions()
+        };
 
         Ok(())
     }
@@ -359,28 +365,4 @@ fn hat_directions_for(state: HatState) -> ArrayVec<[HatDirection; 2]> {
             .collect(),
         HatState::Centered => [].into_iter().collect(),
     }
-}
-
-#[must_use]
-fn sanitize_joypad_state(
-    joypad_state: JoypadState,
-    allow_opposite_directions: bool,
-) -> JoypadState {
-    if allow_opposite_directions {
-        return joypad_state;
-    }
-
-    let mut sanitized = joypad_state;
-
-    if sanitized.up && sanitized.down {
-        // Arbitrarily give Up priority
-        sanitized.down = false;
-    }
-
-    if sanitized.left && sanitized.right {
-        // Arbitrarily give Left priority
-        sanitized.right = false;
-    }
-
-    sanitized
 }

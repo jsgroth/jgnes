@@ -108,7 +108,7 @@ struct WebInputPoller {
 
 impl InputPoller for WebInputPoller {
     fn poll_p1_input(&self) -> JoypadState {
-        *self.p1_joypad_state.borrow()
+        self.p1_joypad_state.borrow().sanitize_opposing_directions()
     }
 
     fn poll_p2_input(&self) -> JoypadState {

@@ -305,7 +305,7 @@ fn set_rom_file_name_text(file_name: &str) {
 }
 
 async fn open_file_in_event_loop(event_loop_proxy: EventLoopProxy<(Vec<u8>, String)>) {
-    let Some(file) = AsyncFileDialog::new().pick_file().await else { return };
+    let Some(file) = AsyncFileDialog::new().add_filter("nes", &["nes"]).pick_file().await else { return };
 
     let file_bytes = file.read().await;
     let file_name = file.file_name();
@@ -373,7 +373,11 @@ pub async fn run(config: JgnesWebConfig) {
         p1_joypad_state: Rc::clone(&input_handler.p1_joypad_state),
     };
 
-    let emulator = match AsyncFileDialog::new().pick_file().await {
+    let emulator = match AsyncFileDialog::new()
+        .add_filter("nes", &["nes"])
+        .pick_file()
+        .await
+    {
         Some(file) => {
             let sav_bytes = load_sav_bytes(&file.file_name());
 

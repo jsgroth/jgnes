@@ -1615,6 +1615,7 @@ dependencies = [
  "sdl2",
  "serde",
  "toml",
+ "xrandr",
 ]
 
 [[package]]
@@ -3477,6 +3478,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "x11"
+version = "2.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "502da5464ccd04011667b11c435cb992822c2c0dbde1770c988480d312a0db2e"
+dependencies = [
+ "libc",
+ "pkg-config",
+]
+
+[[package]]
 name = "x11-dl"
 version = "2.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3533,6 +3544,17 @@ name = "xml-rs"
 version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c1fcc45bb67e8bd9c33ada4b861bccfe2506e726169f7c1081b95841b3758eb3"
+
+[[package]]
+name = "xrandr"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e9faecbb5f354fe09959775758b6f7b6524ee80103a6c5c66a57112a2f707862"
+dependencies = [
+ "indexmap",
+ "thiserror",
+ "x11",
+]
 
 [[package]]
 name = "zbus"

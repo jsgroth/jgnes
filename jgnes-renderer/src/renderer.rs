@@ -541,12 +541,12 @@ fn compute_vertices(
 }
 
 fn cpu_scale_texture(output_buffer: &[u8], scaled_buffer: &mut [u8], cpu_render_scale: u32) {
-    for j in 0..u32::from(jgnes_core::SCREEN_WIDTH) {
-        for i in 0..u32::from(jgnes_core::VISIBLE_SCREEN_HEIGHT) {
+    for i in 0..u32::from(jgnes_core::VISIBLE_SCREEN_HEIGHT) {
+        for j in 0..u32::from(jgnes_core::SCREEN_WIDTH) {
             let from_start = (i * 4 * u32::from(jgnes_core::SCREEN_WIDTH) + j * 4) as usize;
 
-            for jj in 0..cpu_render_scale {
-                for ii in 0..cpu_render_scale {
+            for ii in 0..cpu_render_scale {
+                for jj in 0..cpu_render_scale {
                     let to_start = ((cpu_render_scale * i + ii)
                         * 4
                         * cpu_render_scale

@@ -14,7 +14,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 use web_sys::{AudioContext, AudioContextOptions};
-use winit::dpi::PhysicalSize;
+use winit::dpi::{LogicalSize, PhysicalSize};
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoopBuilder, EventLoopProxy};
 use winit::platform::web::WindowExtWebSys;
@@ -317,7 +317,7 @@ pub async fn run(config: JgnesWebConfig) {
         .build(&event_loop)
         .expect("Unable to create window");
 
-    window.set_inner_size(PhysicalSize::new(878, 672));
+    window.set_inner_size(LogicalSize::new(878, 672));
 
     web_sys::window()
         .and_then(|win| win.document())

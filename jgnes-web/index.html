@@ -104,12 +104,8 @@
                 <li>Select: Right Shift key</li>
             </ul>
             <p>Download the native version and/or source code: <a href="https://github.com/jsgroth/jgnes">https://github.com/jsgroth/jgnes</a></p>
-            <p id="current-rev-text"></p>
         </div>
         <script type="module">
-            import currentVersion from "./js/current-version.js";
-            document.getElementById("current-rev-text").textContent = `Built from revision ${currentVersion}`;
-
             import init, { run, JgnesWebConfig } from "./pkg/jgnes_web.js";
             await init();
 

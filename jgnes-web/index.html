@@ -35,6 +35,14 @@
                 color: white;
             }
 
+            #loading-text {
+                font-size: 60px;
+                text-align: center;
+                margin-left: auto;
+                margin-right: auto;
+                color: white;
+            }
+
             #info-text {
                 width: 672px;
                 margin-left: auto;
@@ -46,64 +54,67 @@
     <body>
         <div id="jgnes-web-text">jgnes web</div>
         <div id="jgnes-wasm"></div>
-        <form id="jgnes-config">
-            <div id="jgnes-init">
-                <div id="rom-file-name"></div>
-                <input id="jgnes-init-button" type="button" value="Open ROM file">
-                <input id="jgnes-reset-button" type="button" value="Reset" disabled>
+        <div id="loading-text">Loading...</div>
+        <div id="jgnes-config-and-info" hidden>
+            <form id="jgnes-config">
+                <div id="jgnes-init">
+                    <div id="rom-file-name"></div>
+                    <input id="jgnes-init-button" type="button" value="Open ROM file">
+                    <input id="jgnes-reset-button" type="button" value="Reset" disabled>
+                </div>
+                <fieldset>
+                    <legend>Aspect ratio</legend>
+
+                    <input type="radio" id="aspect-ntsc" name="aspect-ratio" value="Ntsc" checked>
+                    <label for="aspect-ntsc">NTSC</label>
+
+                    <input type="radio" id="aspect-square-pixels" name="aspect-ratio" value="SquarePixels">
+                    <label for="aspect-square-pixels">Square pixels</label>
+                </fieldset>
+                <fieldset>
+                    <legend>Image filtering</legend>
+
+                    <input type="radio" id="filter-nearest" name="image-filter" value="NearestNeighbor" checked>
+                    <label for="filter-nearest">Nearest neighbor</label>
+
+                    <input type="radio" id="filter-linear" name="image-filter" value="Linear">
+                    <label for="filter-linear">Linear interpolation</label>
+
+                    <input type="radio" id="filter-linear-2x" name="image-filter" value="Linear2x">
+                    <label for="filter-linear-2x">Linear interpolation (2x scaled)</label>
+
+                    <input type="radio" id="filter-linear-3x" name="image-filter" value="Linear3x">
+                    <label for="filter-linear-3x">Linear interpolation (3x scaled)</label>
+                </fieldset>
+                <fieldset>
+                    <legend>Overscan</legend>
+
+                    <input type="checkbox" id="overscan-left" name="overscan-left">
+                    <label for="overscan-left">Left</label>
+
+                    <input type="checkbox" id="overscan-right" name="overscan-right">
+                    <label for="overscan-right">Right</label>
+
+                    <input type="checkbox" id="overscan-top" name="overscan-top">
+                    <label for="overscan-top">Top</label>
+
+                    <input type="checkbox" id="overscan-bottom" name="overscan-bottom">
+                    <label for="overscan-bottom">Bottom</label>
+                </fieldset>
+                <input type="checkbox" id="audio-enabled" name="audio-enabled" checked>
+                <label for="audio-enabled">Audio enabled</label>
+            </form>
+            <div id="info-text">
+                <p>Click on the emulator display for keyboard controls to work</p>
+                <ul>
+                    <li>Up/Left/Right/Down: Arrow keys</li>
+                    <li>A: Z key</li>
+                    <li>B: X key</li>
+                    <li>Start: Return key</li>
+                    <li>Select: Right Shift key</li>
+                </ul>
+                <p>Download the native version and/or source code: <a href="https://github.com/jsgroth/jgnes">https://github.com/jsgroth/jgnes</a></p>
             </div>
-            <fieldset>
-                <legend>Aspect ratio</legend>
-
-                <input type="radio" id="aspect-ntsc" name="aspect-ratio" value="Ntsc" checked>
-                <label for="aspect-ntsc">NTSC</label>
-
-                <input type="radio" id="aspect-square-pixels" name="aspect-ratio" value="SquarePixels">
-                <label for="aspect-square-pixels">Square pixels</label>
-            </fieldset>
-            <fieldset>
-                <legend>Image filtering</legend>
-
-                <input type="radio" id="filter-nearest" name="image-filter" value="NearestNeighbor" checked>
-                <label for="filter-nearest">Nearest neighbor</label>
-
-                <input type="radio" id="filter-linear" name="image-filter" value="Linear">
-                <label for="filter-linear">Linear interpolation</label>
-
-                <input type="radio" id="filter-linear-2x" name="image-filter" value="Linear2x">
-                <label for="filter-linear-2x">Linear interpolation (2x scaled)</label>
-
-                <input type="radio" id="filter-linear-3x" name="image-filter" value="Linear3x">
-                <label for="filter-linear-3x">Linear interpolation (3x scaled)</label>
-            </fieldset>
-            <fieldset>
-                <legend>Overscan</legend>
-
-                <input type="checkbox" id="overscan-left" name="overscan-left">
-                <label for="overscan-left">Left</label>
-
-                <input type="checkbox" id="overscan-right" name="overscan-right">
-                <label for="overscan-right">Right</label>
-
-                <input type="checkbox" id="overscan-top" name="overscan-top">
-                <label for="overscan-top">Top</label>
-
-                <input type="checkbox" id="overscan-bottom" name="overscan-bottom">
-                <label for="overscan-bottom">Bottom</label>
-            </fieldset>
-            <input type="checkbox" id="audio-enabled" name="audio-enabled" checked>
-            <label for="audio-enabled">Audio enabled</label>
-        </form>
-        <div id="info-text">
-            <p>Click on the emulator display for keyboard controls to work</p>
-            <ul>
-                <li>Up/Left/Right/Down: Arrow keys</li>
-                <li>A: Z key</li>
-                <li>B: X key</li>
-                <li>Start: Return key</li>
-                <li>Select: Right Shift key</li>
-            </ul>
-            <p>Download the native version and/or source code: <a href="https://github.com/jsgroth/jgnes">https://github.com/jsgroth/jgnes</a></p>
         </div>
         <script type="module">
             import init, { run, JgnesWebConfig } from "./pkg/jgnes_web.js";
@@ -161,6 +172,9 @@
             document.getElementById("jgnes-reset-button").addEventListener("click", () => {
                 config.reset_emulator();
             });
+
+            document.getElementById("jgnes-config-and-info").hidden = false;
+            document.getElementById("loading-text").remove();
         </script>
     </body>
 </html>

@@ -1,10 +1,10 @@
 mod config;
 mod input;
 
-use jgnes_core::audio::LowPassFilter;
+use jgnes_core::audio::{DownsampleAction, DownsampleCounter, LowPassFilter};
 use jgnes_core::{
-    audio, AudioPlayer, ColorEmphasis, EmulationError, Emulator, FrameBuffer, InputPoller,
-    JoypadState, Renderer, SaveWriter,
+    AudioPlayer, ColorEmphasis, EmulationError, Emulator, FrameBuffer, InputPoller, JoypadState,
+    Renderer, SaveWriter,
 };
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
 use sdl2::event::{Event, EventType, WindowEvent};
@@ -100,7 +100,7 @@ struct SdlAudioPlayer {
     sync_to_audio: bool,
     sample_queue: Vec<f32>,
     low_pass_filter: LowPassFilter,
-    sample_count: u64,
+    downsample_counter: DownsampleCounter,
 }
 
 impl SdlAudioPlayer {
@@ -110,7 +110,7 @@ impl SdlAudioPlayer {
             sync_to_audio,
             sample_queue: Vec::new(),
             low_pass_filter: LowPassFilter::new(),
-            sample_count: 0,
+            downsample_counter: DownsampleCounter::new(AUDIO_OUTPUT_FREQUENCY, DISPLAY_RATE),
         }
     }
 }
@@ -124,8 +124,7 @@ impl AudioPlayer for SdlAudioPlayer {
     fn push_sample(&mut self, sample: f64) -> Result<(), Self::Err> {
         self.low_pass_filter.collect_sample(sample);
 
-        self.sample_count += 1;
-        if audio::should_output_sample(self.sample_count, AUDIO_OUTPUT_FREQUENCY, DISPLAY_RATE) {
+        if self.downsample_counter.increment() == DownsampleAction::OutputSample {
             self.sample_queue
                 .push(self.low_pass_filter.output_sample() as f32);
         }

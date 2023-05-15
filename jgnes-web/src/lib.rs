@@ -3,7 +3,7 @@
 mod audio;
 
 use crate::audio::{AudioQueue, EnqueueResult};
-use jgnes_core::audio::LowPassFilter;
+use jgnes_core::audio::{DownsampleAction, DownsampleCounter, LowPassFilter};
 use jgnes_core::{AudioPlayer, Emulator, InputPoller, JoypadState, SaveWriter, TickEffect};
 use jgnes_renderer::config::{
     AspectRatio, GpuFilterMode, Overscan, RenderScale, RendererConfig, VSyncMode, WgpuBackend,
@@ -119,7 +119,7 @@ impl InputPoller for WebInputPoller {
 struct WebAudioPlayer {
     audio_queue: AudioQueue,
     low_pass_filter: LowPassFilter,
-    sample_count: u64,
+    downsample_counter: DownsampleCounter,
     audio_enabled: Rc<RefCell<bool>>,
 }
 
@@ -128,7 +128,7 @@ impl WebAudioPlayer {
         Self {
             audio_queue,
             low_pass_filter: LowPassFilter::new(),
-            sample_count: 0,
+            downsample_counter: DownsampleCounter::new(AUDIO_OUTPUT_FREQUENCY, DISPLAY_RATE),
             audio_enabled,
         }
     }
@@ -147,12 +147,7 @@ impl AudioPlayer for WebAudioPlayer {
 
         self.low_pass_filter.collect_sample(sample);
 
-        self.sample_count += 1;
-        if jgnes_core::audio::should_output_sample(
-            self.sample_count,
-            AUDIO_OUTPUT_FREQUENCY,
-            DISPLAY_RATE,
-        ) {
+        if self.downsample_counter.increment() == DownsampleAction::OutputSample {
             let output_sample = self.low_pass_filter.output_sample();
             if self.audio_queue.push_if_space(output_sample as f32)? == EnqueueResult::BufferFull {
                 log::warn!("Audio queue is full, dropping sample");

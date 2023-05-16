@@ -131,8 +131,8 @@ impl AudioPlayer for SdlAudioPlayer {
 
         // Arbitrary threshold
         if self.sample_queue.len() >= 16 {
-            // 2048 samples * 4 bytes per sample
-            while self.sync_to_audio && self.audio_queue.size() >= 8192 {
+            // 1024 samples * 4 bytes per sample
+            while self.sync_to_audio && self.audio_queue.size() >= 4096 {
                 thread::sleep(Duration::from_micros(250));
             }
 

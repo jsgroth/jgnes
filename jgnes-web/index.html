@@ -101,8 +101,12 @@
                     <input type="checkbox" id="overscan-bottom" name="overscan-bottom">
                     <label for="overscan-bottom">Bottom</label>
                 </fieldset>
+
                 <input type="checkbox" id="audio-enabled" name="audio-enabled" checked>
                 <label for="audio-enabled">Audio enabled</label>
+
+                <input type="checkbox" id="audio-sync-enabled" name="audio-sync-enabled" checked>
+                <label for="audio-sync-enabled">Audio sync enabled</label>
             </form>
             <div id="info-text">
                 <p>Click on the emulator display for keyboard controls to work</p>
@@ -155,6 +159,10 @@
 
             document.getElementById("audio-enabled").addEventListener("click", (event) => {
                 config.set_audio_enabled(event.target.checked);
+            });
+
+            document.getElementById("audio-sync-enabled").addEventListener("click", (event) => {
+                config.set_audio_sync_enabled(event.target.checked);
             });
 
             document.getElementById("jgnes-init-button").addEventListener("click", () => {

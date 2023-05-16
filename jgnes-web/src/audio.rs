@@ -1,6 +1,5 @@
 use js_sys::{Array, Atomics, SharedArrayBuffer, Uint32Array};
 use std::cmp;
-use std::collections::VecDeque;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
@@ -81,15 +80,23 @@ impl AudioQueue {
         Ok(EnqueueResult::Successful)
     }
 
-    pub fn drain_into(&self, out: &mut VecDeque<f32>) -> Result<(), JsValue> {
+    pub fn drain_into(&self, out: &mut [f32]) -> Result<(), JsValue> {
         let loaded_start = Atomics::load(&self.header_typed, START_INDEX)? as u32;
         let end = Atomics::load(&self.header_typed, END_INDEX)? as u32;
 
+        let queue_len = if loaded_start <= end {
+            end - loaded_start
+        } else {
+            end + BUFFER_LEN - loaded_start
+        };
+        let drain_len = cmp::min(queue_len as usize, out.len());
+
         let mut start = loaded_start;
-        while start != end {
+        for out_value in out.iter_mut().take(drain_len) {
             let value = Atomics::load(&self.buffer_typed, start)?;
             let sample = f32::from_bits(value as u32);
-            out.push_back(sample);
+            *out_value = sample;
+
             start = (start + 1) & BUFFER_INDEX_MASK;
         }
 
@@ -100,17 +107,25 @@ impl AudioQueue {
         Ok(())
     }
 
+    pub fn len(&self) -> Result<u32, JsValue> {
+        let end = Atomics::load(&self.header_typed, END_INDEX)? as u32;
+        let start = Atomics::load(&self.header_typed, START_INDEX)? as u32;
+
+        if start <= end {
+            Ok(end - start)
+        } else {
+            Ok(end + BUFFER_LEN - start)
+        }
+    }
+
     fn to_js_value(&self) -> JsValue {
         Array::of2(&self.header, &self.buffer).into()
     }
 }
 
-const OUTPUT_BUFFER_THRESHOLD: usize = 4096;
-
 #[wasm_bindgen]
 pub struct AudioProcessor {
     audio_queue: AudioQueue,
-    output_buffer: VecDeque<f32>,
 }
 
 #[wasm_bindgen]
@@ -119,25 +134,11 @@ impl AudioProcessor {
     pub fn new(audio_queue: JsValue) -> AudioProcessor {
         let audio_queue = AudioQueue::try_from(audio_queue).unwrap();
 
-        AudioProcessor {
-            audio_queue,
-            output_buffer: VecDeque::new(),
-        }
+        AudioProcessor { audio_queue }
     }
 
     pub fn process(&mut self, output: &mut [f32]) {
-        self.audio_queue
-            .drain_into(&mut self.output_buffer)
-            .unwrap();
-
-        let len = cmp::min(self.output_buffer.len(), output.len());
-        for value in output.iter_mut().take(len) {
-            *value = self.output_buffer.pop_front().unwrap();
-        }
-
-        while self.output_buffer.len() > OUTPUT_BUFFER_THRESHOLD {
-            self.output_buffer.pop_front();
-        }
+        self.audio_queue.drain_into(output).unwrap();
     }
 }
 

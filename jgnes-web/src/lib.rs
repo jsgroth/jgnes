@@ -191,6 +191,7 @@ pub struct JgnesWebConfig {
     gpu_filter_mode: Rc<RefCell<GpuFilterMode>>,
     overscan: Rc<RefCell<Overscan>>,
     audio_enabled: Rc<RefCell<bool>>,
+    audio_sync_enabled: Rc<RefCell<bool>>,
     open_file_requested: Rc<RefCell<bool>>,
     reset_requested: Rc<RefCell<bool>>,
 }
@@ -205,6 +206,7 @@ impl JgnesWebConfig {
             gpu_filter_mode: Rc::new(RefCell::new(GpuFilterMode::NearestNeighbor)),
             overscan: Rc::default(),
             audio_enabled: Rc::new(RefCell::new(true)),
+            audio_sync_enabled: Rc::new(RefCell::new(true)),
             open_file_requested: Rc::new(RefCell::new(false)),
             reset_requested: Rc::new(RefCell::new(false)),
         }
@@ -248,6 +250,10 @@ impl JgnesWebConfig {
 
     pub fn set_audio_enabled(&self, value: bool) {
         *self.audio_enabled.borrow_mut() = value;
+    }
+
+    pub fn set_audio_sync_enabled(&self, value: bool) {
+        *self.audio_sync_enabled.borrow_mut() = value;
     }
 
     pub fn open_new_file(&self) {
@@ -490,9 +496,14 @@ pub async fn run(config: JgnesWebConfig) {
                 }
             }
 
-            // Tick the emulator until it renders the next frame
-            if let Some(emulator) = &mut state.emulator {
-                while emulator.tick().expect("emulation error") != TickEffect::FrameRendered {}
+            // If audio sync is enabled, only run the emulator if the audio queue isn't filling up
+            if !*config.audio_sync_enabled.borrow()
+                || audio_player.borrow().audio_queue.len().unwrap() <= 1024
+            {
+                // Tick the emulator until it renders the next frame
+                if let Some(emulator) = &mut state.emulator {
+                    while emulator.tick().expect("emulation error") != TickEffect::FrameRendered {}
+                }
             }
         }
         _ => {}

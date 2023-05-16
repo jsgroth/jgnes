@@ -3,12 +3,15 @@
 mod audio;
 
 use crate::audio::{AudioQueue, EnqueueResult};
+use base64::engine::general_purpose;
+use base64::Engine;
 use jgnes_core::audio::{DownsampleAction, DownsampleCounter, LowPassFilter};
 use jgnes_core::{AudioPlayer, Emulator, InputPoller, JoypadState, SaveWriter, TickEffect};
 use jgnes_renderer::config::{
     AspectRatio, GpuFilterMode, Overscan, RenderScale, RendererConfig, VSyncMode, WgpuBackend,
 };
 use jgnes_renderer::WgpuRenderer;
+use js_sys::Uint8Array;
 use rfd::AsyncFileDialog;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -32,6 +35,21 @@ extern "C" {
     fn saveToLocalStorage(key: &str, value: &str);
 }
 
+#[must_use]
+#[wasm_bindgen]
+pub fn b64_to_bytes(s: &str) -> Option<Uint8Array> {
+    match general_purpose::STANDARD.decode(s) {
+        Ok(bytes) => {
+            let array = Uint8Array::new_with_length(bytes.len() as u32);
+            for (i, byte) in bytes.iter().copied().enumerate() {
+                array.set_index(i as u32, byte);
+            }
+            Some(array)
+        }
+        Err(_) => None,
+    }
+}
+
 fn alert_and_panic(s: &str) -> ! {
     alert(s);
     panic!("{s}")
@@ -50,12 +68,8 @@ impl SaveWriter for WebSaveWriter {
     type Err = ();
 
     fn persist_sram(&mut self, sram: &[u8]) -> Result<(), Self::Err> {
-        let sram_hex: String = sram
-            .iter()
-            .copied()
-            .map(|byte| format!("{byte:02X}"))
-            .collect();
-        saveToLocalStorage(&self.file_name, &sram_hex);
+        let sram_b64 = general_purpose::STANDARD.encode(sram);
+        saveToLocalStorage(&self.file_name, &sram_b64);
         Ok(())
     }
 }
@@ -194,6 +208,7 @@ pub struct JgnesWebConfig {
     audio_sync_enabled: Rc<RefCell<bool>>,
     open_file_requested: Rc<RefCell<bool>>,
     reset_requested: Rc<RefCell<bool>>,
+    current_filename: Rc<RefCell<String>>,
 }
 
 #[wasm_bindgen]
@@ -209,6 +224,7 @@ impl JgnesWebConfig {
             audio_sync_enabled: Rc::new(RefCell::new(true)),
             open_file_requested: Rc::new(RefCell::new(false)),
             reset_requested: Rc::new(RefCell::new(false)),
+            current_filename: Rc::new(RefCell::new(String::new())),
         }
     }
 
@@ -264,6 +280,11 @@ impl JgnesWebConfig {
         *self.reset_requested.borrow_mut() = true;
     }
 
+    #[must_use]
+    pub fn get_current_filename(&self) -> String {
+        self.current_filename.borrow().clone()
+    }
+
     // Duplicated definition so clone() can be called from JS
     #[allow(clippy::should_implement_trait)]
     #[must_use]
@@ -283,15 +304,8 @@ fn set_overscan_field(value: bool, field: &mut u8) {
 }
 
 fn load_sav_bytes(file_name: &str) -> Option<Vec<u8>> {
-    loadFromLocalStorage(file_name).map(|hex| {
-        let mut sav_bytes = Vec::with_capacity(hex.len() / 2);
-        for i in 0..hex.len() / 2 {
-            let byte = u8::from_str_radix(&hex[2 * i..2 * i + 2], 16)
-                .expect("invalid hex char in save bytes");
-            sav_bytes.push(byte);
-        }
-        sav_bytes
-    })
+    loadFromLocalStorage(file_name)
+        .and_then(|sav_b64| general_purpose::STANDARD.decode(sav_b64).ok())
 }
 
 fn set_rom_file_name_text(file_name: &str) {
@@ -303,6 +317,21 @@ fn set_rom_file_name_text(file_name: &str) {
             Some(())
         })
         .expect("Unable to write file name into the DOM");
+}
+
+fn set_download_save_enabled(enabled: bool) {
+    web_sys::window()
+        .and_then(|win| win.document())
+        .and_then(|doc| {
+            let button = doc.get_element_by_id("jgnes-download-sav-button")?;
+            if enabled {
+                button.remove_attribute("disabled").ok()?;
+            } else {
+                button.set_attribute("disabled", "").ok()?;
+            }
+            Some(())
+        })
+        .expect("Unable to enable/disable download save button");
 }
 
 async fn open_file_in_event_loop(event_loop_proxy: EventLoopProxy<(Vec<u8>, String)>) {
@@ -394,6 +423,8 @@ pub async fn run(config: JgnesWebConfig) {
             ) {
                 Ok(emulator) => {
                     set_rom_file_name_text(&file.file_name());
+                    *config.current_filename.borrow_mut() = file.file_name();
+                    set_download_save_enabled(emulator.has_persistent_ram());
                     Some(emulator)
                 }
                 Err(err) => {
@@ -437,8 +468,10 @@ pub async fn run(config: JgnesWebConfig) {
                 save_writer,
             ) {
                 Ok(emulator) => {
-                    state.emulator = Some(emulator);
                     set_rom_file_name_text(&file_name);
+                    *config.current_filename.borrow_mut() = file_name;
+                    set_download_save_enabled(emulator.has_persistent_ram());
+                    state.emulator = Some(emulator);
                 }
                 Err(err) => {
                     alert(&format!("Error initializing emulator: {err}"));

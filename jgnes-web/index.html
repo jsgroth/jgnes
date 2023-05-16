@@ -61,6 +61,7 @@
                     <div id="rom-file-name"></div>
                     <input id="jgnes-init-button" type="button" value="Open ROM file">
                     <input id="jgnes-reset-button" type="button" value="Reset" disabled>
+                    <input id="jgnes-download-sav-button" type="button" value="Download save file" disabled>
                 </div>
                 <fieldset>
                     <legend>Aspect ratio</legend>
@@ -121,7 +122,7 @@
             </div>
         </div>
         <script type="module">
-            import init, { run, JgnesWebConfig } from "./pkg/jgnes_web.js";
+            import init, { b64_to_bytes, run, JgnesWebConfig } from "./pkg/jgnes_web.js";
             await init();
 
             let config = new JgnesWebConfig();
@@ -179,6 +180,29 @@
 
             document.getElementById("jgnes-reset-button").addEventListener("click", () => {
                 config.reset_emulator();
+            });
+
+            document.getElementById("jgnes-download-sav-button").addEventListener("click", () => {
+                let currentFilename = config.get_current_filename();
+                let savB64 = localStorage.getItem(currentFilename);
+                if (savB64 !== null) {
+                    let savBytes = b64_to_bytes(savB64);
+                    if (savBytes !== undefined) {
+                        let savFilename = currentFilename.replace(".nes", ".sav");
+
+                        let a = document.createElement("a");
+                        a.href = window.URL.createObjectURL(new Blob([savBytes], {type: "application/octet-stream"}));
+                        a.download = savFilename;
+
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                    } else {
+                        alert(`Save file for '${currentFilename}' is invalid`);
+                    }
+                } else {
+                    alert(`No save file found for '${currentFilename}'; game most likely does not have persistent saves`);
+                }
             });
 
             document.getElementById("jgnes-config-and-info").hidden = false;

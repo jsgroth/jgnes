@@ -12,6 +12,7 @@ crate-type = ["cdylib"]
 jgnes-core = { path = "../jgnes-core" }
 jgnes-renderer = { path = "../jgnes-renderer" }
 
+base64 = "0.21"
 console_error_panic_hook = "0.1"
 console_log = "1"
 getrandom = { version = "0.2", features = ["js"] }

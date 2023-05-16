@@ -188,7 +188,7 @@
                 if (savB64 !== null) {
                     let savBytes = b64_to_bytes(savB64);
                     if (savBytes !== undefined) {
-                        let savFilename = currentFilename.replace(".nes", ".sav");
+                        let savFilename = currentFilename.replace(/\.nes$/, ".sav");
 
                         let a = document.createElement("a");
                         a.href = window.URL.createObjectURL(new Blob([savBytes], {type: "application/octet-stream"}));

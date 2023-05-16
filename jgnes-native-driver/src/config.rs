@@ -362,6 +362,7 @@ pub struct JgnesNativeConfig {
     pub forced_integer_height_scaling: bool,
     pub vsync_mode: VSyncMode,
     pub sync_to_audio: bool,
+    pub silence_ultrasonic_triangle_output: bool,
     pub launch_fullscreen: bool,
     pub input_config: InputConfig,
 }
@@ -383,6 +384,11 @@ impl Display for JgnesNativeConfig {
         )?;
         writeln!(f, "vsync_mode: {}", self.vsync_mode)?;
         writeln!(f, "sync_to_audio: {}", self.sync_to_audio)?;
+        writeln!(
+            f,
+            "silence_ultrasonic_triangle_output: {}",
+            self.silence_ultrasonic_triangle_output
+        )?;
         writeln!(f, "launch_fullscreen: {}", self.launch_fullscreen)?;
         writeln!(f, "input_config: {}", self.input_config)?;
 

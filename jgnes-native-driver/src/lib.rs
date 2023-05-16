@@ -3,8 +3,8 @@ mod input;
 
 use jgnes_core::audio::{DownsampleAction, DownsampleCounter, LowPassFilter};
 use jgnes_core::{
-    AudioPlayer, ColorEmphasis, EmulationError, Emulator, FrameBuffer, InputPoller, JoypadState,
-    Renderer, SaveWriter,
+    AudioPlayer, ColorEmphasis, EmulationError, Emulator, EmulatorConfig, FrameBuffer, InputPoller,
+    JoypadState, Renderer, SaveWriter,
 };
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
 use sdl2::event::{Event, EventType, WindowEvent};
@@ -306,6 +306,10 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
 
     let save_state_path = Path::new(&config.nes_file_path).with_extension("ss0");
 
+    let emulator_config = EmulatorConfig {
+        silence_ultrasonic_triangle_output: config.silence_ultrasonic_triangle_output,
+    };
+
     match config.renderer {
         NativeRenderer::Sdl2 => {
             let mut canvas_builder = window.into_canvas();
@@ -326,6 +330,7 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
             )?;
             run_emulator(
                 emulator,
+                emulator_config,
                 dynamic_config,
                 event_pump,
                 input_handler,
@@ -348,6 +353,7 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
             )?;
             run_emulator(
                 emulator,
+                emulator_config,
                 dynamic_config,
                 event_pump,
                 input_handler,
@@ -369,6 +375,7 @@ fn init_window(window: Window) -> Result<Window, anyhow::Error> {
 
 fn run_emulator<R, A, I, S, P>(
     mut emulator: Emulator<R, A, I, S>,
+    emulator_config: EmulatorConfig,
     dynamic_config: JgnesDynamicConfig,
     mut event_pump: EventPump,
     mut input_handler: SdlInputHandler<'_>,
@@ -385,7 +392,7 @@ where
 
     let mut ticks = 0_u64;
     loop {
-        if let Err(err) = emulator.tick() {
+        if let Err(err) = emulator.tick(&emulator_config) {
             return match err {
                 EmulationError::Render(err)
                 | EmulationError::Audio(err)

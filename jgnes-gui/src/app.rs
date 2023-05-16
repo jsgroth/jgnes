@@ -68,6 +68,8 @@ struct AppConfig {
     #[serde(default = "true_fn")]
     sync_to_audio: bool,
     #[serde(default)]
+    silence_ultrasonic_triangle_output: bool,
+    #[serde(default)]
     launch_fullscreen: bool,
     #[serde(default)]
     vsync_mode: VSyncMode,
@@ -93,6 +95,7 @@ impl AppConfig {
             forced_integer_height_scaling: self.forced_integer_height_scaling,
             vsync_mode: self.vsync_mode,
             sync_to_audio: self.sync_to_audio,
+            silence_ultrasonic_triangle_output: self.silence_ultrasonic_triangle_output,
             launch_fullscreen: self.launch_fullscreen,
             input_config: self.input.clone(),
         }
@@ -851,6 +854,12 @@ impl App {
                     &mut self.config.sync_to_audio,
                     "Sync emulation speed to audio",
                 );
+
+                ui.checkbox(
+                    &mut self.config.silence_ultrasonic_triangle_output,
+                    "Silence triangle wave channel at ultrasonic frequencies",
+                )
+                .on_hover_text("This is less accurate but can reduce audio popping in some games");
             });
         if !audio_settings_open {
             self.state.open_window = None;

@@ -78,6 +78,10 @@ struct CliArgs {
     #[arg(long = "no-audio-sync", default_value_t = true, action = clap::ArgAction::SetFalse)]
     sync_to_audio: bool,
 
+    /// Silence the triangle wave channel when it is outputting waves at ultrasonic frequencies
+    #[arg(long, default_value_t)]
+    silence_ultrasonic_triangle_output: bool,
+
     /// Launch in fullscreen
     #[arg(long = "fullscreen", default_value_t)]
     launch_fullscreen: bool,
@@ -140,6 +144,7 @@ fn main() -> anyhow::Result<()> {
         forced_integer_height_scaling: args.forced_integer_height_scaling,
         vsync_mode: args.vsync_mode,
         sync_to_audio: args.sync_to_audio,
+        silence_ultrasonic_triangle_output: args.silence_ultrasonic_triangle_output,
         launch_fullscreen: args.launch_fullscreen,
         input_config: InputConfig::default(),
     };

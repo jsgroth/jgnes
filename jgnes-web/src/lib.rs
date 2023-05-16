@@ -6,7 +6,9 @@ use crate::audio::{AudioQueue, EnqueueResult};
 use base64::engine::general_purpose;
 use base64::Engine;
 use jgnes_core::audio::{DownsampleAction, DownsampleCounter, LowPassFilter};
-use jgnes_core::{AudioPlayer, Emulator, InputPoller, JoypadState, SaveWriter, TickEffect};
+use jgnes_core::{
+    AudioPlayer, Emulator, EmulatorConfig, InputPoller, JoypadState, SaveWriter, TickEffect,
+};
 use jgnes_renderer::config::{
     AspectRatio, GpuFilterMode, Overscan, RenderScale, RendererConfig, VSyncMode, WgpuBackend,
 };
@@ -206,6 +208,7 @@ pub struct JgnesWebConfig {
     overscan: Rc<RefCell<Overscan>>,
     audio_enabled: Rc<RefCell<bool>>,
     audio_sync_enabled: Rc<RefCell<bool>>,
+    silence_ultrasonic_triangle_output: Rc<RefCell<bool>>,
     open_file_requested: Rc<RefCell<bool>>,
     reset_requested: Rc<RefCell<bool>>,
     current_filename: Rc<RefCell<String>>,
@@ -222,6 +225,7 @@ impl JgnesWebConfig {
             overscan: Rc::default(),
             audio_enabled: Rc::new(RefCell::new(true)),
             audio_sync_enabled: Rc::new(RefCell::new(true)),
+            silence_ultrasonic_triangle_output: Rc::new(RefCell::new(false)),
             open_file_requested: Rc::new(RefCell::new(false)),
             reset_requested: Rc::new(RefCell::new(false)),
             current_filename: Rc::new(RefCell::new(String::new())),
@@ -270,6 +274,10 @@ impl JgnesWebConfig {
 
     pub fn set_audio_sync_enabled(&self, value: bool) {
         *self.audio_sync_enabled.borrow_mut() = value;
+    }
+
+    pub fn set_silence_ultrasonic_triangle_output(&self, value: bool) {
+        *self.silence_ultrasonic_triangle_output.borrow_mut() = value;
     }
 
     pub fn open_new_file(&self) {
@@ -535,7 +543,15 @@ pub async fn run(config: JgnesWebConfig) {
             {
                 // Tick the emulator until it renders the next frame
                 if let Some(emulator) = &mut state.emulator {
-                    while emulator.tick().expect("emulation error") != TickEffect::FrameRendered {}
+                    let emulator_config = EmulatorConfig {
+                        silence_ultrasonic_triangle_output: *config
+                            .silence_ultrasonic_triangle_output
+                            .borrow(),
+                    };
+
+                    while emulator.tick(&emulator_config).expect("emulation error")
+                        != TickEffect::FrameRendered
+                    {}
                 }
             }
         }

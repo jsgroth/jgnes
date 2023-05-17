@@ -62,9 +62,11 @@ jobs:
         components: rust-src, clippy
 
     - name: Install wasm-pack
-      run: |
-        curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-
+      uses: actions-rs/cargo@v1
+      with:
+        command: install
+        args: wasm-pack
+      
     - name: Build web
       run: |
         cd jgnes-web && ./build.sh

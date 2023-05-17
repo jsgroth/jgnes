@@ -120,11 +120,11 @@ fn mapper_name(mapper_number: u16, sub_mapper_number: u8) -> &'static str {
         16 | 153 | 159 => "Bandai FCG",
         19 => "Namco 163",
         21 | 23 | 25 => match (mapper_number, sub_mapper_number) {
-            (23 | 25, 3) => "VRC2",
-            _ => "VRC4",
+            (23 | 25, 3) => "Konami VRC2",
+            _ => "Konami VRC4",
         },
-        22 => "VRC2",
-        24 | 26 => "VRC6",
+        22 => "Konami VRC2",
+        24 | 26 => "Konami VRC6",
         34 => match sub_mapper_number {
             1 => "NINA-001",
             _ => "BNROM",
@@ -132,8 +132,12 @@ fn mapper_name(mapper_number: u16, sub_mapper_number: u8) -> &'static str {
         66 => "GxROM",
         69 => "Sunsoft FME-7",
         71 => "Codemasters",
-        85 => "VRC7",
+        85 => "Konami VRC7",
         140 => "Jaleco JF-14",
+        210 => match sub_mapper_number {
+            2 => "Namco 340",
+            _ => "Namco 175",
+        },
         _ => "(Unknown)",
     }
 }

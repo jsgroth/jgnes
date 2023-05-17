@@ -21,6 +21,7 @@ Implemented:
   * Color Dreams unlicensed board
   * Bandai FCG-1 / FCG-2 / LZ93D50
     * The LZ93D50 variant that uses the Datach Joint ROM system is not implemented (iNES mapper 157)
+  * Namco 129 / 163
   * Jaleco JF-11 / JF-14
   * GxROM
   * BNROM
@@ -36,7 +37,7 @@ Not Implemented:
 * Cycle-accurate rendering effects of enabling rendering mid-scanline
 * DMC DMA cycle stealing and dummy reads, an obscure hardware quirk that affects very very few if any games
 * Color palette customization; the NES hardware directly outputs an NTSC video signal rather than RGB pixel grids, so any mapping from NES colors to RGB colors is an approximation at best
-* Lots of mappers, most notably Namco's custom mappers
+* Lots of more obscure cartridge boards
 * Fast forward or rewind
 * Support for PAL/EU releases (the processor timings are different compared to NTSC US/JP)
 * Support for any controller port peripherals (e.g. the Zapper)

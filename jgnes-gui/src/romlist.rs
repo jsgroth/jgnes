@@ -135,6 +135,7 @@ fn mapper_name(mapper_number: u16, sub_mapper_number: u8) -> &'static str {
         76 => "NAMCOT-3446",
         85 => "Konami VRC7",
         88 | 206 => "Namco 108",
+        95 => "NAMCOT-3425",
         140 => "Jaleco JF-14",
         154 => "NAMCOT-3453",
         210 => match sub_mapper_number {

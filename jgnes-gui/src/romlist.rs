@@ -118,6 +118,7 @@ fn mapper_name(mapper_number: u16, sub_mapper_number: u8) -> &'static str {
         10 => "MMC4",
         11 => "Color Dreams",
         16 | 153 | 159 => "Bandai FCG",
+        19 => "Namco 163",
         21 | 23 | 25 => match (mapper_number, sub_mapper_number) {
             (23 | 25, 3) => "VRC2",
             _ => "VRC4",

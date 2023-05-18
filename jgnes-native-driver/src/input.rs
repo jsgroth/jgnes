@@ -70,47 +70,59 @@ impl<'a> SdlInputHandler<'a> {
         p1_joypad_state: Rc<RefCell<JoypadState>>,
         p2_joypad_state: Rc<RefCell<JoypadState>>,
     ) -> Self {
-        let mut keyboard_input_mapping = HashMap::new();
-        populate_map(
-            &mut keyboard_input_mapping,
-            &input_config.p1.keyboard.to_keycode_config(),
-            Player::Player1,
-        );
-        populate_map(
-            &mut keyboard_input_mapping,
-            &input_config.p2.keyboard.to_keycode_config(),
-            Player::Player2,
-        );
-
-        let mut joystick_input_mapping = HashMap::new();
-        populate_map(
-            &mut joystick_input_mapping,
-            &input_config.p1.joystick,
-            Player::Player1,
-        );
-        populate_map(
-            &mut joystick_input_mapping,
-            &input_config.p2.joystick,
-            Player::Player2,
-        );
-
-        let mut hotkey_mapping = HashMap::new();
-        populate_hotkey_map(&mut hotkey_mapping, &input_config.hotkeys);
-
-        Self {
+        let mut input_handler = Self {
             raw_p1_joypad_state: JoypadState::new(),
             p1_joypad_state,
             raw_p2_joypad_state: JoypadState::new(),
             p2_joypad_state,
-            keyboard_input_mapping,
-            joystick_input_mapping,
-            hotkey_mapping,
+            keyboard_input_mapping: HashMap::new(),
+            joystick_input_mapping: HashMap::new(),
+            hotkey_mapping: HashMap::new(),
             axis_deadzone: input_config.axis_deadzone,
             allow_opposite_directions: input_config.allow_opposite_directions,
             joystick_subsystem,
             joysticks: HashMap::new(),
             instance_id_to_device_id: HashMap::new(),
-        }
+        };
+
+        input_handler.reload_input_config(input_config);
+
+        input_handler
+    }
+
+    pub(crate) fn reload_input_config(&mut self, input_config: &InputConfig) {
+        self.keyboard_input_mapping.clear();
+        populate_map(
+            &mut self.keyboard_input_mapping,
+            &input_config.p1.keyboard.to_keycode_config(),
+            Player::Player1,
+        );
+        populate_map(
+            &mut self.keyboard_input_mapping,
+            &input_config.p2.keyboard.to_keycode_config(),
+            Player::Player2,
+        );
+
+        self.joystick_input_mapping.clear();
+        populate_map(
+            &mut self.joystick_input_mapping,
+            &input_config.p1.joystick,
+            Player::Player1,
+        );
+        populate_map(
+            &mut self.joystick_input_mapping,
+            &input_config.p2.joystick,
+            Player::Player2,
+        );
+
+        self.hotkey_mapping.clear();
+        populate_hotkey_map(&mut self.hotkey_mapping, &input_config.hotkeys);
+
+        // Clear all current joypad states in case there were any lingering pressed inputs
+        self.raw_p1_joypad_state = JoypadState::default();
+        self.raw_p2_joypad_state = JoypadState::default();
+        *self.p1_joypad_state.borrow_mut() = JoypadState::default();
+        *self.p2_joypad_state.borrow_mut() = JoypadState::default();
     }
 
     pub(crate) fn handle_event(&mut self, event: &Event) -> Result<(), anyhow::Error> {

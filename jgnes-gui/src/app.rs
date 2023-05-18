@@ -86,18 +86,22 @@ impl AppConfig {
             window_height: self.window_height,
             renderer: self.renderer,
             wgpu_backend: self.wgpu_backend,
-            gpu_filter_mode: match self.gpu_filter_type {
-                GpuFilterType::NearestNeighbor => GpuFilterMode::NearestNeighbor,
-                GpuFilterType::Linear => GpuFilterMode::Linear(self.gpu_render_scale),
-            },
-            aspect_ratio: self.aspect_ratio,
-            overscan: self.overscan,
-            forced_integer_height_scaling: self.forced_integer_height_scaling,
-            vsync_mode: self.vsync_mode,
-            sync_to_audio: self.sync_to_audio,
-            silence_ultrasonic_triangle_output: self.silence_ultrasonic_triangle_output,
             launch_fullscreen: self.launch_fullscreen,
-            input_config: self.input.clone(),
+            dynamic_config: Arc::new(Mutex::new(JgnesDynamicConfig {
+                gpu_filter_mode: match self.gpu_filter_type {
+                    GpuFilterType::NearestNeighbor => GpuFilterMode::NearestNeighbor,
+                    GpuFilterType::Linear => GpuFilterMode::Linear(self.gpu_render_scale),
+                },
+                aspect_ratio: self.aspect_ratio,
+                overscan: self.overscan,
+                forced_integer_height_scaling: self.forced_integer_height_scaling,
+                vsync_mode: self.vsync_mode,
+                sync_to_audio: self.sync_to_audio,
+                silence_ultrasonic_triangle_output: self.silence_ultrasonic_triangle_output,
+                input_config: self.input.clone(),
+            })),
+            reload_signal: Arc::new(AtomicBool::new(false)),
+            quit_signal: Arc::new(AtomicBool::new(false)),
         }
     }
 }
@@ -206,6 +210,7 @@ struct HotkeyButton<'a> {
     button: Button,
     hotkey: Hotkey,
     axis_deadzone: u16,
+    on_disabled_hover_text: Option<String>,
     app_state: &'a mut AppState,
 }
 
@@ -225,12 +230,22 @@ impl<'a> HotkeyButton<'a> {
             button: Button::new(button_text),
             hotkey,
             axis_deadzone: app.config.input.axis_deadzone,
+            on_disabled_hover_text: None,
             app_state: &mut app.state,
         }
     }
 
+    fn on_disabled_hover_text(mut self, s: impl Into<String>) -> Self {
+        self.on_disabled_hover_text = Some(s.into());
+        self
+    }
+
     fn ui(self, ui: &mut Ui) {
-        if self.button.ui(ui).clicked() {
+        let mut response = self.button.ui(ui);
+        if let Some(on_disabled_hover_text) = self.on_disabled_hover_text {
+            response = response.on_disabled_hover_text(on_disabled_hover_text);
+        }
+        if response.clicked() {
             self.app_state
                 .thread_task_sender
                 .send(EmuThreadTask::CollectInput {
@@ -370,7 +385,7 @@ struct AppState {
     open_input_window: Option<InputWindow>,
     waiting_for_input: Option<WaitingForInput>,
     emulator_is_running: Arc<AtomicBool>,
-    emulator_quit_signal: Arc<AtomicBool>,
+    running_emulator_config: JgnesNativeConfig,
     emulation_error: Arc<Mutex<Option<anyhow::Error>>>,
     thread_task_sender: Sender<EmuThreadTask>,
     thread_input_receiver: Receiver<Option<InputCollectResult>>,
@@ -379,15 +394,9 @@ struct AppState {
 impl AppState {
     fn new(config: &AppConfig) -> Self {
         let is_running = Arc::new(AtomicBool::new(false));
-        let quit_signal = Arc::new(AtomicBool::new(false));
         let emulation_error = Arc::new(Mutex::new(None));
-        let (thread_task_sender, thread_input_receiver) = emuthread::start(
-            JgnesDynamicConfig {
-                quit_signal: Arc::clone(&quit_signal),
-            },
-            Arc::clone(&is_running),
-            Arc::clone(&emulation_error),
-        );
+        let (thread_task_sender, thread_input_receiver) =
+            emuthread::start(Arc::clone(&is_running), Arc::clone(&emulation_error));
         let overscan_state = OverscanState {
             top_text: config.overscan.top.to_string(),
             top_invalid: false,
@@ -416,7 +425,7 @@ impl AppState {
             open_input_window: None,
             waiting_for_input: None,
             emulator_is_running: is_running,
-            emulator_quit_signal: quit_signal,
+            running_emulator_config: config.to_jgnes_native_config(String::new()),
             emulation_error,
             thread_task_sender,
             thread_input_receiver,
@@ -426,7 +435,9 @@ impl AppState {
     fn stop_emulator_if_running(&self) {
         if self.emulator_is_running.load(Ordering::Relaxed) {
             log::info!("Setting quit signal to stop running emulator");
-            self.emulator_quit_signal.store(true, Ordering::Relaxed);
+            self.running_emulator_config
+                .quit_signal
+                .store(true, Ordering::Relaxed);
         }
     }
 }
@@ -520,14 +531,55 @@ impl App {
         if let Some(file) = file {
             self.state.stop_emulator_if_running();
 
-            launch_emulator(file, &self.state.thread_task_sender, &self.config);
+            self.launch_emulator(file);
         }
+    }
+
+    fn launch_emulator<P: AsRef<Path>>(&mut self, path: P) {
+        let path = path.as_ref();
+
+        let file_path_str = path.to_string_lossy().to_string();
+        let native_config = self.config.to_jgnes_native_config(file_path_str);
+
+        self.state
+            .thread_task_sender
+            .send(EmuThreadTask::RunEmulator(Box::new(native_config.clone())))
+            .unwrap();
+
+        self.state.running_emulator_config = native_config;
     }
 
     fn save_config(&mut self) {
         let config_str =
             toml::to_string(&self.config).expect("Config should always be serializable");
         fs::write(&self.config_path, config_str).expect("Unable to save config file");
+    }
+
+    fn update_running_emulator_config(&mut self) {
+        let mut dynamic_config = self
+            .state
+            .running_emulator_config
+            .dynamic_config
+            .lock()
+            .unwrap();
+
+        dynamic_config.gpu_filter_mode = match self.config.gpu_filter_type {
+            GpuFilterType::NearestNeighbor => GpuFilterMode::NearestNeighbor,
+            GpuFilterType::Linear => GpuFilterMode::Linear(self.config.gpu_render_scale),
+        };
+        dynamic_config.aspect_ratio = self.config.aspect_ratio;
+        dynamic_config.overscan = self.config.overscan;
+        dynamic_config.forced_integer_height_scaling = self.config.forced_integer_height_scaling;
+        dynamic_config.vsync_mode = self.config.vsync_mode;
+        dynamic_config.sync_to_audio = self.config.sync_to_audio;
+        dynamic_config.silence_ultrasonic_triangle_output =
+            self.config.silence_ultrasonic_triangle_output;
+        dynamic_config.input_config = self.config.input.clone();
+
+        self.state
+            .running_emulator_config
+            .reload_signal
+            .store(true, Ordering::Relaxed);
     }
 
     fn render_central_panel(&mut self, ctx: &Context) {
@@ -571,7 +623,7 @@ impl App {
                             row.col(|_ui| {});
                         })
                         .body(|mut body| {
-                            for metadata in &self.state.rom_list {
+                            for metadata in self.state.rom_list.clone() {
                                 body.row(40.0, |mut row| {
                                     row.col(|ui| {
                                         let button = Button::new(&metadata.file_name_no_ext)
@@ -579,11 +631,7 @@ impl App {
                                             .wrap(true);
                                         if button.ui(ui).clicked() {
                                             self.state.stop_emulator_if_running();
-                                            launch_emulator(
-                                                &metadata.full_path,
-                                                &self.state.thread_task_sender,
-                                                &self.config,
-                                            );
+                                            self.launch_emulator(&metadata.full_path);
                                         }
                                     });
 
@@ -659,22 +707,35 @@ impl App {
             .open(&mut video_settings_open)
             .show(ctx, |ui| {
                 ui.group(|ui| {
+                    ui.set_enabled(!self.state.emulator_is_running.load(Ordering::Relaxed));
+
                     ui.label("Renderer");
                     ui.horizontal(|ui| {
-                        ui.radio_value(&mut self.config.renderer, NativeRenderer::Wgpu, "wgpu");
-                        ui.radio_value(&mut self.config.renderer, NativeRenderer::Sdl2, "SDL2");
+                        ui.radio_value(&mut self.config.renderer, NativeRenderer::Wgpu, "wgpu")
+                            .on_disabled_hover_text("Cannot change renderer while emulator is running");
+                        ui.radio_value(&mut self.config.renderer, NativeRenderer::Sdl2, "SDL2")
+                            .on_disabled_hover_text("Cannot change renderer while emulator is running");
                     });
                 });
 
                 ui.group(|ui| {
-                    ui.set_enabled(self.config.renderer == NativeRenderer::Wgpu);
+                    ui.set_enabled(!self.state.emulator_is_running.load(Ordering::Relaxed) && self.config.renderer == NativeRenderer::Wgpu);
+
+                    let disabled_text = match self.config.renderer {
+                        NativeRenderer::Sdl2 => "Not applicable to SDL2 renderer",
+                        NativeRenderer::Wgpu => "Cannot change wgpu backend while emulator is running"
+                    };
 
                     ui.label("wgpu backend");
                     ui.horizontal(|ui| {
-                        ui.radio_value(&mut self.config.wgpu_backend, WgpuBackend::Auto, "Auto");
-                        ui.radio_value(&mut self.config.wgpu_backend, WgpuBackend::Vulkan, "Vulkan");
-                        ui.radio_value(&mut self.config.wgpu_backend, WgpuBackend::Direct3d12, "Direct3D 12");
-                        ui.radio_value(&mut self.config.wgpu_backend, WgpuBackend::Metal, "Metal");
+                        ui.radio_value(&mut self.config.wgpu_backend, WgpuBackend::Auto, "Auto")
+                            .on_disabled_hover_text(disabled_text);
+                        ui.radio_value(&mut self.config.wgpu_backend, WgpuBackend::Vulkan, "Vulkan")
+                            .on_disabled_hover_text(disabled_text);
+                        ui.radio_value(&mut self.config.wgpu_backend, WgpuBackend::Direct3d12, "Direct3D 12")
+                            .on_disabled_hover_text(disabled_text);
+                        ui.radio_value(&mut self.config.wgpu_backend, WgpuBackend::Metal, "Metal")
+                            .on_disabled_hover_text(disabled_text);
                     });
                 });
 
@@ -713,9 +774,13 @@ impl App {
                 ui.group(|ui| {
                     ui.label("VSync mode");
 
+                    ui.set_enabled(self.config.renderer == NativeRenderer::Wgpu || !self.state.emulator_is_running.load(Ordering::Relaxed));
+
                     ui.horizontal(|ui| {
-                        ui.radio_value(&mut self.config.vsync_mode, VSyncMode::Enabled, "Enabled");
-                        ui.radio_value(&mut self.config.vsync_mode, VSyncMode::Disabled, "Disabled");
+                        ui.radio_value(&mut self.config.vsync_mode, VSyncMode::Enabled, "Enabled")
+                            .on_disabled_hover_text("SDL2 renderer cannot change VSync mode while running");
+                        ui.radio_value(&mut self.config.vsync_mode, VSyncMode::Disabled, "Disabled")
+                            .on_disabled_hover_text("SDL2 renderer cannot change VSync mode while running");
 
                         ui.set_enabled(self.config.renderer == NativeRenderer::Wgpu);
                         ui.radio_value(&mut self.config.vsync_mode, VSyncMode::Fast, "Fast")
@@ -874,14 +939,19 @@ impl App {
             .show(ctx, |ui| {
                 ui.set_enabled(self.state.open_input_window.is_none() && self.state.waiting_for_input.is_none());
 
+                let emulator_running = self.state.emulator_is_running.load(Ordering::Relaxed);
+                let disabled_text = "Cannot reconfigure input bindings while emulator is running";
+
                 ui.horizontal(|ui| {
-                    if ui.button("P1 Keyboard Input").clicked() {
+                    ui.set_enabled(!emulator_running);
+
+                    if ui.button("P1 Keyboard Input").on_disabled_hover_text(disabled_text).clicked() {
                         self.state.open_input_window = Some(InputWindow(Player::P1, InputType::Keyboard));
                     }
 
                     ui.add_space(20.0);
 
-                    if ui.button("P1 Gamepad Input").clicked() {
+                    if ui.button("P1 Gamepad Input").on_disabled_hover_text(disabled_text).clicked() {
                         self.state.open_input_window = Some(InputWindow(Player::P1, InputType::Gamepad));
                     }
                 });
@@ -889,13 +959,15 @@ impl App {
                 ui.add_space(10.0);
 
                 ui.horizontal(|ui| {
-                    if ui.button("P2 Keyboard Input").clicked() {
+                    ui.set_enabled(!emulator_running);
+
+                    if ui.button("P2 Keyboard Input").on_disabled_hover_text(disabled_text).clicked() {
                         self.state.open_input_window = Some(InputWindow(Player::P2, InputType::Keyboard));
                     }
 
                     ui.add_space(20.0);
 
-                    if ui.button("P2 Gamepad Input").clicked() {
+                    if ui.button("P2 Gamepad Input").on_disabled_hover_text(disabled_text).clicked() {
                         self.state.open_input_window = Some(InputWindow(Player::P2, InputType::Gamepad));
                     }
                 });
@@ -980,16 +1052,22 @@ impl App {
     }
 
     fn render_hotkey_settings_window(&mut self, ctx: &Context) {
+        let disabled_text = "Cannot reconfigure hotkey bindings while emulator is running";
+
         let mut hotkey_settings_open = true;
         Window::new("Hotkey Settings")
             .resizable(false)
             .open(&mut hotkey_settings_open)
             .show(ctx, |ui| {
+                ui.set_enabled(!self.state.emulator_is_running.load(Ordering::Relaxed));
+
                 Grid::new("hotkey_settings_grid").show(ui, |ui| {
                     for hotkey in Hotkey::ALL {
                         ui.label(format!("{}:", hotkey.label()));
 
-                        HotkeyButton::new(hotkey, self).ui(ui);
+                        HotkeyButton::new(hotkey, self)
+                            .on_disabled_hover_text(disabled_text)
+                            .ui(ui);
 
                         if ui.button("Clear").clicked() {
                             *get_hotkey_field(&mut self.config.input.hotkeys, hotkey) = None;
@@ -1130,7 +1208,6 @@ impl eframe::App for App {
                     }
                 });
 
-                ui.set_enabled(!self.state.emulator_is_running.load(Ordering::Relaxed));
                 ui.menu_button("Settings", |ui| {
                     if ui.button("Video").clicked() {
                         self.state.open_window = Some(OpenWindow::VideoSettings);
@@ -1215,19 +1292,12 @@ impl eframe::App for App {
         if prev_config != self.config {
             self.save_config();
             self.refresh_rom_list();
+
+            if self.state.emulator_is_running.load(Ordering::Relaxed) {
+                self.update_running_emulator_config();
+            }
         }
     }
-}
-
-fn launch_emulator<P: AsRef<Path>>(path: P, sender: &Sender<EmuThreadTask>, config: &AppConfig) {
-    let path = path.as_ref();
-
-    let file_path_str = path.to_string_lossy().to_string();
-    sender
-        .send(EmuThreadTask::RunEmulator(Box::new(
-            config.to_jgnes_native_config(file_path_str),
-        )))
-        .unwrap();
 }
 
 #[cfg(test)]

@@ -1,7 +1,5 @@
 use crate::app::InputType;
-use jgnes_native_driver::{
-    AxisDirection, HatDirection, JgnesDynamicConfig, JgnesNativeConfig, JoystickInput,
-};
+use jgnes_native_driver::{AxisDirection, HatDirection, JgnesNativeConfig, JoystickInput};
 use sdl2::event::Event;
 use sdl2::joystick::HatState;
 use sdl2::keyboard::Keycode;
@@ -28,7 +26,6 @@ pub(crate) enum InputCollectResult {
 
 #[must_use]
 pub(crate) fn start(
-    dynamic_config: JgnesDynamicConfig,
     is_running: Arc<AtomicBool>,
     emulation_error: Arc<Mutex<Option<anyhow::Error>>>,
 ) -> (Sender<EmuThreadTask>, Receiver<Option<InputCollectResult>>) {
@@ -52,7 +49,7 @@ pub(crate) fn start(
 
             match task {
                 EmuThreadTask::RunEmulator(config) => {
-                    run_emulator(config, &is_running, &emulation_error, &dynamic_config);
+                    run_emulator(config, &is_running, &emulation_error);
                 }
                 EmuThreadTask::CollectInput {
                     input_type,
@@ -83,15 +80,13 @@ fn run_emulator(
     config: Box<JgnesNativeConfig>,
     is_running: &Arc<AtomicBool>,
     emulation_error: &Arc<Mutex<Option<anyhow::Error>>>,
-    dynamic_config: &JgnesDynamicConfig,
 ) {
     is_running.store(true, Ordering::Relaxed);
-    if let Err(err) = jgnes_native_driver::run(&config, dynamic_config.clone()) {
+    if let Err(err) = jgnes_native_driver::run(&config) {
         *emulation_error.lock().unwrap() = Some(err);
     }
 
     is_running.store(false, Ordering::Relaxed);
-    dynamic_config.quit_signal.store(false, Ordering::Relaxed);
 }
 
 fn collect_input(

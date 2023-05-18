@@ -5,7 +5,7 @@ use jgnes_renderer::config::{AspectRatio, GpuFilterMode, Overscan, VSyncMode, Wg
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum GpuFilterType {
@@ -138,20 +138,20 @@ fn main() -> anyhow::Result<()> {
         window_height: args.window_height,
         renderer: args.renderer,
         wgpu_backend: args.wgpu_backend,
-        gpu_filter_mode,
-        aspect_ratio: args.aspect_ratio,
-        overscan,
-        forced_integer_height_scaling: args.forced_integer_height_scaling,
-        vsync_mode: args.vsync_mode,
-        sync_to_audio: args.sync_to_audio,
-        silence_ultrasonic_triangle_output: args.silence_ultrasonic_triangle_output,
         launch_fullscreen: args.launch_fullscreen,
-        input_config: InputConfig::default(),
-    };
-
-    let dynamic_config = JgnesDynamicConfig {
+        dynamic_config: Arc::new(Mutex::new(JgnesDynamicConfig {
+            gpu_filter_mode,
+            aspect_ratio: args.aspect_ratio,
+            overscan,
+            forced_integer_height_scaling: args.forced_integer_height_scaling,
+            vsync_mode: args.vsync_mode,
+            sync_to_audio: args.sync_to_audio,
+            silence_ultrasonic_triangle_output: args.silence_ultrasonic_triangle_output,
+            input_config: InputConfig::default(),
+        })),
+        reload_signal: Arc::new(AtomicBool::new(false)),
         quit_signal: Arc::new(AtomicBool::new(false)),
     };
 
-    jgnes_native_driver::run(&config, dynamic_config)
+    jgnes_native_driver::run(&config)
 }

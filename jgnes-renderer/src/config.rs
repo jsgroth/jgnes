@@ -120,6 +120,17 @@ pub enum VSyncMode {
     Adaptive,
 }
 
+impl VSyncMode {
+    pub(crate) fn to_present_mode(self) -> wgpu::PresentMode {
+        match self {
+            Self::Enabled => wgpu::PresentMode::Fifo,
+            Self::Disabled => wgpu::PresentMode::Immediate,
+            Self::Fast => wgpu::PresentMode::Mailbox,
+            Self::Adaptive => wgpu::PresentMode::FifoRelaxed,
+        }
+    }
+}
+
 impl Display for VSyncMode {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {

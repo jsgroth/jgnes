@@ -187,7 +187,9 @@ fn load_sav_file<P: AsRef<Path>>(path: P) -> Option<Vec<u8>> {
 trait SdlWindowRenderer {
     fn window_mut(&mut self) -> &mut Window;
 
-    fn reconfigure(&mut self);
+    fn handle_resize(&mut self);
+
+    fn reload_config(&mut self, config: &JgnesDynamicConfig);
 }
 
 impl<'a> SdlWindowRenderer for SdlRenderer<'a> {
@@ -195,8 +197,15 @@ impl<'a> SdlWindowRenderer for SdlRenderer<'a> {
         self.canvas.window_mut()
     }
 
-    fn reconfigure(&mut self) {
+    fn handle_resize(&mut self) {
         // nothing to do
+    }
+
+    fn reload_config(&mut self, config: &JgnesDynamicConfig) {
+        self.config.aspect_ratio = config.aspect_ratio;
+        self.config.overscan = config.overscan;
+        self.config.forced_integer_height_scaling = config.forced_integer_height_scaling;
+        // VSync mode is not configurable for the SDL2 renderer and filter mode is not applicable
     }
 }
 
@@ -205,8 +214,16 @@ impl SdlWindowRenderer for WgpuRenderer<Window> {
         self.window_mut()
     }
 
-    fn reconfigure(&mut self) {
+    fn handle_resize(&mut self) {
         self.reconfigure_surface();
+    }
+
+    fn reload_config(&mut self, config: &JgnesDynamicConfig) {
+        self.update_filter_mode(config.gpu_filter_mode);
+        self.update_aspect_ratio(config.aspect_ratio);
+        self.update_overscan(config.overscan);
+        self.update_forced_integer_height_scaling(config.forced_integer_height_scaling);
+        self.update_vsync_mode(config.vsync_mode);
     }
 }
 
@@ -216,7 +233,13 @@ impl SdlWindowRenderer for WgpuRenderer<Window> {
 ///
 /// This function will return an error if any issues are encountered rendering graphics, playing
 /// audio, or writing a save file.
-pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> anyhow::Result<()> {
+///
+/// # Panics
+///
+/// This function will panic if it is unable to claim the dynamic config lock while attempting to
+/// reload the dynamic config, which should only happen if another thread panics while holding that
+/// lock.
+pub fn run(config: &JgnesNativeConfig) -> anyhow::Result<()> {
     log::info!("Running with config:\n{config}");
 
     let Some(file_name) = Path::new(&config.nes_file_path)
@@ -240,19 +263,26 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
         config.window_width,
         config.window_height,
     );
+    window_builder.resizable();
+
     if config.launch_fullscreen {
         window_builder.fullscreen_desktop();
     }
+
     let window = init_window(window_builder.build()?)?;
 
-    let renderer_config = RendererConfig {
-        vsync_mode: config.vsync_mode,
-        wgpu_backend: config.wgpu_backend,
-        gpu_filter_mode: config.gpu_filter_mode,
-        aspect_ratio: config.aspect_ratio,
-        overscan: config.overscan,
-        forced_integer_height_scaling: config.forced_integer_height_scaling,
-        use_webgl2_limits: false,
+    let renderer_config = {
+        let dynamic_config = config.dynamic_config.lock().unwrap();
+
+        RendererConfig {
+            vsync_mode: dynamic_config.vsync_mode,
+            wgpu_backend: config.wgpu_backend,
+            gpu_filter_mode: dynamic_config.gpu_filter_mode,
+            aspect_ratio: dynamic_config.aspect_ratio,
+            overscan: dynamic_config.overscan,
+            forced_integer_height_scaling: dynamic_config.forced_integer_height_scaling,
+            use_webgl2_limits: false,
+        }
     };
 
     let audio_queue = audio_subsystem
@@ -266,7 +296,10 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
         )
         .map_err(anyhow::Error::msg)?;
     audio_queue.resume();
-    let audio_player = SdlAudioPlayer::new(audio_queue, config.sync_to_audio);
+    let audio_player = SdlAudioPlayer::new(
+        audio_queue,
+        config.dynamic_config.lock().unwrap().sync_to_audio,
+    );
 
     let input_poller = SdlInputPoller {
         p1_joypad_state: Rc::default(),
@@ -274,7 +307,7 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
     };
     let input_handler = SdlInputHandler::new(
         &joystick_subsystem,
-        &config.input_config,
+        &config.dynamic_config.lock().unwrap().input_config,
         Rc::clone(&input_poller.p1_joypad_state),
         Rc::clone(&input_poller.p2_joypad_state),
     );
@@ -292,28 +325,12 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
     let mut event_pump = sdl_ctx.event_pump().map_err(anyhow::Error::msg)?;
     event_pump.disable_event(EventType::MouseMotion);
 
-    let (window_width, window_height) = window.size();
-    let display_area = jgnes_renderer::determine_display_area(
-        window_width,
-        window_height,
-        config.aspect_ratio,
-        config.forced_integer_height_scaling,
-    );
-    log::info!(
-        "Setting display area to {}x{} pixels with window size of {window_width}x{window_height} and aspect ratio {}",
-        display_area.width, display_area.height, config.aspect_ratio
-    );
-
     let save_state_path = Path::new(&config.nes_file_path).with_extension("ss0");
-
-    let emulator_config = EmulatorConfig {
-        silence_ultrasonic_triangle_output: config.silence_ultrasonic_triangle_output,
-    };
 
     match config.renderer {
         NativeRenderer::Sdl2 => {
             let mut canvas_builder = window.into_canvas();
-            if config.vsync_mode == VSyncMode::Enabled {
+            if renderer_config.vsync_mode == VSyncMode::Enabled {
                 canvas_builder = canvas_builder.present_vsync();
             }
             let canvas = canvas_builder.build()?;
@@ -330,8 +347,7 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
             )?;
             run_emulator(
                 emulator,
-                emulator_config,
-                dynamic_config,
+                config,
                 event_pump,
                 input_handler,
                 &save_state_path,
@@ -353,8 +369,7 @@ pub fn run(config: &JgnesNativeConfig, dynamic_config: JgnesDynamicConfig) -> an
             )?;
             run_emulator(
                 emulator,
-                emulator_config,
-                dynamic_config,
+                config,
                 event_pump,
                 input_handler,
                 &save_state_path,
@@ -373,22 +388,31 @@ fn init_window(window: Window) -> Result<Window, anyhow::Error> {
     Ok(canvas.into_window())
 }
 
-fn run_emulator<R, A, I, S, P>(
-    mut emulator: Emulator<R, A, I, S>,
-    emulator_config: EmulatorConfig,
-    dynamic_config: JgnesDynamicConfig,
+fn run_emulator<R, I, S, P>(
+    mut emulator: Emulator<R, SdlAudioPlayer, I, S>,
+    native_config: &JgnesNativeConfig,
     mut event_pump: EventPump,
     mut input_handler: SdlInputHandler<'_>,
     save_state_path: P,
 ) -> anyhow::Result<()>
 where
     R: Renderer<Err = anyhow::Error> + SdlWindowRenderer,
-    A: AudioPlayer<Err = anyhow::Error>,
     I: InputPoller,
     S: SaveWriter<Err = anyhow::Error>,
     P: AsRef<Path>,
 {
+    let dynamic_config = &native_config.dynamic_config;
+    let config_reload_signal = &native_config.reload_signal;
+    let quit_signal = &native_config.quit_signal;
+
     let save_state_path = save_state_path.as_ref();
+
+    let mut emulator_config = EmulatorConfig {
+        silence_ultrasonic_triangle_output: dynamic_config
+            .lock()
+            .unwrap()
+            .silence_ultrasonic_triangle_output,
+    };
 
     let mut ticks = 0_u64;
     loop {
@@ -403,8 +427,22 @@ where
 
         ticks += 1;
         if ticks % 15000 == 0 {
-            if dynamic_config.quit_signal.load(Ordering::Relaxed) {
+            if quit_signal.load(Ordering::Relaxed) {
                 return Ok(());
+            }
+
+            if config_reload_signal.load(Ordering::Relaxed) {
+                config_reload_signal.store(false, Ordering::Relaxed);
+
+                let dynamic_config = &*dynamic_config.lock().unwrap();
+
+                log::info!("Reloading dynamic config: {dynamic_config}");
+
+                emulator.get_renderer_mut().reload_config(dynamic_config);
+                emulator.get_audio_player_mut().sync_to_audio = dynamic_config.sync_to_audio;
+                input_handler.reload_input_config(&dynamic_config.input_config);
+                emulator_config.silence_ultrasonic_triangle_output =
+                    dynamic_config.silence_ultrasonic_triangle_output;
             }
 
             for event in event_pump.poll_iter() {
@@ -426,7 +464,7 @@ where
                         | WindowEvent::Maximized
                         | WindowEvent::Restored
                         | WindowEvent::Shown => {
-                            emulator.get_renderer_mut().reconfigure();
+                            emulator.get_renderer_mut().handle_resize();
                         }
                         _ => {}
                     },

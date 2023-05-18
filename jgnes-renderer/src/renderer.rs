@@ -152,12 +152,7 @@ where
             .copied()
             .find(wgpu::TextureFormat::is_srgb)
             .ok_or_else(|| anyhow::Error::msg("Unable to find an sRGB wgpu surface format"))?;
-        let desired_present_mode = match render_config.vsync_mode {
-            VSyncMode::Enabled => wgpu::PresentMode::Fifo,
-            VSyncMode::Disabled => wgpu::PresentMode::Immediate,
-            VSyncMode::Fast => wgpu::PresentMode::Mailbox,
-            VSyncMode::Adaptive => wgpu::PresentMode::FifoRelaxed,
-        };
+        let desired_present_mode = render_config.vsync_mode.to_present_mode();
 
         if !surface_capabilities
             .present_modes
@@ -198,22 +193,8 @@ where
         });
         let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        let render_scale = render_config.gpu_filter_mode.gpu_render_scale();
-        let scaled_texture_size = wgpu::Extent3d {
-            width: render_scale * u32::from(jgnes_core::SCREEN_WIDTH),
-            height: render_scale * u32::from(jgnes_core::VISIBLE_SCREEN_HEIGHT),
-            depth_or_array_layers: 1,
-        };
-        let scaled_texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("scaled_texture"),
-            size: scaled_texture_size,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Unorm,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::STORAGE_BINDING,
-            view_formats: &[],
-        });
+        let gpu_render_scale = render_config.gpu_filter_mode.gpu_render_scale();
+        let scaled_texture = create_scaled_texture(&device, gpu_render_scale);
         let scaled_texture_view =
             scaled_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
@@ -229,69 +210,13 @@ where
         let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
 
         // Compute pipeline is for texture scaling and is only needed if render scale is higher than 1
-        let compute_resources = (render_scale > 1).then(|| {
-            let compute_bind_group_layout =
-                device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                    label: Some("compute_bind_group_layout"),
-                    entries: &[
-                        wgpu::BindGroupLayoutEntry {
-                            binding: 0,
-                            visibility: wgpu::ShaderStages::COMPUTE,
-                            ty: wgpu::BindingType::Texture {
-                                sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                                view_dimension: wgpu::TextureViewDimension::D2,
-                                multisampled: false,
-                            },
-                            count: None,
-                        },
-                        wgpu::BindGroupLayoutEntry {
-                            binding: 1,
-                            visibility: wgpu::ShaderStages::COMPUTE,
-                            ty: wgpu::BindingType::StorageTexture {
-                                access: wgpu::StorageTextureAccess::WriteOnly,
-                                format: scaled_texture.format(),
-                                view_dimension: wgpu::TextureViewDimension::D2,
-                            },
-                            count: None,
-                        },
-                    ],
-                });
-            let compute_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("compute_bind_group"),
-                layout: &compute_bind_group_layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: wgpu::BindingResource::TextureView(&texture_view),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::TextureView(&scaled_texture_view),
-                    },
-                ],
-            });
-
-            let compute_pipeline_layout =
-                device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                    label: Some("compute_pipeline_layout"),
-                    bind_group_layouts: &[&compute_bind_group_layout],
-                    push_constant_ranges: &[],
-                });
-
-            let texture_scale_shader =
-                device.create_shader_module(wgpu::include_wgsl!("texture_scale.wgsl"));
-
-            let compute_entry_point = format!("texture_scale_{render_scale}x");
-            let compute_pipeline =
-                device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-                    label: Some("compute_pipeline"),
-                    layout: Some(&compute_pipeline_layout),
-                    module: &texture_scale_shader,
-                    entry_point: &compute_entry_point,
-                });
-
-            (compute_bind_group, compute_pipeline)
-        });
+        let compute_resources = create_compute_resources(
+            &device,
+            &scaled_texture,
+            &texture_view,
+            &scaled_texture_view,
+            gpu_render_scale,
+        );
 
         let render_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -316,25 +241,17 @@ where
                 ],
             });
         // Ignore the scaled texture if render scale is 1
-        let render_bind_texture = if render_scale > 1 {
+        let render_bind_texture = if gpu_render_scale > 1 {
             &scaled_texture_view
         } else {
             &texture_view
         };
-        let render_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("render_bind_group"),
-            layout: &render_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(render_bind_texture),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&sampler),
-                },
-            ],
-        });
+        let render_bind_group = create_render_bind_group(
+            &device,
+            &render_bind_group_layout,
+            render_bind_texture,
+            &sampler,
+        );
 
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -421,81 +338,232 @@ where
         self.reconfigure_surface();
     }
 
-    /// # Panics
-    ///
-    /// This method will panic if called with `GpuFilterMode::Linear` with a render scale greater
-    /// than 1, which is not currently supported.
     pub fn update_filter_mode(&mut self, filter_mode: GpuFilterMode) {
-        if let GpuFilterMode::Linear(render_scale) = filter_mode {
-            assert_eq!(
-                render_scale.get(),
-                1,
-                "updating filter mode to GPU scaling + linear interpolation is not supported"
-            );
-        }
-
         self.render_config.gpu_filter_mode = filter_mode;
-
-        if let GpuFilterMode::LinearCpuScaled(render_scale) = filter_mode {
-            let render_scale = render_scale.get() as usize;
-            self.cpu_scale_output_buffer =
-                vec![0; self.output_buffer.len() * render_scale * render_scale];
-
-            self.texture = self.device.create_texture(&wgpu::TextureDescriptor {
-                label: Some("texture"),
-                size: wgpu::Extent3d {
-                    width: render_scale as u32 * u32::from(jgnes_core::SCREEN_WIDTH),
-                    height: render_scale as u32 * u32::from(jgnes_core::VISIBLE_SCREEN_HEIGHT),
-                    depth_or_array_layers: 1,
-                },
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: wgpu::TextureDimension::D2,
-                format: wgpu::TextureFormat::Rgba8UnormSrgb,
-                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-                view_formats: &[],
-            });
-        } else {
-            self.texture = self.device.create_texture(&wgpu::TextureDescriptor {
-                label: Some("texture"),
-                size: wgpu::Extent3d {
-                    width: u32::from(jgnes_core::SCREEN_WIDTH),
-                    height: u32::from(jgnes_core::VISIBLE_SCREEN_HEIGHT),
-                    depth_or_array_layers: 1,
-                },
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: wgpu::TextureDimension::D2,
-                format: wgpu::TextureFormat::Rgba8UnormSrgb,
-                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-                view_formats: &[],
-            });
-        }
 
         let sampler = create_sampler(&self.device, filter_mode);
 
-        let texture_view = self
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
-        self.render_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("render_bind_group"),
-            layout: &self.render_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&texture_view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&sampler),
-                },
-            ],
-        });
+        match filter_mode {
+            GpuFilterMode::LinearCpuScaled(render_scale) => {
+                let render_scale = render_scale.get() as usize;
+                self.cpu_scale_output_buffer =
+                    vec![0; self.output_buffer.len() * render_scale * render_scale];
+
+                self.texture = self.device.create_texture(&wgpu::TextureDescriptor {
+                    label: Some("texture"),
+                    size: wgpu::Extent3d {
+                        width: render_scale as u32 * u32::from(jgnes_core::SCREEN_WIDTH),
+                        height: render_scale as u32 * u32::from(jgnes_core::VISIBLE_SCREEN_HEIGHT),
+                        depth_or_array_layers: 1,
+                    },
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D2,
+                    format: wgpu::TextureFormat::Rgba8UnormSrgb,
+                    usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                    view_formats: &[],
+                });
+
+                let texture_view = self
+                    .texture
+                    .create_view(&wgpu::TextureViewDescriptor::default());
+
+                self.render_bind_group = create_render_bind_group(
+                    &self.device,
+                    &self.render_bind_group_layout,
+                    &texture_view,
+                    &sampler,
+                );
+            }
+            GpuFilterMode::NearestNeighbor | GpuFilterMode::Linear(_) => {
+                self.texture = self.device.create_texture(&wgpu::TextureDescriptor {
+                    label: Some("texture"),
+                    size: wgpu::Extent3d {
+                        width: u32::from(jgnes_core::SCREEN_WIDTH),
+                        height: u32::from(jgnes_core::VISIBLE_SCREEN_HEIGHT),
+                        depth_or_array_layers: 1,
+                    },
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D2,
+                    format: wgpu::TextureFormat::Rgba8UnormSrgb,
+                    usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                    view_formats: &[],
+                });
+
+                let texture_view = self
+                    .texture
+                    .create_view(&wgpu::TextureViewDescriptor::default());
+
+                match filter_mode {
+                    GpuFilterMode::NearestNeighbor => {
+                        self.render_bind_group = create_render_bind_group(
+                            &self.device,
+                            &self.render_bind_group_layout,
+                            &texture_view,
+                            &sampler,
+                        );
+                    }
+                    GpuFilterMode::Linear(render_scale) => {
+                        let render_scale = render_scale.get();
+
+                        let scaled_texture = create_scaled_texture(&self.device, render_scale);
+                        let scaled_texture_view =
+                            scaled_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+                        self.compute_resources = create_compute_resources(
+                            &self.device,
+                            &scaled_texture,
+                            &texture_view,
+                            &scaled_texture_view,
+                            render_scale,
+                        );
+
+                        let render_texture_view = if render_scale > 1 {
+                            &scaled_texture_view
+                        } else {
+                            &texture_view
+                        };
+                        self.render_bind_group = create_render_bind_group(
+                            &self.device,
+                            &self.render_bind_group_layout,
+                            render_texture_view,
+                            &sampler,
+                        );
+                    }
+                    GpuFilterMode::LinearCpuScaled(_) => unreachable!("nested match expressions"),
+                }
+            }
+        }
     }
 
     pub fn update_overscan(&mut self, overscan: Overscan) {
         self.render_config.overscan = overscan;
+        // No need to reconfigure surface, overscan is read on every frame rendered as it is only
+        // used to determine which pixels to copy from the NES PPU frame buffer
     }
+
+    pub fn update_forced_integer_height_scaling(&mut self, forced_integer_height_scaling: bool) {
+        self.render_config.forced_integer_height_scaling = forced_integer_height_scaling;
+        self.reconfigure_surface();
+    }
+
+    pub fn update_vsync_mode(&mut self, vsync_mode: VSyncMode) {
+        self.render_config.vsync_mode = vsync_mode;
+        self.surface_config.present_mode = vsync_mode.to_present_mode();
+        self.reconfigure_surface();
+    }
+}
+
+fn create_compute_resources(
+    device: &wgpu::Device,
+    scaled_texture: &wgpu::Texture,
+    texture_view: &wgpu::TextureView,
+    scaled_texture_view: &wgpu::TextureView,
+    gpu_render_scale: u32,
+) -> Option<(wgpu::BindGroup, wgpu::ComputePipeline)> {
+    (gpu_render_scale > 1).then(|| {
+        let compute_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("compute_bind_group_layout"),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::StorageTexture {
+                            access: wgpu::StorageTextureAccess::WriteOnly,
+                            format: scaled_texture.format(),
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                        },
+                        count: None,
+                    },
+                ],
+            });
+        let compute_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("compute_bind_group"),
+            layout: &compute_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(scaled_texture_view),
+                },
+            ],
+        });
+
+        let compute_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("compute_pipeline_layout"),
+                bind_group_layouts: &[&compute_bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
+        let texture_scale_shader =
+            device.create_shader_module(wgpu::include_wgsl!("texture_scale.wgsl"));
+
+        let compute_entry_point = format!("texture_scale_{gpu_render_scale}x");
+        let compute_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some("compute_pipeline"),
+            layout: Some(&compute_pipeline_layout),
+            module: &texture_scale_shader,
+            entry_point: &compute_entry_point,
+        });
+
+        (compute_bind_group, compute_pipeline)
+    })
+}
+
+fn create_scaled_texture(device: &wgpu::Device, gpu_render_scale: u32) -> wgpu::Texture {
+    let scaled_texture_size = wgpu::Extent3d {
+        width: gpu_render_scale * u32::from(jgnes_core::SCREEN_WIDTH),
+        height: gpu_render_scale * u32::from(jgnes_core::VISIBLE_SCREEN_HEIGHT),
+        depth_or_array_layers: 1,
+    };
+    device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("scaled_texture"),
+        size: scaled_texture_size,
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Rgba8Unorm,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::STORAGE_BINDING,
+        view_formats: &[],
+    })
+}
+
+fn create_render_bind_group(
+    device: &wgpu::Device,
+    render_bind_group_layout: &wgpu::BindGroupLayout,
+    texture_view: &wgpu::TextureView,
+    sampler: &wgpu::Sampler,
+) -> wgpu::BindGroup {
+    device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("render_bind_group"),
+        layout: render_bind_group_layout,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::TextureView(texture_view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::Sampler(sampler),
+            },
+        ],
+    })
 }
 
 fn create_sampler(device: &wgpu::Device, filter_mode: GpuFilterMode) -> wgpu::Sampler {

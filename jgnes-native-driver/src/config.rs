@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum NativeRenderer {
@@ -356,15 +356,10 @@ pub struct JgnesNativeConfig {
     pub window_height: u32,
     pub renderer: NativeRenderer,
     pub wgpu_backend: WgpuBackend,
-    pub gpu_filter_mode: GpuFilterMode,
-    pub aspect_ratio: AspectRatio,
-    pub overscan: Overscan,
-    pub forced_integer_height_scaling: bool,
-    pub vsync_mode: VSyncMode,
-    pub sync_to_audio: bool,
-    pub silence_ultrasonic_triangle_output: bool,
     pub launch_fullscreen: bool,
-    pub input_config: InputConfig,
+    pub dynamic_config: Arc<Mutex<JgnesDynamicConfig>>,
+    pub reload_signal: Arc<AtomicBool>,
+    pub quit_signal: Arc<AtomicBool>,
 }
 
 impl Display for JgnesNativeConfig {
@@ -374,6 +369,26 @@ impl Display for JgnesNativeConfig {
         writeln!(f, "window_height: {}", self.window_height)?;
         writeln!(f, "renderer: {}", self.renderer)?;
         writeln!(f, "wgpu_backend: {}", self.wgpu_backend)?;
+        writeln!(f, "launch_fullscreen: {}", self.launch_fullscreen)?;
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct JgnesDynamicConfig {
+    pub gpu_filter_mode: GpuFilterMode,
+    pub aspect_ratio: AspectRatio,
+    pub overscan: Overscan,
+    pub forced_integer_height_scaling: bool,
+    pub vsync_mode: VSyncMode,
+    pub sync_to_audio: bool,
+    pub silence_ultrasonic_triangle_output: bool,
+    pub input_config: InputConfig,
+}
+
+impl Display for JgnesDynamicConfig {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "gpu_filter_mode: {}", self.gpu_filter_mode)?;
         writeln!(f, "aspect_ratio: {}", self.aspect_ratio)?;
         writeln!(f, "overscan: {}", self.overscan)?;
@@ -389,14 +404,8 @@ impl Display for JgnesNativeConfig {
             "silence_ultrasonic_triangle_output: {}",
             self.silence_ultrasonic_triangle_output
         )?;
-        writeln!(f, "launch_fullscreen: {}", self.launch_fullscreen)?;
         writeln!(f, "input_config: {}", self.input_config)?;
 
         Ok(())
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct JgnesDynamicConfig {
-    pub quit_signal: Arc<AtomicBool>,
 }

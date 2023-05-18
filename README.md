@@ -21,7 +21,7 @@ Implemented:
   * Color Dreams unlicensed board
   * Bandai FCG-1 / FCG-2 / LZ93D50
     * The LZ93D50 variant that uses the Datach Joint ROM system is not implemented (iNES mapper 157)
-  * Namco 108 / 129 / 163, including 163 expansion audio
+  * Namco 108 / 129 / 163 / 175 / 340, including 163 expansion audio
   * NAMCOT-3425 / NAMCOT-3446 / NAMCOT-3453
   * Jaleco JF-11 / JF-14
   * GxROM

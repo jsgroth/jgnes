@@ -28,13 +28,14 @@ pub use crate::config::{
     NativeRenderer, PlayerInputConfig,
 };
 use crate::input::{Hotkey, SdlInputHandler};
-use jgnes_renderer::config::{RendererConfig, VSyncMode};
+use jgnes_renderer::config::{FrameSkip, RendererConfig, VSyncMode};
 use jgnes_renderer::{colors, WgpuRenderer};
 
 struct SdlRenderer<'a> {
     canvas: WindowCanvas,
     texture: Texture<'a>,
     config: RendererConfig,
+    total_frames: u64,
 }
 
 impl<'a> SdlRenderer<'a> {
@@ -52,6 +53,7 @@ impl<'a> SdlRenderer<'a> {
             canvas,
             texture,
             config,
+            total_frames: 0,
         })
     }
 }
@@ -64,6 +66,12 @@ impl<'a> Renderer for SdlRenderer<'a> {
         frame_buffer: &FrameBuffer,
         color_emphasis: ColorEmphasis,
     ) -> Result<(), Self::Err> {
+        self.total_frames += 1;
+
+        if self.config.frame_skip.should_skip(self.total_frames) {
+            return Ok(());
+        }
+
         self.texture
             .with_lock(
                 None,
@@ -101,6 +109,8 @@ struct SdlAudioPlayer {
     sample_queue: Vec<f32>,
     low_pass_filter: LowPassFilter,
     downsample_counter: DownsampleCounter,
+    frame_skip: FrameSkip,
+    total_output_samples: u64,
 }
 
 impl SdlAudioPlayer {
@@ -111,6 +121,8 @@ impl SdlAudioPlayer {
             sample_queue: Vec::new(),
             low_pass_filter: LowPassFilter::new(),
             downsample_counter: DownsampleCounter::new(AUDIO_OUTPUT_FREQUENCY, DISPLAY_RATE),
+            frame_skip: FrameSkip::ZERO,
+            total_output_samples: 0,
         }
     }
 }
@@ -125,8 +137,12 @@ impl AudioPlayer for SdlAudioPlayer {
         self.low_pass_filter.collect_sample(sample);
 
         if self.downsample_counter.increment() == DownsampleAction::OutputSample {
-            self.sample_queue
-                .push(self.low_pass_filter.output_sample() as f32);
+            self.total_output_samples += 1;
+
+            if !self.frame_skip.should_skip(self.total_output_samples) {
+                self.sample_queue
+                    .push(self.low_pass_filter.output_sample() as f32);
+            }
         }
 
         // Arbitrary threshold
@@ -187,6 +203,8 @@ fn load_sav_file<P: AsRef<Path>>(path: P) -> Option<Vec<u8>> {
 trait SdlWindowRenderer {
     fn window_mut(&mut self) -> &mut Window;
 
+    fn set_frame_skip(&mut self, frame_skip: FrameSkip);
+
     fn handle_resize(&mut self);
 
     fn reload_config(&mut self, config: &JgnesDynamicConfig);
@@ -195,6 +213,10 @@ trait SdlWindowRenderer {
 impl<'a> SdlWindowRenderer for SdlRenderer<'a> {
     fn window_mut(&mut self) -> &mut Window {
         self.canvas.window_mut()
+    }
+
+    fn set_frame_skip(&mut self, frame_skip: FrameSkip) {
+        self.config.frame_skip = frame_skip;
     }
 
     fn handle_resize(&mut self) {
@@ -212,6 +234,10 @@ impl<'a> SdlWindowRenderer for SdlRenderer<'a> {
 impl SdlWindowRenderer for WgpuRenderer<Window> {
     fn window_mut(&mut self) -> &mut Window {
         self.window_mut()
+    }
+
+    fn set_frame_skip(&mut self, frame_skip: FrameSkip) {
+        self.update_frame_skip(frame_skip);
     }
 
     fn handle_resize(&mut self) {
@@ -241,6 +267,10 @@ impl SdlWindowRenderer for WgpuRenderer<Window> {
 /// lock.
 pub fn run(config: &JgnesNativeConfig) -> anyhow::Result<()> {
     log::info!("Running with config:\n{config}");
+    {
+        let dynamic_config = &*config.dynamic_config.lock().unwrap();
+        log::info!("Initial dynamic config:\n{dynamic_config}");
+    }
 
     let Some(file_name) = Path::new(&config.nes_file_path)
         .file_name()
@@ -280,6 +310,7 @@ pub fn run(config: &JgnesNativeConfig) -> anyhow::Result<()> {
             gpu_filter_mode: dynamic_config.gpu_filter_mode,
             aspect_ratio: dynamic_config.aspect_ratio,
             overscan: dynamic_config.overscan,
+            frame_skip: FrameSkip::ZERO,
             forced_integer_height_scaling: dynamic_config.forced_integer_height_scaling,
             use_webgl2_limits: false,
         }
@@ -414,6 +445,8 @@ where
             .silence_ultrasonic_triangle_output,
     };
 
+    let mut fast_forward_multiplier = dynamic_config.lock().unwrap().fast_forward_multiplier;
+
     let mut ticks = 0_u64;
     loop {
         if let Err(err) = emulator.tick(&emulator_config) {
@@ -438,11 +471,14 @@ where
 
                 log::info!("Reloading dynamic config: {dynamic_config}");
 
-                emulator.get_renderer_mut().reload_config(dynamic_config);
+                let renderer = emulator.get_renderer_mut();
+                renderer.reload_config(dynamic_config);
                 emulator.get_audio_player_mut().sync_to_audio = dynamic_config.sync_to_audio;
                 input_handler.reload_input_config(&dynamic_config.input_config);
                 emulator_config.silence_ultrasonic_triangle_output =
                     dynamic_config.silence_ultrasonic_triangle_output;
+
+                fast_forward_multiplier = dynamic_config.fast_forward_multiplier;
             }
 
             for event in event_pump.poll_iter() {
@@ -521,7 +557,26 @@ where
                                     log::info!("Performing hard reset");
                                     emulator = emulator.hard_reset();
                                 }
+                                Hotkey::FastForward => {
+                                    let frame_skip =
+                                        FrameSkip(fast_forward_multiplier.saturating_sub(1));
+
+                                    emulator.get_renderer_mut().set_frame_skip(frame_skip);
+                                    emulator.get_audio_player_mut().frame_skip = frame_skip;
+                                }
                             }
+                        }
+                    }
+                    Event::KeyUp {
+                        keycode: Some(keycode),
+                        ..
+                    } => {
+                        if input_handler
+                            .check_for_hotkeys(keycode)
+                            .contains(&Hotkey::FastForward)
+                        {
+                            emulator.get_renderer_mut().set_frame_skip(FrameSkip::ZERO);
+                            emulator.get_audio_player_mut().frame_skip = FrameSkip::ZERO;
                         }
                     }
                     _ => {}

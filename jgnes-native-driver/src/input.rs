@@ -38,6 +38,7 @@ pub enum Hotkey {
     LoadState,
     SoftReset,
     HardReset,
+    FastForward,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -346,6 +347,7 @@ fn populate_hotkey_map(map: &mut HashMap<Keycode, Vec<Hotkey>>, config: &HotkeyC
         config.load_state => Hotkey::LoadState,
         config.soft_reset => Hotkey::SoftReset,
         config.hard_reset => Hotkey::HardReset,
+        config.fast_forward => Hotkey::FastForward,
     );
 }
 

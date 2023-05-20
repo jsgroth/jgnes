@@ -2,7 +2,7 @@
 #![allow(clippy::let_underscore_untyped)]
 
 use crate::colors;
-use crate::config::{AspectRatio, GpuFilterMode, Overscan, RendererConfig, VSyncMode};
+use crate::config::{AspectRatio, FrameSkip, GpuFilterMode, Overscan, RendererConfig, VSyncMode};
 use jgnes_core::{ColorEmphasis, FrameBuffer, Renderer};
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 use std::{iter, mem};
@@ -76,6 +76,7 @@ pub struct WgpuRenderer<W> {
     // surface is dropped
     window: W,
     window_size_fn: WindowSizeFn<W>,
+    total_frames: u64,
 }
 
 impl<W> WgpuRenderer<W>
@@ -312,6 +313,7 @@ where
             vertex_buffer,
             window,
             window_size_fn,
+            total_frames: 0,
         })
     }
 
@@ -441,6 +443,10 @@ where
         self.render_config.overscan = overscan;
         // No need to reconfigure surface, overscan is read on every frame rendered as it is only
         // used to determine which pixels to copy from the NES PPU frame buffer
+    }
+
+    pub fn update_frame_skip(&mut self, frame_skip: FrameSkip) {
+        self.render_config.frame_skip = frame_skip;
     }
 
     pub fn update_forced_integer_height_scaling(&mut self, forced_integer_height_scaling: bool) {
@@ -637,6 +643,12 @@ impl<W> Renderer for WgpuRenderer<W> {
         frame_buffer: &FrameBuffer,
         color_emphasis: ColorEmphasis,
     ) -> Result<(), Self::Err> {
+        self.total_frames += 1;
+
+        if self.render_config.frame_skip.should_skip(self.total_frames) {
+            return Ok(());
+        }
+
         self.queue
             .write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&self.vertices));
 

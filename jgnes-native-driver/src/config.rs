@@ -245,6 +245,7 @@ pub struct HotkeyConfig {
     pub load_state: Option<String>,
     pub soft_reset: Option<String>,
     pub hard_reset: Option<String>,
+    pub fast_forward: Option<String>,
 }
 
 impl Default for HotkeyConfig {
@@ -256,6 +257,7 @@ impl Default for HotkeyConfig {
             load_state: Some(Keycode::F6.name()),
             soft_reset: Some(Keycode::F3.name()),
             hard_reset: Some(Keycode::F4.name()),
+            fast_forward: Some(Keycode::Tab.name()),
         }
     }
 }
@@ -284,10 +286,15 @@ impl Display for HotkeyConfig {
             "    Soft Reset: {}",
             fmt_option(self.soft_reset.as_ref())
         )?;
-        write!(
+        writeln!(
             f,
             "    Hard Reset: {}",
             fmt_option(self.hard_reset.as_ref())
+        )?;
+        write!(
+            f,
+            "    Fast Forward: {}",
+            fmt_option(self.fast_forward.as_ref())
         )?;
 
         Ok(())
@@ -384,6 +391,7 @@ pub struct JgnesDynamicConfig {
     pub vsync_mode: VSyncMode,
     pub sync_to_audio: bool,
     pub silence_ultrasonic_triangle_output: bool,
+    pub fast_forward_multiplier: u8,
     pub input_config: InputConfig,
 }
 
@@ -403,6 +411,11 @@ impl Display for JgnesDynamicConfig {
             f,
             "silence_ultrasonic_triangle_output: {}",
             self.silence_ultrasonic_triangle_output
+        )?;
+        writeln!(
+            f,
+            "fast_forward_multiplier: {}",
+            self.fast_forward_multiplier
         )?;
         writeln!(f, "input_config: {}", self.input_config)?;
 

@@ -94,6 +94,10 @@ struct CliArgs {
     #[arg(long, default_value_t)]
     overscan_left: u8,
 
+    /// Fast forward multiplier
+    #[arg(long, default_value_t = 2)]
+    fast_forward_multiplier: u8,
+
     /// Right overscan in pixels
     #[arg(long, default_value_t)]
     overscan_right: u8,
@@ -147,6 +151,7 @@ fn main() -> anyhow::Result<()> {
             vsync_mode: args.vsync_mode,
             sync_to_audio: args.sync_to_audio,
             silence_ultrasonic_triangle_output: args.silence_ultrasonic_triangle_output,
+            fast_forward_multiplier: args.fast_forward_multiplier,
             input_config: InputConfig::default(),
         })),
         reload_signal: Arc::new(AtomicBool::new(false)),

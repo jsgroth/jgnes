@@ -226,6 +226,18 @@ impl Display for GpuFilterMode {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FrameSkip(pub u8);
+
+impl FrameSkip {
+    pub const ZERO: Self = Self(0);
+
+    #[must_use]
+    pub fn should_skip(self, frame_count: u64) -> bool {
+        self.0 != 0 && frame_count % (u64::from(self.0) + 1) != 0
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct RendererConfig {
     pub vsync_mode: VSyncMode,
@@ -233,6 +245,7 @@ pub struct RendererConfig {
     pub gpu_filter_mode: GpuFilterMode,
     pub aspect_ratio: AspectRatio,
     pub overscan: Overscan,
+    pub frame_skip: FrameSkip,
     pub forced_integer_height_scaling: bool,
     pub use_webgl2_limits: bool,
 }

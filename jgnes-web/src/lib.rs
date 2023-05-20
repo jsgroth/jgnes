@@ -10,7 +10,8 @@ use jgnes_core::{
     AudioPlayer, Emulator, EmulatorConfig, InputPoller, JoypadState, SaveWriter, TickEffect,
 };
 use jgnes_renderer::config::{
-    AspectRatio, GpuFilterMode, Overscan, RenderScale, RendererConfig, VSyncMode, WgpuBackend,
+    AspectRatio, FrameSkip, GpuFilterMode, Overscan, RenderScale, RendererConfig, VSyncMode,
+    WgpuBackend,
 };
 use jgnes_renderer::WgpuRenderer;
 use js_sys::Uint8Array;
@@ -383,6 +384,7 @@ pub async fn run(config: JgnesWebConfig) {
             gpu_filter_mode,
             aspect_ratio,
             overscan: Overscan::default(),
+            frame_skip: FrameSkip::ZERO,
             forced_integer_height_scaling: false,
             use_webgl2_limits: true,
         },

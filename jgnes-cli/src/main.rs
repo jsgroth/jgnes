@@ -1,39 +1,15 @@
 use clap::Parser;
 use env_logger::Env;
 use jgnes_native_driver::{InputConfig, JgnesDynamicConfig, JgnesNativeConfig, NativeRenderer};
+use jgnes_proc_macros::{EnumDisplay, EnumFromStr};
 use jgnes_renderer::config::{AspectRatio, GpuFilterMode, Overscan, VSyncMode, WgpuBackend};
-use std::fmt::{Display, Formatter};
-use std::str::FromStr;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumDisplay, EnumFromStr)]
 enum GpuFilterType {
     NearestNeighbor,
     Linear,
-}
-
-impl Display for GpuFilterType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::NearestNeighbor => write!(f, "NearestNeighbor"),
-            Self::Linear => write!(f, "Linear"),
-        }
-    }
-}
-
-impl FromStr for GpuFilterType {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "NearestNeighbor" => Ok(Self::NearestNeighbor),
-            "Linear" => Ok(Self::Linear),
-            _ => Err(anyhow::Error::msg(format!(
-                "invalid GPU filter type string: {s}"
-            ))),
-        }
-    }
 }
 
 #[derive(Parser)]

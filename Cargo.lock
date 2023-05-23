@@ -1554,6 +1554,7 @@ dependencies = [
  "clap",
  "env_logger",
  "jgnes-native-driver",
+ "jgnes-proc-macros",
  "jgnes-renderer",
 ]
 
@@ -1597,6 +1598,7 @@ version = "0.4.0"
 dependencies = [
  "anyhow",
  "jgnes-core",
+ "jgnes-proc-macros",
  "jgnes-renderer",
  "log",
  "pollster",
@@ -1620,6 +1622,7 @@ dependencies = [
  "anyhow",
  "bytemuck",
  "jgnes-core",
+ "jgnes-proc-macros",
  "log",
  "raw-window-handle",
  "serde",

@@ -1,37 +1,18 @@
+use jgnes_proc_macros::{EnumDisplay, EnumFromStr};
 use jgnes_renderer::config::{AspectRatio, GpuFilterMode, Overscan, VSyncMode, WgpuBackend};
 use sdl2::keyboard::Keycode;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use std::str::FromStr;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, EnumDisplay, EnumFromStr,
+)]
 pub enum NativeRenderer {
     Sdl2,
     #[default]
     Wgpu,
-}
-
-impl Display for NativeRenderer {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Sdl2 => write!(f, "Sdl2"),
-            Self::Wgpu => write!(f, "Wgpu"),
-        }
-    }
-}
-
-impl FromStr for NativeRenderer {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "Sdl2" => Ok(Self::Sdl2),
-            "Wgpu" => Ok(Self::Wgpu),
-            _ => Err(format!("invalid renderer string: {s}")),
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -111,7 +92,7 @@ impl Display for KeyboardInput {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, EnumDisplay)]
 pub enum AxisDirection {
     Positive,
     Negative,
@@ -126,16 +107,7 @@ impl AxisDirection {
     }
 }
 
-impl Display for AxisDirection {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Positive => write!(f, "Positive"),
-            Self::Negative => write!(f, "Negative"),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize, EnumDisplay)]
 pub enum HatDirection {
     #[default]
     Up,
@@ -146,17 +118,6 @@ pub enum HatDirection {
 
 impl HatDirection {
     pub(crate) const ALL: [Self; 4] = [Self::Up, Self::Left, Self::Right, Self::Down];
-}
-
-impl Display for HatDirection {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Up => write!(f, "Up"),
-            Self::Left => write!(f, "Left"),
-            Self::Right => write!(f, "Right"),
-            Self::Down => write!(f, "Down"),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

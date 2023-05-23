@@ -1,8 +1,10 @@
+use jgnes_proc_macros::{EnumDisplay, EnumFromStr};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use std::str::FromStr;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, EnumDisplay, EnumFromStr,
+)]
 pub enum WgpuBackend {
     #[default]
     Auto,
@@ -12,37 +14,6 @@ pub enum WgpuBackend {
     BrowserAuto,
     WebGpu,
     OpenGl,
-}
-
-impl Display for WgpuBackend {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Auto => write!(f, "Auto"),
-            Self::Vulkan => write!(f, "Vulkan"),
-            Self::Direct3d12 => write!(f, "Direct3d12"),
-            Self::Metal => write!(f, "Metal"),
-            Self::BrowserAuto => write!(f, "BrowserAuto"),
-            Self::WebGpu => write!(f, "WebGpu"),
-            Self::OpenGl => write!(f, "OpenGl"),
-        }
-    }
-}
-
-impl FromStr for WgpuBackend {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "Auto" => Ok(Self::Auto),
-            "Vulkan" => Ok(Self::Vulkan),
-            "Direct3d12" => Ok(Self::Direct3d12),
-            "Metal" => Ok(Self::Metal),
-            "BrowserAuto" => Ok(Self::BrowserAuto),
-            "WebGpu" => Ok(Self::WebGpu),
-            "OpenGl" => Ok(Self::OpenGl),
-            _ => Err(format!("invalid wgpu backend string: {s}")),
-        }
-    }
 }
 
 impl WgpuBackend {
@@ -59,38 +30,15 @@ impl WgpuBackend {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, EnumDisplay, EnumFromStr,
+)]
 pub enum AspectRatio {
     #[default]
     Ntsc,
     SquarePixels,
     FourThree,
     Stretched,
-}
-
-impl Display for AspectRatio {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Ntsc => write!(f, "Ntsc"),
-            Self::SquarePixels => write!(f, "SquarePixels"),
-            Self::FourThree => write!(f, "FourThree"),
-            Self::Stretched => write!(f, "Stretched"),
-        }
-    }
-}
-
-impl FromStr for AspectRatio {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "Ntsc" => Ok(Self::Ntsc),
-            "SquarePixels" => Ok(Self::SquarePixels),
-            "FourThree" => Ok(Self::FourThree),
-            "Stretched" => Ok(Self::Stretched),
-            _ => Err(format!("invalid aspect ratio string: {s}")),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -111,7 +59,9 @@ impl Display for Overscan {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, EnumDisplay, EnumFromStr,
+)]
 pub enum VSyncMode {
     #[default]
     Enabled,
@@ -127,31 +77,6 @@ impl VSyncMode {
             Self::Disabled => wgpu::PresentMode::Immediate,
             Self::Fast => wgpu::PresentMode::Mailbox,
             Self::Adaptive => wgpu::PresentMode::FifoRelaxed,
-        }
-    }
-}
-
-impl Display for VSyncMode {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Enabled => write!(f, "Enabled"),
-            Self::Disabled => write!(f, "Disabled"),
-            Self::Fast => write!(f, "Fast"),
-            Self::Adaptive => write!(f, "Adaptive"),
-        }
-    }
-}
-
-impl FromStr for VSyncMode {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "Enabled" => Ok(Self::Enabled),
-            "Disabled" => Ok(Self::Disabled),
-            "Fast" => Ok(Self::Fast),
-            "Adaptive" => Ok(Self::Adaptive),
-            _ => Err(format!("invalid VSync mode string: {s}")),
         }
     }
 }

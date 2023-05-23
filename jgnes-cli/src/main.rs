@@ -5,6 +5,7 @@ use jgnes_proc_macros::{EnumDisplay, EnumFromStr};
 use jgnes_renderer::config::{AspectRatio, GpuFilterMode, Overscan, VSyncMode, WgpuBackend};
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, EnumDisplay, EnumFromStr)]
 enum GpuFilterType {
@@ -74,6 +75,10 @@ struct CliArgs {
     #[arg(long, default_value_t = 2)]
     fast_forward_multiplier: u8,
 
+    /// Rewind buffer length in seconds
+    #[arg(long, default_value_t = 10)]
+    rewind_buffer_len_secs: u64,
+
     /// Right overscan in pixels
     #[arg(long, default_value_t)]
     overscan_right: u8,
@@ -128,6 +133,7 @@ fn main() -> anyhow::Result<()> {
             sync_to_audio: args.sync_to_audio,
             silence_ultrasonic_triangle_output: args.silence_ultrasonic_triangle_output,
             fast_forward_multiplier: args.fast_forward_multiplier,
+            rewind_buffer_len: Duration::from_secs(args.rewind_buffer_len_secs),
             input_config: InputConfig::default(),
         })),
         reload_signal: Arc::new(AtomicBool::new(false)),

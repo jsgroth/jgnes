@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, EnumDisplay, EnumFromStr,
@@ -207,6 +208,7 @@ pub struct HotkeyConfig {
     pub soft_reset: Option<String>,
     pub hard_reset: Option<String>,
     pub fast_forward: Option<String>,
+    pub rewind: Option<String>,
 }
 
 impl Default for HotkeyConfig {
@@ -219,6 +221,7 @@ impl Default for HotkeyConfig {
             soft_reset: Some(Keycode::F3.name()),
             hard_reset: Some(Keycode::F4.name()),
             fast_forward: Some(Keycode::Tab.name()),
+            rewind: Some(Keycode::Backquote.name()),
         }
     }
 }
@@ -252,11 +255,12 @@ impl Display for HotkeyConfig {
             "    Hard Reset: {}",
             fmt_option(self.hard_reset.as_ref())
         )?;
-        write!(
+        writeln!(
             f,
             "    Fast Forward: {}",
             fmt_option(self.fast_forward.as_ref())
         )?;
+        write!(f, "    Rewind: {}", fmt_option(self.rewind.as_ref()))?;
 
         Ok(())
     }
@@ -353,6 +357,7 @@ pub struct JgnesDynamicConfig {
     pub sync_to_audio: bool,
     pub silence_ultrasonic_triangle_output: bool,
     pub fast_forward_multiplier: u8,
+    pub rewind_buffer_len: Duration,
     pub input_config: InputConfig,
 }
 
@@ -377,6 +382,11 @@ impl Display for JgnesDynamicConfig {
             f,
             "fast_forward_multiplier: {}",
             self.fast_forward_multiplier
+        )?;
+        writeln!(
+            f,
+            "rewind_buffer_len_seconds: {}",
+            self.rewind_buffer_len.as_secs()
         )?;
         writeln!(f, "input_config: {}", self.input_config)?;
 

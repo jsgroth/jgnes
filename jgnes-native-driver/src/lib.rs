@@ -3,8 +3,8 @@ mod input;
 
 use jgnes_core::audio::{DownsampleAction, DownsampleCounter, LowPassFilter};
 use jgnes_core::{
-    AudioPlayer, ColorEmphasis, EmulationError, Emulator, EmulatorConfig, FrameBuffer, InputPoller,
-    JoypadState, Renderer, SaveWriter,
+    AudioPlayer, ColorEmphasis, EmulationError, EmulationState, Emulator, EmulatorConfig,
+    FrameBuffer, InputPoller, JoypadState, Renderer, SaveWriter, TickEffect,
 };
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
 use sdl2::event::{Event, EventType, WindowEvent};
@@ -14,12 +14,13 @@ use sdl2::render::{Texture, TextureCreator, WindowCanvas};
 use sdl2::video::{FullscreenType, Window};
 use sdl2::EventPump;
 use std::cell::RefCell;
+use std::collections::VecDeque;
 use std::ffi::OsStr;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::atomic::Ordering;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 use std::{fs, thread};
 
 pub use crate::config::{
@@ -419,6 +420,71 @@ fn init_window(window: Window) -> Result<Window, anyhow::Error> {
     Ok(canvas.into_window())
 }
 
+struct RewindState {
+    previous_states: VecDeque<EmulationState>,
+    frame_count: u64,
+    rewind_buffer_len: usize,
+    rewinding: bool,
+}
+
+const REWIND_RECORD_INTERVAL: u64 = 3;
+// 3 * 16.6~ ms
+const THREE_FRAME_TIMES_NANOS: u64 = 50_000_000;
+
+impl RewindState {
+    fn compute_rewind_buffer_len(rewind_buffer_len: Duration) -> usize {
+        (rewind_buffer_len.as_nanos() / u128::from(THREE_FRAME_TIMES_NANOS)) as usize
+    }
+
+    fn new(rewind_buffer_len: Duration) -> Self {
+        let rewind_buffer_len = Self::compute_rewind_buffer_len(rewind_buffer_len);
+        Self {
+            previous_states: VecDeque::new(),
+            frame_count: 0,
+            rewind_buffer_len,
+            rewinding: false,
+        }
+    }
+
+    fn reload_buffer_len(&mut self, rewind_buffer_len: Duration) {
+        self.rewind_buffer_len = Self::compute_rewind_buffer_len(rewind_buffer_len);
+    }
+
+    // Should be called once per frame; will internally store state every 3rd frame
+    fn record<R, A, I, S>(&mut self, emulator: &Emulator<R, A, I, S>) {
+        self.frame_count += 1;
+        if self.frame_count % REWIND_RECORD_INTERVAL == 0 {
+            self.previous_states.push_back(emulator.snapshot_state());
+
+            while self.previous_states.len() > self.rewind_buffer_len {
+                self.previous_states.pop_front();
+            }
+        }
+    }
+
+    // Rewind to the most recent previous state, and then sleep for the appropriate amount of time.
+    // If the rewind buffer is empty then this method will do nothing and immediately return.
+    fn rewind_once<R: Renderer, A, I, S>(
+        &mut self,
+        emulator: &mut Emulator<R, A, I, S>,
+    ) -> Result<(), R::Err> {
+        if let Some(state) = self.previous_states.pop_back() {
+            emulator.load_state_snapshot(state);
+
+            let start_time = SystemTime::now();
+            emulator.force_render()?;
+
+            while SystemTime::now().duration_since(start_time).unwrap()
+                < Duration::from_nanos(THREE_FRAME_TIMES_NANOS)
+            {
+                thread::sleep(Duration::from_micros(250));
+            }
+        }
+
+        Ok(())
+    }
+}
+
 fn run_emulator<R, I, S, P>(
     mut emulator: Emulator<R, SdlAudioPlayer, I, S>,
     native_config: &JgnesNativeConfig,
@@ -438,28 +504,50 @@ where
 
     let save_state_path = save_state_path.as_ref();
 
-    let mut emulator_config = EmulatorConfig {
-        silence_ultrasonic_triangle_output: dynamic_config
-            .lock()
-            .unwrap()
-            .silence_ultrasonic_triangle_output,
+    let (initial_silence_ultrasonic_triangle, initial_ff_multiplier, initial_rewind_buffer_len) = {
+        let dynamic_config = dynamic_config.lock().unwrap();
+        (
+            dynamic_config.silence_ultrasonic_triangle_output,
+            dynamic_config.fast_forward_multiplier,
+            dynamic_config.rewind_buffer_len,
+        )
     };
 
-    let mut fast_forward_multiplier = dynamic_config.lock().unwrap().fast_forward_multiplier;
+    let mut emulator_config = EmulatorConfig {
+        silence_ultrasonic_triangle_output: initial_silence_ultrasonic_triangle,
+    };
+
+    let mut fast_forward_multiplier = initial_ff_multiplier;
+    let mut rewind_state = RewindState::new(initial_rewind_buffer_len);
 
     let mut ticks = 0_u64;
     loop {
-        if let Err(err) = emulator.tick(&emulator_config) {
-            return match err {
-                EmulationError::Render(err)
-                | EmulationError::Audio(err)
-                | EmulationError::Save(err) => Err(err),
-                EmulationError::CpuInvalidOpcode(..) => Err(anyhow::Error::msg(err.to_string())),
-            };
+        if !rewind_state.rewinding {
+            match emulator.tick(&emulator_config) {
+                Ok(TickEffect::None) => {}
+                Ok(TickEffect::FrameRendered) => {
+                    rewind_state.record(&emulator);
+                }
+                Err(err) => {
+                    return match err {
+                        EmulationError::Render(err)
+                        | EmulationError::Audio(err)
+                        | EmulationError::Save(err) => Err(err),
+                        EmulationError::CpuInvalidOpcode(..) => {
+                            Err(anyhow::Error::msg(err.to_string()))
+                        }
+                    };
+                }
+            }
+
+            ticks += 1;
         }
 
-        ticks += 1;
-        if ticks % 15000 == 0 {
+        if rewind_state.rewinding {
+            rewind_state.rewind_once(&mut emulator)?;
+        }
+
+        if ticks % 15000 == 0 || rewind_state.rewinding {
             if quit_signal.load(Ordering::Relaxed) {
                 return Ok(());
             }
@@ -479,6 +567,7 @@ where
                     dynamic_config.silence_ultrasonic_triangle_output;
 
                 fast_forward_multiplier = dynamic_config.fast_forward_multiplier;
+                rewind_state.reload_buffer_len(dynamic_config.rewind_buffer_len);
             }
 
             for event in event_pump.poll_iter() {
@@ -564,6 +653,9 @@ where
                                     emulator.get_renderer_mut().set_frame_skip(frame_skip);
                                     emulator.get_audio_player_mut().frame_skip = frame_skip;
                                 }
+                                Hotkey::Rewind => {
+                                    rewind_state.rewinding = true;
+                                }
                             }
                         }
                     }
@@ -571,12 +663,17 @@ where
                         keycode: Some(keycode),
                         ..
                     } => {
-                        if input_handler
-                            .check_for_hotkeys(keycode)
-                            .contains(&Hotkey::FastForward)
-                        {
-                            emulator.get_renderer_mut().set_frame_skip(FrameSkip::ZERO);
-                            emulator.get_audio_player_mut().frame_skip = FrameSkip::ZERO;
+                        for hotkey in input_handler.check_for_hotkeys(keycode) {
+                            match hotkey {
+                                Hotkey::FastForward => {
+                                    emulator.get_renderer_mut().set_frame_skip(FrameSkip::ZERO);
+                                    emulator.get_audio_player_mut().frame_skip = FrameSkip::ZERO;
+                                }
+                                Hotkey::Rewind => {
+                                    rewind_state.rewinding = false;
+                                }
+                                _ => {}
+                            }
                         }
                     }
                     _ => {}

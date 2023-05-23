@@ -32,6 +32,7 @@ Implemented:
 * A GPU-backed renderer based on `wgpu` with an option for integer upscaling + linear interpolation, producing a sharp but clean image even at higher resolutions and non-8:7 aspect ratios
 * Save & load state
 * Fast forward with a configurable speed multiplier (very CPU-intensive at higher multipliers; my i5-1240P laptop maxes out between 5x and 6x speed)
+* Rewind
 
 Not Implemented:
 * Unofficial CPU opcodes
@@ -39,7 +40,6 @@ Not Implemented:
 * DMC DMA cycle stealing and dummy reads, an obscure hardware quirk that affects very very few if any games
 * Color palette customization; the NES hardware directly outputs an NTSC video signal rather than RGB pixel grids, so any mapping from NES colors to RGB colors is an approximation at best
 * Lots of more obscure cartridge boards
-* Rewind
 * Support for PAL/EU releases (the processor timings are different compared to NTSC US/JP)
 * Support for any controller port peripherals (e.g. the Zapper)
 

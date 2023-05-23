@@ -45,6 +45,10 @@ fn default_ff_multiplier() -> u8 {
     2
 }
 
+fn default_rewind_buffer_len_secs() -> u64 {
+    10
+}
+
 fn true_fn() -> bool {
     true
 }
@@ -79,6 +83,8 @@ struct AppConfig {
     vsync_mode: VSyncMode,
     #[serde(default = "default_ff_multiplier")]
     fast_forward_multiplier: u8,
+    #[serde(default = "default_rewind_buffer_len_secs")]
+    rewind_buffer_len_secs: u64,
     rom_search_dir: Option<String>,
     #[serde(default)]
     input: InputConfig,
@@ -105,6 +111,7 @@ impl AppConfig {
                 sync_to_audio: self.sync_to_audio,
                 silence_ultrasonic_triangle_output: self.silence_ultrasonic_triangle_output,
                 fast_forward_multiplier: self.fast_forward_multiplier,
+                rewind_buffer_len: Duration::from_secs(self.rewind_buffer_len_secs),
                 input_config: self.input.clone(),
             })),
             reload_signal: Arc::new(AtomicBool::new(false)),
@@ -183,6 +190,8 @@ struct InputState {
     axis_deadzone_invalid: bool,
     ff_multiplier_text: String,
     ff_multiplier_invalid: bool,
+    rewind_buffer_len_text: String,
+    rewind_buffer_len_invalid: bool,
 }
 
 struct InputButton<'a> {
@@ -248,6 +257,7 @@ impl<'a> HotkeyButton<'a> {
             Hotkey::SoftReset => app.config.input.hotkeys.soft_reset.as_ref(),
             Hotkey::HardReset => app.config.input.hotkeys.hard_reset.as_ref(),
             Hotkey::FastForward => app.config.input.hotkeys.fast_forward.as_ref(),
+            Hotkey::Rewind => app.config.input.hotkeys.rewind.as_ref(),
         };
         let button_text = current_value.map_or("<None>", String::as_str);
 
@@ -317,10 +327,11 @@ enum Hotkey {
     SoftReset,
     HardReset,
     FastForward,
+    Rewind,
 }
 
 impl Hotkey {
-    const ALL: [Self; 7] = [
+    const ALL: &'static [Self] = &[
         Self::Quit,
         Self::ToggleFullscreen,
         Self::SaveState,
@@ -328,6 +339,7 @@ impl Hotkey {
         Self::SoftReset,
         Self::HardReset,
         Self::FastForward,
+        Self::Rewind,
     ];
 
     fn label(self) -> &'static str {
@@ -339,6 +351,7 @@ impl Hotkey {
             Self::SoftReset => "Soft Reset",
             Self::HardReset => "Hard Reset",
             Self::FastForward => "Fast Forward",
+            Self::Rewind => "Rewind",
         }
     }
 }
@@ -378,6 +391,7 @@ fn get_hotkey_field(hotkey_config: &mut HotkeyConfig, hotkey: Hotkey) -> &mut Op
         Hotkey::SoftReset => &mut hotkey_config.soft_reset,
         Hotkey::HardReset => &mut hotkey_config.hard_reset,
         Hotkey::FastForward => &mut hotkey_config.fast_forward,
+        Hotkey::Rewind => &mut hotkey_config.rewind,
     }
 }
 
@@ -441,6 +455,8 @@ impl AppState {
             axis_deadzone_invalid: false,
             ff_multiplier_text: config.fast_forward_multiplier.to_string(),
             ff_multiplier_invalid: false,
+            rewind_buffer_len_text: config.rewind_buffer_len_secs.to_string(),
+            rewind_buffer_len_invalid: false,
         };
         Self {
             render_scale_text: config.gpu_render_scale.get().to_string(),
@@ -1082,7 +1098,7 @@ impl App {
                 Grid::new("hotkey_settings_grid").show(ui, |ui| {
                     ui.set_enabled(!self.state.emulator_is_running.load(Ordering::Relaxed));
 
-                    for hotkey in Hotkey::ALL {
+                    for &hotkey in Hotkey::ALL {
                         ui.label(format!("{}:", hotkey.label()));
 
                         HotkeyButton::new(hotkey, self)
@@ -1108,11 +1124,28 @@ impl App {
                     .ui(ui);
                     ui.label("Fast forward multiplier");
                 });
-
                 if self.state.input.ff_multiplier_invalid {
                     ui.colored_label(
                         Color32::RED,
                         "Fast forward multiplier must be an integer between 2 and 16",
+                    );
+                }
+
+                ui.horizontal(|ui| {
+                    NumericTextInput::new(
+                        &mut self.state.input.rewind_buffer_len_text,
+                        &mut self.config.rewind_buffer_len_secs,
+                        &mut self.state.input.rewind_buffer_len_invalid,
+                        0..=u64::MAX,
+                    )
+                    .desired_width(40.0)
+                    .ui(ui);
+                    ui.label("Rewind buffer length in seconds");
+                });
+                if self.state.input.rewind_buffer_len_invalid {
+                    ui.colored_label(
+                        Color32::RED,
+                        "Rewind buffer length must be a non-negative integer",
                     );
                 }
             });

@@ -67,7 +67,6 @@ pub enum VSyncMode {
     Enabled,
     Disabled,
     Fast,
-    Adaptive,
 }
 
 impl VSyncMode {
@@ -76,7 +75,6 @@ impl VSyncMode {
             Self::Enabled => wgpu::PresentMode::Fifo,
             Self::Disabled => wgpu::PresentMode::Immediate,
             Self::Fast => wgpu::PresentMode::Mailbox,
-            Self::Adaptive => wgpu::PresentMode::FifoRelaxed,
         }
     }
 }

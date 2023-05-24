@@ -824,8 +824,6 @@ impl App {
                         ui.set_enabled(self.config.renderer == NativeRenderer::Wgpu);
                         ui.radio_value(&mut self.config.vsync_mode, VSyncMode::Fast, "Fast")
                             .on_disabled_hover_text("Fast VSync is only supported with the wgpu renderer");
-                        ui.radio_value(&mut self.config.vsync_mode, VSyncMode::Adaptive, "Adaptive")
-                            .on_disabled_hover_text("Adaptive VSync is only supported with the wgpu renderer");
                     });
                 });
 

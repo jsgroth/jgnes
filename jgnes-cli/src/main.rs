@@ -63,7 +63,7 @@ struct CliArgs {
     #[arg(long = "fullscreen", default_value_t)]
     launch_fullscreen: bool,
 
-    /// VSync mode (Enabled / Disabled / Fast / Adaptive)
+    /// VSync mode (Enabled / Disabled / Fast)
     #[arg(long, default_value_t)]
     vsync_mode: VSyncMode,
 

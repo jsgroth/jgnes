@@ -64,6 +64,7 @@ pub struct WgpuRenderer<W> {
     device: wgpu::Device,
     queue: wgpu::Queue,
     surface: wgpu::Surface,
+    surface_capabilities: wgpu::SurfaceCapabilities,
     surface_config: wgpu::SurfaceConfiguration,
     texture: wgpu::Texture,
     compute_resources: Option<(wgpu::BindGroup, wgpu::ComputePipeline)>,
@@ -159,9 +160,9 @@ where
             .present_modes
             .contains(&desired_present_mode)
         {
-            return Err(anyhow::Error::msg(format!(
-                "GPU hardware/driver does not support VSync mode {} (wgpu present mode {desired_present_mode:?}); supported present modes are {:?}",
-                render_config.vsync_mode, surface_capabilities.present_modes
+            return Err(anyhow::Error::msg(unsupported_vsync_mode_error(
+                render_config.vsync_mode,
+                &surface_capabilities.present_modes,
             )));
         }
 
@@ -303,6 +304,7 @@ where
             device,
             queue,
             surface,
+            surface_capabilities,
             surface_config,
             texture,
             compute_resources,
@@ -454,11 +456,38 @@ where
         self.reconfigure_surface();
     }
 
-    pub fn update_vsync_mode(&mut self, vsync_mode: VSyncMode) {
+    /// # Errors
+    ///
+    /// This method will return an error if the GPU driver does not support the specified vsync mode.
+    pub fn update_vsync_mode(&mut self, vsync_mode: VSyncMode) -> Result<(), anyhow::Error> {
+        let present_mode = vsync_mode.to_present_mode();
+        if !self
+            .surface_capabilities
+            .present_modes
+            .contains(&present_mode)
+        {
+            return Err(anyhow::Error::msg(unsupported_vsync_mode_error(
+                vsync_mode,
+                &self.surface_capabilities.present_modes,
+            )));
+        }
+
         self.render_config.vsync_mode = vsync_mode;
-        self.surface_config.present_mode = vsync_mode.to_present_mode();
+        self.surface_config.present_mode = present_mode;
         self.reconfigure_surface();
+
+        Ok(())
     }
+}
+
+fn unsupported_vsync_mode_error(
+    vsync_mode: VSyncMode,
+    supported_modes: &[wgpu::PresentMode],
+) -> String {
+    let desired_present_mode = vsync_mode.to_present_mode();
+    format!(
+        "GPU hardware/driver does not support VSync mode {vsync_mode} (wgpu present mode {desired_present_mode:?}); supported present modes are {supported_modes:?}",
+    )
 }
 
 fn create_compute_resources(

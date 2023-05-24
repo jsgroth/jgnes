@@ -208,7 +208,7 @@ trait SdlWindowRenderer {
 
     fn handle_resize(&mut self);
 
-    fn reload_config(&mut self, config: &JgnesDynamicConfig);
+    fn reload_config(&mut self, config: &JgnesDynamicConfig) -> Result<(), anyhow::Error>;
 }
 
 impl<'a> SdlWindowRenderer for SdlRenderer<'a> {
@@ -224,11 +224,13 @@ impl<'a> SdlWindowRenderer for SdlRenderer<'a> {
         // nothing to do
     }
 
-    fn reload_config(&mut self, config: &JgnesDynamicConfig) {
+    fn reload_config(&mut self, config: &JgnesDynamicConfig) -> Result<(), anyhow::Error> {
         self.config.aspect_ratio = config.aspect_ratio;
         self.config.overscan = config.overscan;
         self.config.forced_integer_height_scaling = config.forced_integer_height_scaling;
         // VSync mode is not configurable for the SDL2 renderer and filter mode is not applicable
+
+        Ok(())
     }
 }
 
@@ -245,12 +247,14 @@ impl SdlWindowRenderer for WgpuRenderer<Window> {
         self.reconfigure_surface();
     }
 
-    fn reload_config(&mut self, config: &JgnesDynamicConfig) {
+    fn reload_config(&mut self, config: &JgnesDynamicConfig) -> Result<(), anyhow::Error> {
         self.update_filter_mode(config.gpu_filter_mode);
         self.update_aspect_ratio(config.aspect_ratio);
         self.update_overscan(config.overscan);
         self.update_forced_integer_height_scaling(config.forced_integer_height_scaling);
-        self.update_vsync_mode(config.vsync_mode);
+        self.update_vsync_mode(config.vsync_mode)?;
+
+        Ok(())
     }
 }
 
@@ -560,7 +564,7 @@ where
                 log::info!("Reloading dynamic config: {dynamic_config}");
 
                 let renderer = emulator.get_renderer_mut();
-                renderer.reload_config(dynamic_config);
+                renderer.reload_config(dynamic_config)?;
                 emulator.get_audio_player_mut().sync_to_audio = dynamic_config.sync_to_audio;
                 input_handler.reload_input_config(&dynamic_config.input_config);
                 emulator_config.silence_ultrasonic_triangle_output =

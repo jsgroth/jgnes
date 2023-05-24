@@ -150,7 +150,6 @@ enum OpenWindow {
     HotkeySettings,
     UiSettings,
     About,
-    EmulationError,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -425,6 +424,7 @@ struct AppState {
     input: InputState,
     rom_list: Vec<RomMetadata>,
     open_window: Option<OpenWindow>,
+    error_window_open: bool,
     open_input_window: Option<InputWindow>,
     waiting_for_input: Option<WaitingForInput>,
     emulator_is_running: Arc<AtomicBool>,
@@ -469,6 +469,7 @@ impl AppState {
             input: input_state,
             rom_list: Vec::new(),
             open_window: None,
+            error_window_open: false,
             open_input_window: None,
             waiting_for_input: None,
             emulator_is_running: is_running,
@@ -486,6 +487,10 @@ impl AppState {
                 .quit_signal
                 .store(true, Ordering::Relaxed);
         }
+    }
+
+    fn is_any_window_open(&self) -> bool {
+        self.open_window.is_some() || self.error_window_open || self.open_input_window.is_some()
     }
 }
 
@@ -620,9 +625,7 @@ impl App {
 
     fn render_central_panel(&mut self, ctx: &Context) {
         CentralPanel::default().show(ctx, |ui| {
-            ui.set_enabled(
-                self.state.open_window.is_none() && self.state.waiting_for_input.is_none(),
-            );
+            ui.set_enabled(!self.state.is_any_window_open());
 
             match &self.config.rom_search_dir {
                 Some(_) => {
@@ -1245,7 +1248,7 @@ impl eframe::App for App {
         self.poll_for_input_thread_result();
 
         if self.state.emulation_error.lock().unwrap().is_some() {
-            self.state.open_window = Some(OpenWindow::EmulationError);
+            self.state.error_window_open = true;
         }
 
         let open_shortcut = KeyboardShortcut::new(Modifiers::CTRL, Key::O);
@@ -1259,9 +1262,7 @@ impl eframe::App for App {
         }
 
         TopBottomPanel::new(TopBottomSide::Top, "top_bottom_panel").show(ctx, |ui| {
-            ui.set_enabled(
-                self.state.open_window.is_none() && self.state.waiting_for_input.is_none(),
-            );
+            ui.set_enabled(!self.state.is_any_window_open());
             menu::bar(ui, |ui| {
                 ui.menu_button("File", |ui| {
                     let open_button = Button::new("Open")
@@ -1337,28 +1338,29 @@ impl eframe::App for App {
             Some(OpenWindow::About) => {
                 self.render_about_window(ctx);
             }
-            Some(OpenWindow::EmulationError) => {
-                let mut error_open = true;
-                Window::new("Error")
-                    .resizable(false)
-                    .open(&mut error_open)
-                    .show(ctx, |ui| {
-                        ui.colored_label(
-                            Color32::RED,
-                            self.state
-                                .emulation_error
-                                .lock()
-                                .unwrap()
-                                .as_ref()
-                                .map_or(String::new(), anyhow::Error::to_string),
-                        );
-                    });
-                if !error_open {
-                    self.state.open_window = None;
-                    *self.state.emulation_error.lock().unwrap() = None;
-                }
-            }
             None => {}
+        }
+
+        if self.state.error_window_open {
+            let mut error_open = true;
+            Window::new("Error")
+                .resizable(false)
+                .open(&mut error_open)
+                .show(ctx, |ui| {
+                    ui.colored_label(
+                        Color32::RED,
+                        self.state
+                            .emulation_error
+                            .lock()
+                            .unwrap()
+                            .as_ref()
+                            .map_or(String::new(), anyhow::Error::to_string),
+                    );
+                });
+            if !error_open {
+                self.state.error_window_open = false;
+                *self.state.emulation_error.lock().unwrap() = None;
+            }
         }
 
         if prev_config != self.config {

@@ -22,7 +22,7 @@ use wasm_bindgen::prelude::*;
 use web_sys::{AudioContext, AudioContextOptions};
 use winit::dpi::{LogicalSize, PhysicalSize};
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
-use winit::event_loop::{ControlFlow, EventLoopBuilder, EventLoopProxy};
+use winit::event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopProxy};
 use winit::platform::web::WindowExtWebSys;
 use winit::window::{Window, WindowBuilder, WindowId};
 
@@ -183,6 +183,7 @@ type WebEmulator =
 struct State {
     emulator: Option<WebEmulator>,
     renderer: WebRenderer,
+    audio_player: Rc<RefCell<WebAudioPlayer>>,
     input_handler: InputHandler,
     aspect_ratio: AspectRatio,
     filter_mode: GpuFilterMode,
@@ -447,15 +448,24 @@ pub async fn run(config: JgnesWebConfig) {
         None => None,
     };
 
-    let mut state = State {
+    let state = State {
         emulator,
         renderer,
+        audio_player,
         input_handler,
         aspect_ratio: *config.aspect_ratio.borrow(),
         filter_mode: *config.gpu_filter_mode.borrow(),
         overscan: *config.overscan.borrow(),
     };
 
+    run_event_loop(event_loop, config, state);
+}
+
+fn run_event_loop(
+    event_loop: EventLoop<(Vec<u8>, String)>,
+    config: JgnesWebConfig,
+    mut state: State,
+) -> ! {
     let event_loop_proxy = event_loop.create_proxy();
 
     event_loop.run(move |event, _, control_flow| match event {
@@ -473,7 +483,7 @@ pub async fn run(config: JgnesWebConfig) {
                 file_bytes,
                 sav_bytes,
                 Rc::clone(&state.renderer),
-                Rc::clone(&audio_player),
+                Rc::clone(&state.audio_player),
                 input_poller,
                 save_writer,
             ) {
@@ -541,7 +551,7 @@ pub async fn run(config: JgnesWebConfig) {
 
             // If audio sync is enabled, only run the emulator if the audio queue isn't filling up
             if !*config.audio_sync_enabled.borrow()
-                || audio_player.borrow().audio_queue.len().unwrap() <= 1024
+                || state.audio_player.borrow().audio_queue.len().unwrap() <= 1024
             {
                 // Tick the emulator until it renders the next frame
                 if let Some(emulator) = &mut state.emulator {
@@ -558,5 +568,5 @@ pub async fn run(config: JgnesWebConfig) {
             }
         }
         _ => {}
-    });
+    })
 }

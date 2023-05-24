@@ -146,12 +146,11 @@ pub async fn initialize_audio_worklet(
     audio_ctx: &AudioContext,
     audio_queue: &AudioQueue,
 ) -> Result<AudioWorkletNode, JsValue> {
-    JsFuture::from(
-        audio_ctx
-            .audio_worklet()?
-            .add_module("./js/audio-processor.js")?,
-    )
-    .await?;
+    // Append a random query parameter because Firefox caches this file way too aggressively and
+    // Ctrl+Shift+R doesn't force a reload because it's not loaded on page load. The file itself is
+    // less than 1KB and is only loaded at most once per page load, so not a big deal to not cache it.
+    let module_url = format!("./js/audio-processor.js?r={}", rand::random::<u32>());
+    JsFuture::from(audio_ctx.audio_worklet()?.add_module(&module_url)?).await?;
 
     let mut node_options = AudioWorkletNodeOptions::new();
     node_options

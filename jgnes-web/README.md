@@ -42,6 +42,12 @@ Alternatively, you can just run the provided `build.sh` script which runs that c
 ./build.sh
 ```
 
+For local testing, the `--dev` flag (passed on to wasm-pack) will disable link-time optimizations and skip running
+`wasm-opt`, which leads to _significantly_ shorter build times:
+```shell
+./build.sh --dev
+```
+
 ## Run
 
 Host `index.html`, the `js` directory, and the `pkg` directory in the webserver of your choice.

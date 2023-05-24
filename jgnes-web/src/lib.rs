@@ -7,7 +7,8 @@ use base64::engine::general_purpose;
 use base64::Engine;
 use jgnes_core::audio::{DownsampleAction, DownsampleCounter, LowPassFilter};
 use jgnes_core::{
-    AudioPlayer, Emulator, EmulatorConfig, InputPoller, JoypadState, SaveWriter, TickEffect,
+    AudioPlayer, ColorEmphasis, Emulator, EmulatorConfig, InputPoller, JoypadState, Renderer,
+    SaveWriter, TickEffect,
 };
 use jgnes_renderer::config::{
     AspectRatio, FrameSkip, GpuFilterMode, Overscan, RenderScale, RendererConfig, VSyncMode,
@@ -538,6 +539,9 @@ fn run_event_loop(
 ) -> ! {
     let event_loop_proxy = event_loop.create_proxy();
 
+    // Used in white noise generator because rendering 60FPS is a bit much visually
+    let mut odd_frame = false;
+
     event_loop.run(move |event, _, control_flow| {
         match event {
             Event::UserEvent(JgnesUserEvent::RomFileLoaded {
@@ -644,17 +648,25 @@ fn run_event_loop(
                     let should_wait_for_audio = *config.audio_sync_enabled.borrow()
                         && state.audio_player.borrow().audio_queue.len().unwrap() > 1024;
                     if !should_wait_for_audio {
-                        if let Some(emulator) = &mut state.emulator {
-                            let emulator_config = EmulatorConfig {
-                                silence_ultrasonic_triangle_output: *config
-                                    .silence_ultrasonic_triangle_output
-                                    .borrow(),
-                            };
+                        match &mut state.emulator {
+                            Some(emulator) => {
+                                let emulator_config = EmulatorConfig {
+                                    silence_ultrasonic_triangle_output: *config
+                                        .silence_ultrasonic_triangle_output
+                                        .borrow(),
+                                };
 
-                            // Tick the emulator until it renders the next frame
-                            while emulator.tick(&emulator_config).expect("emulation error")
-                                != TickEffect::FrameRendered
-                            {}
+                                // Tick the emulator until it renders the next frame
+                                while emulator.tick(&emulator_config).expect("emulation error")
+                                    != TickEffect::FrameRendered
+                                {}
+                            }
+                            None => {
+                                odd_frame = !odd_frame;
+                                if odd_frame {
+                                    render_white_noise(&mut *state.renderer.borrow_mut()).unwrap();
+                                }
+                            }
                         }
                     }
                 }
@@ -662,4 +674,11 @@ fn run_event_loop(
             _ => {}
         }
     })
+}
+
+fn render_white_noise<R: Renderer>(renderer: &mut R) -> Result<(), R::Err> {
+    let frame_buffer = [[(); jgnes_core::SCREEN_WIDTH as usize];
+        jgnes_core::SCREEN_HEIGHT as usize]
+        .map(|arr| arr.map(|_| rand::random::<u8>() % 64));
+    renderer.render_frame(&frame_buffer, ColorEmphasis::default())
 }

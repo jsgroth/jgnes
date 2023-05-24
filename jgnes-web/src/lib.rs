@@ -241,6 +241,10 @@ impl WebAudioPlayer {
 const AUDIO_OUTPUT_FREQUENCY: f64 = 48000.0;
 const DISPLAY_RATE: f64 = 60.0;
 
+// The emulator should generate 800 samples per frame, but setting the threshold to 800 causes
+// noticeable audio lag at high refresh rates, so set the threshold a little lower than that
+const AUDIO_QUEUE_THRESHOLD: u32 = 600;
+
 impl AudioPlayer for WebAudioPlayer {
     type Err = JsValue;
 
@@ -645,8 +649,9 @@ fn run_event_loop(
                     InputHandlerState::WaitingForInput(_)
                 ) {
                     // If audio sync is enabled, only run the emulator if the audio queue isn't filling up
+                    let audio_queue_len = state.audio_player.borrow().audio_queue.len().unwrap();
                     let should_wait_for_audio = *config.audio_sync_enabled.borrow()
-                        && state.audio_player.borrow().audio_queue.len().unwrap() > 1024;
+                        && audio_queue_len > AUDIO_QUEUE_THRESHOLD;
                     if !should_wait_for_audio {
                         match &mut state.emulator {
                             Some(emulator) => {

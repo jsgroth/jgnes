@@ -14,9 +14,10 @@ use jgnes_renderer::config::{
     WgpuBackend,
 };
 use jgnes_renderer::WgpuRenderer;
-use js_sys::Uint8Array;
+use js_sys::{Promise, Uint8Array};
 use rfd::AsyncFileDialog;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 use web_sys::{AudioContext, AudioContextOptions};
@@ -36,6 +37,43 @@ extern "C" {
     fn loadFromLocalStorage(key: &str) -> Option<String>;
 
     fn saveToLocalStorage(key: &str, value: &str);
+}
+
+#[wasm_bindgen(module = "/js/ui.js")]
+extern "C" {
+    fn initComplete();
+
+    fn afterInputReconfigure(buttonId: &str, buttonText: &str);
+
+    fn focusCanvas();
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[wasm_bindgen]
+pub enum NesButton {
+    Up,
+    Left,
+    Right,
+    Down,
+    A,
+    B,
+    Start,
+    Select,
+}
+
+impl NesButton {
+    fn element_id(self) -> &'static str {
+        match self {
+            Self::Up => "up-key",
+            Self::Left => "left-key",
+            Self::Right => "right-key",
+            Self::Down => "down-key",
+            Self::A => "a-key",
+            Self::B => "b-key",
+            Self::Start => "start-key",
+            Self::Select => "select-key",
+        }
+    }
 }
 
 #[must_use]
@@ -77,27 +115,58 @@ impl SaveWriter for WebSaveWriter {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum InputHandlerState {
+    RunningEmulator,
+    WaitingForInput(NesButton),
+}
+
 struct InputHandler {
+    button_mapping: HashMap<VirtualKeyCode, Vec<NesButton>>,
     p1_joypad_state: Rc<RefCell<JoypadState>>,
+    handler_state: InputHandlerState,
 }
 
 impl InputHandler {
-    fn get_field_mut(joypad_state: &mut JoypadState, keycode: VirtualKeyCode) -> Option<&mut bool> {
-        let field = match keycode {
-            VirtualKeyCode::Up => &mut joypad_state.up,
-            VirtualKeyCode::Left => &mut joypad_state.left,
-            VirtualKeyCode::Right => &mut joypad_state.right,
-            VirtualKeyCode::Down => &mut joypad_state.down,
-            VirtualKeyCode::Z => &mut joypad_state.a,
-            VirtualKeyCode::X => &mut joypad_state.b,
-            VirtualKeyCode::Return => &mut joypad_state.start,
-            VirtualKeyCode::RShift => &mut joypad_state.select,
-            _ => return None,
-        };
-        Some(field)
+    fn new() -> Self {
+        let mut default_mapping = HashMap::new();
+        default_mapping.insert(VirtualKeyCode::Up, vec![NesButton::Up]);
+        default_mapping.insert(VirtualKeyCode::Left, vec![NesButton::Left]);
+        default_mapping.insert(VirtualKeyCode::Right, vec![NesButton::Right]);
+        default_mapping.insert(VirtualKeyCode::Down, vec![NesButton::Down]);
+        default_mapping.insert(VirtualKeyCode::Z, vec![NesButton::A]);
+        default_mapping.insert(VirtualKeyCode::X, vec![NesButton::B]);
+        default_mapping.insert(VirtualKeyCode::Return, vec![NesButton::Start]);
+        default_mapping.insert(VirtualKeyCode::RShift, vec![NesButton::Select]);
+
+        Self {
+            button_mapping: default_mapping,
+            p1_joypad_state: Rc::default(),
+            handler_state: InputHandlerState::RunningEmulator,
+        }
     }
 
-    fn handle_window_event(&self, event: &WindowEvent<'_>) {
+    fn get_field_mut(joypad_state: &mut JoypadState, button: NesButton) -> &mut bool {
+        match button {
+            NesButton::Up => &mut joypad_state.up,
+            NesButton::Left => &mut joypad_state.left,
+            NesButton::Right => &mut joypad_state.right,
+            NesButton::Down => &mut joypad_state.down,
+            NesButton::A => &mut joypad_state.a,
+            NesButton::B => &mut joypad_state.b,
+            NesButton::Start => &mut joypad_state.start,
+            NesButton::Select => &mut joypad_state.select,
+        }
+    }
+
+    fn remove_mapping_for_button(&mut self, button: NesButton) {
+        for buttons in self.button_mapping.values_mut() {
+            buttons.retain(|other_button| *other_button != button);
+        }
+        self.button_mapping.retain(|_, buttons| !buttons.is_empty());
+    }
+
+    fn handle_window_event(&mut self, event: &WindowEvent<'_>) {
         if let WindowEvent::KeyboardInput {
             input:
                 KeyboardInput {
@@ -108,12 +177,29 @@ impl InputHandler {
             ..
         } = event
         {
-            let mut joypad_state = self.p1_joypad_state.borrow_mut();
-            if let Some(field) = Self::get_field_mut(&mut joypad_state, *keycode) {
-                *field = match state {
-                    ElementState::Pressed => true,
-                    ElementState::Released => false,
-                };
+            match self.handler_state {
+                InputHandlerState::RunningEmulator => {
+                    for &button in self.button_mapping.get(keycode).unwrap_or(&vec![]) {
+                        let mut joypad_state = self.p1_joypad_state.borrow_mut();
+                        let field = Self::get_field_mut(&mut joypad_state, button);
+                        *field = match state {
+                            ElementState::Pressed => true,
+                            ElementState::Released => false,
+                        };
+                    }
+                }
+                InputHandlerState::WaitingForInput(button) => {
+                    if *state == ElementState::Pressed {
+                        self.button_mapping
+                            .entry(*keycode)
+                            .or_default()
+                            .push(button);
+                        *self.p1_joypad_state.borrow_mut() = JoypadState::new();
+                        self.handler_state = InputHandlerState::RunningEmulator;
+
+                        afterInputReconfigure(button.element_id(), &format!("{keycode:?}"));
+                    }
+                }
             }
         }
     }
@@ -184,10 +270,12 @@ struct State {
     emulator: Option<WebEmulator>,
     renderer: WebRenderer,
     audio_player: Rc<RefCell<WebAudioPlayer>>,
+    audio_ctx: AudioContext,
     input_handler: InputHandler,
     aspect_ratio: AspectRatio,
     filter_mode: GpuFilterMode,
     overscan: Overscan,
+    user_interacted: bool,
 }
 
 impl State {
@@ -211,6 +299,7 @@ pub struct JgnesWebConfig {
     audio_enabled: Rc<RefCell<bool>>,
     audio_sync_enabled: Rc<RefCell<bool>>,
     silence_ultrasonic_triangle_output: Rc<RefCell<bool>>,
+    reconfig_input_request: Rc<RefCell<Option<NesButton>>>,
     open_file_requested: Rc<RefCell<bool>>,
     reset_requested: Rc<RefCell<bool>>,
     current_filename: Rc<RefCell<String>>,
@@ -228,6 +317,7 @@ impl JgnesWebConfig {
             audio_enabled: Rc::new(RefCell::new(true)),
             audio_sync_enabled: Rc::new(RefCell::new(true)),
             silence_ultrasonic_triangle_output: Rc::new(RefCell::new(false)),
+            reconfig_input_request: Rc::new(RefCell::new(None)),
             open_file_requested: Rc::new(RefCell::new(false)),
             reset_requested: Rc::new(RefCell::new(false)),
             current_filename: Rc::new(RefCell::new(String::new())),
@@ -280,6 +370,10 @@ impl JgnesWebConfig {
 
     pub fn set_silence_ultrasonic_triangle_output(&self, value: bool) {
         *self.silence_ultrasonic_triangle_output.borrow_mut() = value;
+    }
+
+    pub fn reconfigure_input(&self, button: NesButton) {
+        *self.reconfig_input_request.borrow_mut() = Some(button);
     }
 
     pub fn open_new_file(&self) {
@@ -344,20 +438,31 @@ fn set_download_save_enabled(enabled: bool) {
         .expect("Unable to enable/disable download save button");
 }
 
-async fn open_file_in_event_loop(event_loop_proxy: EventLoopProxy<(Vec<u8>, String)>) {
+async fn open_file_in_event_loop(event_loop_proxy: EventLoopProxy<JgnesUserEvent>) {
     let Some(file) = AsyncFileDialog::new().add_filter("nes", &["nes"]).pick_file().await else { return };
 
     let file_bytes = file.read().await;
     let file_name = file.file_name();
     event_loop_proxy
-        .send_event((file_bytes, file_name))
+        .send_event(JgnesUserEvent::RomFileLoaded {
+            file_bytes,
+            file_name,
+        })
         .unwrap();
+}
+
+#[derive(Debug, Clone)]
+enum JgnesUserEvent {
+    RomFileLoaded {
+        file_bytes: Vec<u8>,
+        file_name: String,
+    },
 }
 
 #[allow(clippy::missing_panics_doc)]
 #[wasm_bindgen]
 pub async fn run(config: JgnesWebConfig) {
-    let event_loop = EventLoopBuilder::<(Vec<u8>, String)>::with_user_event().build();
+    let event_loop = EventLoopBuilder::<JgnesUserEvent>::with_user_event().build();
     let window = WindowBuilder::new()
         .build(&event_loop)
         .expect("Unable to create window");
@@ -407,166 +512,154 @@ pub async fn run(config: JgnesWebConfig) {
     let audio_player = WebAudioPlayer::new(audio_queue, Rc::clone(&config.audio_enabled));
     let audio_player = Rc::new(RefCell::new(audio_player));
 
-    let input_handler = InputHandler {
-        p1_joypad_state: Rc::default(),
-    };
-    let input_poller = WebInputPoller {
-        p1_joypad_state: Rc::clone(&input_handler.p1_joypad_state),
-    };
-
-    let emulator = match AsyncFileDialog::new()
-        .add_filter("nes", &["nes"])
-        .pick_file()
-        .await
-    {
-        Some(file) => {
-            let sav_bytes = load_sav_bytes(&file.file_name());
-
-            match Emulator::create(
-                file.read().await,
-                sav_bytes,
-                Rc::clone(&renderer),
-                Rc::clone(&audio_player),
-                input_poller,
-                WebSaveWriter {
-                    file_name: file.file_name(),
-                },
-            ) {
-                Ok(emulator) => {
-                    set_rom_file_name_text(&file.file_name());
-                    *config.current_filename.borrow_mut() = file.file_name();
-                    set_download_save_enabled(emulator.has_persistent_ram());
-                    Some(emulator)
-                }
-                Err(err) => {
-                    alert(&format!("Error initializing emulator: {err}"));
-                    log::error!("Error initializing emulator: {err}");
-                    None
-                }
-            }
-        }
-        None => None,
-    };
+    let input_handler = InputHandler::new();
 
     let state = State {
-        emulator,
+        emulator: None,
         renderer,
         audio_player,
+        audio_ctx,
         input_handler,
         aspect_ratio: *config.aspect_ratio.borrow(),
         filter_mode: *config.gpu_filter_mode.borrow(),
         overscan: *config.overscan.borrow(),
+        user_interacted: false,
     };
+
+    initComplete();
 
     run_event_loop(event_loop, config, state);
 }
 
 fn run_event_loop(
-    event_loop: EventLoop<(Vec<u8>, String)>,
+    event_loop: EventLoop<JgnesUserEvent>,
     config: JgnesWebConfig,
     mut state: State,
 ) -> ! {
     let event_loop_proxy = event_loop.create_proxy();
 
-    event_loop.run(move |event, _, control_flow| match event {
-        Event::UserEvent((file_bytes, file_name)) => {
-            let sav_bytes = load_sav_bytes(&file_name);
-
-            let input_poller = WebInputPoller {
-                p1_joypad_state: Rc::clone(&state.input_handler.p1_joypad_state),
-            };
-            let save_writer = WebSaveWriter {
-                file_name: file_name.clone(),
-            };
-
-            match Emulator::create(
+    event_loop.run(move |event, _, control_flow| {
+        match event {
+            Event::UserEvent(JgnesUserEvent::RomFileLoaded {
                 file_bytes,
-                sav_bytes,
-                Rc::clone(&state.renderer),
-                Rc::clone(&state.audio_player),
-                input_poller,
-                save_writer,
-            ) {
-                Ok(emulator) => {
-                    set_rom_file_name_text(&file_name);
-                    *config.current_filename.borrow_mut() = file_name;
-                    set_download_save_enabled(emulator.has_persistent_ram());
-                    state.emulator = Some(emulator);
-                }
-                Err(err) => {
-                    alert(&format!("Error initializing emulator: {err}"));
-                    log::error!("Error initializing emulator: {err}");
+                file_name,
+            }) => {
+                let sav_bytes = load_sav_bytes(&file_name);
+
+                let input_poller = WebInputPoller {
+                    p1_joypad_state: Rc::clone(&state.input_handler.p1_joypad_state),
+                };
+                let save_writer = WebSaveWriter {
+                    file_name: file_name.clone(),
+                };
+
+                match Emulator::create(
+                    file_bytes,
+                    sav_bytes,
+                    Rc::clone(&state.renderer),
+                    Rc::clone(&state.audio_player),
+                    input_poller,
+                    save_writer,
+                ) {
+                    Ok(emulator) => {
+                        if !state.user_interacted {
+                            state.user_interacted = true;
+
+                            let _: Promise = state.audio_ctx.resume().unwrap();
+                        }
+
+                        set_rom_file_name_text(&file_name);
+                        *config.current_filename.borrow_mut() = file_name;
+                        set_download_save_enabled(emulator.has_persistent_ram());
+                        focusCanvas();
+                        state.emulator = Some(emulator);
+                    }
+                    Err(err) => {
+                        alert(&format!("Error initializing emulator: {err}"));
+                        log::error!("Error initializing emulator: {err}");
+                    }
                 }
             }
+            Event::WindowEvent {
+                event: win_event,
+                window_id,
+            } if window_id == state.window_id() => {
+                state.input_handler.handle_window_event(&win_event);
+
+                if let WindowEvent::CloseRequested = win_event {
+                    *control_flow = ControlFlow::Exit;
+                }
+            }
+            Event::MainEventsCleared => {
+                let config_aspect_ratio = *config.aspect_ratio.borrow();
+                if config_aspect_ratio != state.aspect_ratio {
+                    state
+                        .renderer
+                        .borrow_mut()
+                        .update_aspect_ratio(config_aspect_ratio);
+                    state.aspect_ratio = config_aspect_ratio;
+                }
+
+                let config_filter_mode = *config.gpu_filter_mode.borrow();
+                if config_filter_mode != state.filter_mode {
+                    state
+                        .renderer
+                        .borrow_mut()
+                        .update_filter_mode(config_filter_mode);
+                    state.filter_mode = config_filter_mode;
+                }
+
+                let config_overscan = *config.overscan.borrow();
+                if config_overscan != state.overscan {
+                    state.renderer.borrow_mut().update_overscan(config_overscan);
+                    state.overscan = config_overscan;
+                }
+
+                if *config.open_file_requested.borrow() {
+                    *config.open_file_requested.borrow_mut() = false;
+
+                    wasm_bindgen_futures::spawn_local(open_file_in_event_loop(
+                        event_loop_proxy.clone(),
+                    ));
+                }
+
+                if *config.reset_requested.borrow() {
+                    *config.reset_requested.borrow_mut() = false;
+                    if let Some(emulator) = &mut state.emulator {
+                        emulator.soft_reset();
+                    }
+                }
+
+                if let Some(button) = config.reconfig_input_request.borrow_mut().take() {
+                    state.input_handler.remove_mapping_for_button(button);
+                    state.input_handler.handler_state = InputHandlerState::WaitingForInput(button);
+                }
+
+                // Don't tick the emulator while waiting for input configuration
+                if !matches!(
+                    state.input_handler.handler_state,
+                    InputHandlerState::WaitingForInput(_)
+                ) {
+                    // If audio sync is enabled, only run the emulator if the audio queue isn't filling up
+                    let should_wait_for_audio = *config.audio_sync_enabled.borrow()
+                        && state.audio_player.borrow().audio_queue.len().unwrap() > 1024;
+                    if !should_wait_for_audio {
+                        if let Some(emulator) = &mut state.emulator {
+                            let emulator_config = EmulatorConfig {
+                                silence_ultrasonic_triangle_output: *config
+                                    .silence_ultrasonic_triangle_output
+                                    .borrow(),
+                            };
+
+                            // Tick the emulator until it renders the next frame
+                            while emulator.tick(&emulator_config).expect("emulation error")
+                                != TickEffect::FrameRendered
+                            {}
+                        }
+                    }
+                }
+            }
+            _ => {}
         }
-        Event::WindowEvent {
-            event: win_event,
-            window_id,
-        } if window_id == state.window_id() => {
-            state.input_handler.handle_window_event(&win_event);
-
-            if let WindowEvent::CloseRequested = win_event {
-                *control_flow = ControlFlow::Exit;
-            }
-        }
-        Event::MainEventsCleared => {
-            let config_aspect_ratio = *config.aspect_ratio.borrow();
-            if config_aspect_ratio != state.aspect_ratio {
-                state
-                    .renderer
-                    .borrow_mut()
-                    .update_aspect_ratio(config_aspect_ratio);
-                state.aspect_ratio = config_aspect_ratio;
-            }
-
-            let config_filter_mode = *config.gpu_filter_mode.borrow();
-            if config_filter_mode != state.filter_mode {
-                state
-                    .renderer
-                    .borrow_mut()
-                    .update_filter_mode(config_filter_mode);
-                state.filter_mode = config_filter_mode;
-            }
-
-            let config_overscan = *config.overscan.borrow();
-            if config_overscan != state.overscan {
-                state.renderer.borrow_mut().update_overscan(config_overscan);
-                state.overscan = config_overscan;
-            }
-
-            if *config.open_file_requested.borrow() {
-                *config.open_file_requested.borrow_mut() = false;
-
-                wasm_bindgen_futures::spawn_local(open_file_in_event_loop(
-                    event_loop_proxy.clone(),
-                ));
-            }
-
-            if *config.reset_requested.borrow() {
-                *config.reset_requested.borrow_mut() = false;
-                if let Some(emulator) = &mut state.emulator {
-                    emulator.soft_reset();
-                }
-            }
-
-            // If audio sync is enabled, only run the emulator if the audio queue isn't filling up
-            if !*config.audio_sync_enabled.borrow()
-                || state.audio_player.borrow().audio_queue.len().unwrap() <= 1024
-            {
-                // Tick the emulator until it renders the next frame
-                if let Some(emulator) = &mut state.emulator {
-                    let emulator_config = EmulatorConfig {
-                        silence_ultrasonic_triangle_output: *config
-                            .silence_ultrasonic_triangle_output
-                            .borrow(),
-                    };
-
-                    while emulator.tick(&emulator_config).expect("emulation error")
-                        != TickEffect::FrameRendered
-                    {}
-                }
-            }
-        }
-        _ => {}
     })
 }

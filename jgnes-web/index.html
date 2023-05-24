@@ -8,6 +8,10 @@
                 background-color: black;
             }
 
+            canvas.grayed-out {
+                opacity: 0.5;
+            }
+
             #jgnes-wasm {
                 width: 878px;
                 margin-bottom: 15px;
@@ -15,9 +19,14 @@
                 margin-right: auto;
             }
 
+            #jgnes-wasm.grayed-out {
+                background-color: white;
+            }
+
             #jgnes-web-text {
                 margin-left: auto;
                 margin-right: auto;
+                margin-bottom: 15px;
                 width: 878px;
                 font-size: 24px;
                 text-align: center;
@@ -116,19 +125,22 @@
                 </fieldset>
             </form>
             <div id="info-text">
-                <p>Click on the emulator display for keyboard controls to work</p>
+                <p>Input keys</p>
                 <ul>
-                    <li>Up/Left/Right/Down: Arrow keys</li>
-                    <li>A: Z key</li>
-                    <li>B: X key</li>
-                    <li>Start: Return key</li>
-                    <li>Select: Right Shift key</li>
+                    <li>Up: <input type="button" id="up-key" class="input-config" value="Up"></li>
+                    <li>Left: <input type="button" id="left-key" class="input-config" value="Left"></li>
+                    <li>Right: <input type="button" id="right-key" class="input-config" value="Right"></li>
+                    <li>Down: <input type="button" id="down-key" class="input-config" value="Down"></li>
+                    <li>A: <input type="button" id="a-key" class="input-config" value="Z"></li>
+                    <li>B: <input type="button" id="b-key" class="input-config" value="X"></li>
+                    <li>Start: <input type="button" id="start-key" class="input-config" value="Return"></li>
+                    <li>Select: <input type="button" id="select-key" class="input-config" value="RShift"></li>
                 </ul>
                 <p>Download the native version and/or source code: <a href="https://github.com/jsgroth/jgnes">https://github.com/jsgroth/jgnes</a></p>
             </div>
         </div>
         <script type="module">
-            import init, { b64_to_bytes, run, JgnesWebConfig } from "./pkg/jgnes_web.js";
+            import init, { b64_to_bytes, run, JgnesWebConfig, NesButton } from "./pkg/jgnes_web.js";
             await init();
 
             let config = new JgnesWebConfig();
@@ -176,16 +188,41 @@
                 config.set_silence_ultrasonic_triangle_output(event.target.checked);
             });
 
+            document.querySelectorAll("input.input-config").forEach((element) => {
+                element.addEventListener("click", (event) => {
+                    let button = {
+                        "up-key": NesButton.Up,
+                        "left-key": NesButton.Left,
+                        "right-key": NesButton.Right,
+                        "down-key": NesButton.Down,
+                        "a-key": NesButton.A,
+                        "b-key": NesButton.B,
+                        "start-key": NesButton.Start,
+                        "select-key": NesButton.Select,
+                    }[event.target.id];
+
+                    config.reconfigure_input(button);
+
+                    document.querySelectorAll("input.input-config").forEach((element) => {
+                        element.disabled = true;
+                    });
+
+                    let canvas = document.querySelector("canvas");
+                    canvas.classList.add("grayed-out");
+                    document.getElementById("jgnes-wasm").classList.add("grayed-out");
+
+                    // Focus canvas so the user doesn't have to go click on it
+                    canvas.focus();
+                });
+            });
+
             document.getElementById("jgnes-init-button").addEventListener("click", () => {
                 if (!running) {
-                    document.getElementById("jgnes-web-text").remove();
                     document.getElementById("jgnes-reset-button").disabled = false;
-
                     running = true;
-                    run(config.clone());
-                } else {
-                    config.open_new_file();
                 }
+
+                config.open_new_file();
             });
 
             document.getElementById("jgnes-reset-button").addEventListener("click", () => {
@@ -215,8 +252,7 @@
                 }
             });
 
-            document.getElementById("jgnes-config-and-info").hidden = false;
-            document.getElementById("loading-text").remove();
+            run(config.clone());
         </script>
     </body>
 </html>

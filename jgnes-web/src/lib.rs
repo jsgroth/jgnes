@@ -1,6 +1,7 @@
 #![cfg(target_arch = "wasm32")]
 
 mod audio;
+mod js;
 
 use crate::audio::{AudioQueue, EnqueueResult};
 use base64::engine::general_purpose;
@@ -15,7 +16,7 @@ use jgnes_renderer::config::{
     WgpuBackend,
 };
 use jgnes_renderer::WgpuRenderer;
-use js_sys::{Promise, Uint8Array};
+use js_sys::Promise;
 use rfd::AsyncFileDialog;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -27,27 +28,6 @@ use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEve
 use winit::event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopProxy};
 use winit::platform::web::WindowExtWebSys;
 use winit::window::{Window, WindowBuilder, WindowId};
-
-#[wasm_bindgen]
-extern "C" {
-    fn alert(s: &str);
-}
-
-#[wasm_bindgen(module = "/js/save-writer.js")]
-extern "C" {
-    fn loadFromLocalStorage(key: &str) -> Option<String>;
-
-    fn saveToLocalStorage(key: &str, value: &str);
-}
-
-#[wasm_bindgen(module = "/js/ui.js")]
-extern "C" {
-    fn initComplete();
-
-    fn afterInputReconfigure(buttonId: &str, buttonText: &str);
-
-    fn focusCanvas();
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[wasm_bindgen]
@@ -77,23 +57,8 @@ impl NesButton {
     }
 }
 
-#[must_use]
-#[wasm_bindgen]
-pub fn b64_to_bytes(s: &str) -> Option<Uint8Array> {
-    match general_purpose::STANDARD.decode(s) {
-        Ok(bytes) => {
-            let array = Uint8Array::new_with_length(bytes.len() as u32);
-            for (i, byte) in bytes.iter().copied().enumerate() {
-                array.set_index(i as u32, byte);
-            }
-            Some(array)
-        }
-        Err(_) => None,
-    }
-}
-
 fn alert_and_panic(s: &str) -> ! {
-    alert(s);
+    js::alert(s);
     panic!("{s}")
 }
 
@@ -111,7 +76,7 @@ impl SaveWriter for WebSaveWriter {
 
     fn persist_sram(&mut self, sram: &[u8]) -> Result<(), Self::Err> {
         let sram_b64 = general_purpose::STANDARD.encode(sram);
-        saveToLocalStorage(&self.file_name, &sram_b64);
+        js::saveToLocalStorage(&self.file_name, &sram_b64);
         Ok(())
     }
 }
@@ -198,7 +163,7 @@ impl InputHandler {
                         *self.p1_joypad_state.borrow_mut() = JoypadState::new();
                         self.handler_state = InputHandlerState::RunningEmulator;
 
-                        afterInputReconfigure(button.element_id(), &format!("{keycode:?}"));
+                        js::afterInputReconfigure(button.element_id(), &format!("{keycode:?}"));
                     }
                 }
             }
@@ -413,7 +378,7 @@ fn set_overscan_field(value: bool, field: &mut u8) {
 }
 
 fn load_sav_bytes(file_name: &str) -> Option<Vec<u8>> {
-    loadFromLocalStorage(file_name)
+    js::loadFromLocalStorage(file_name)
         .and_then(|sav_b64| general_purpose::STANDARD.decode(sav_b64).ok())
 }
 
@@ -531,7 +496,7 @@ pub async fn run(config: JgnesWebConfig) {
         user_interacted: false,
     };
 
-    initComplete();
+    js::initComplete();
 
     run_event_loop(event_loop, config, state);
 }
@@ -579,11 +544,11 @@ fn run_event_loop(
                         set_rom_file_name_text(&file_name);
                         *config.current_filename.borrow_mut() = file_name;
                         set_download_save_enabled(emulator.has_persistent_ram());
-                        focusCanvas();
+                        js::focusCanvas();
                         state.emulator = Some(emulator);
                     }
                     Err(err) => {
-                        alert(&format!("Error initializing emulator: {err}"));
+                        js::alert(&format!("Error initializing emulator: {err}"));
                         log::error!("Error initializing emulator: {err}");
                     }
                 }

@@ -1,5 +1,13 @@
 // Miscellaneous UI functions called from Rust
 
+export function loadFromLocalStorage(key) {
+    return localStorage.getItem(key);
+}
+
+export function saveToLocalStorage(key, value) {
+    localStorage.setItem(key, value);
+}
+
 export function initComplete() {
     document.getElementById("jgnes-config-and-info").hidden = false;
     document.getElementById("loading-text").remove();

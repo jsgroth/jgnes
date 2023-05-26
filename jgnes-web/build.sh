@@ -4,6 +4,17 @@ set -euo pipefail
 
 toolchain=${NIGHTLY_TOOLCHAIN:-nightly}
 
-RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals" \
+RUSTFLAGS=""
+cargo_args=""
+if [[ -n "${JGNES_WEBGPU:-}" ]]; then
+    echo "Compiling for WebGPU backend"
+
+    RUSTFLAGS="--cfg=web_sys_unstable_apis"
+    cargo_args="--no-default-features"
+else
+    echo "Compiling for WebGL2 backend"
+fi
+
+RUSTFLAGS="$RUSTFLAGS -C target-feature=+atomics,+bulk-memory,+mutable-globals" \
 rustup run $toolchain \
-wasm-pack build --target web . "$@" -- -Z build-std=panic_abort,std
+wasm-pack build --target web . "$@" -- $cargo_args -Z build-std=panic_abort,std

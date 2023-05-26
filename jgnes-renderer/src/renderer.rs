@@ -66,6 +66,7 @@ pub struct WgpuRenderer<W> {
     surface: wgpu::Surface,
     surface_capabilities: wgpu::SurfaceCapabilities,
     surface_config: wgpu::SurfaceConfiguration,
+    texture_format: wgpu::TextureFormat,
     texture: wgpu::Texture,
     compute_resources: Option<(wgpu::BindGroup, wgpu::ComputePipeline)>,
     render_bind_group: wgpu::BindGroup,
@@ -153,7 +154,11 @@ where
             .iter()
             .copied()
             .find(wgpu::TextureFormat::is_srgb)
-            .ok_or_else(|| anyhow::Error::msg("Unable to find an sRGB wgpu surface format"))?;
+            .unwrap_or_else(|| {
+                log::warn!("wgpu adapter does not support any sRGB texture formats; defaulting to first format in this list: {:?}", surface_capabilities.formats);
+                surface_capabilities.formats[0]
+            });
+
         let desired_present_mode = render_config.vsync_mode.to_present_mode();
 
         if !surface_capabilities
@@ -177,6 +182,12 @@ where
         };
         surface.configure(&device, &surface_config);
 
+        let texture_format = if surface_format.is_srgb() {
+            wgpu::TextureFormat::Rgba8UnormSrgb
+        } else {
+            wgpu::TextureFormat::Rgba8Unorm
+        };
+
         let cpu_render_scale = render_config.gpu_filter_mode.cpu_render_scale();
         let texture_size = wgpu::Extent3d {
             width: cpu_render_scale * u32::from(jgnes_core::SCREEN_WIDTH),
@@ -189,7 +200,7 @@ where
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            format: texture_format,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],
         });
@@ -306,6 +317,7 @@ where
             surface,
             surface_capabilities,
             surface_config,
+            texture_format,
             texture,
             compute_resources,
             render_bind_group,
@@ -363,7 +375,7 @@ where
                     mip_level_count: 1,
                     sample_count: 1,
                     dimension: wgpu::TextureDimension::D2,
-                    format: wgpu::TextureFormat::Rgba8UnormSrgb,
+                    format: self.texture_format,
                     usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
                     view_formats: &[],
                 });
@@ -390,7 +402,7 @@ where
                     mip_level_count: 1,
                     sample_count: 1,
                     dimension: wgpu::TextureDimension::D2,
-                    format: wgpu::TextureFormat::Rgba8UnormSrgb,
+                    format: self.texture_format,
                     usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
                     view_formats: &[],
                 });

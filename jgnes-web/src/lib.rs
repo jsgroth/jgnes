@@ -305,12 +305,25 @@ impl JgnesWebConfig {
         *self.aspect_ratio.borrow_mut() = aspect_ratio;
     }
 
+    #[cfg(feature = "webgl")]
     pub fn set_filter_mode(&self, gpu_filter_mode: &str) {
         let gpu_filter_mode = match gpu_filter_mode {
             "NearestNeighbor" => GpuFilterMode::NearestNeighbor,
             "Linear" => GpuFilterMode::Linear(RenderScale::ONE),
             "Linear2x" => GpuFilterMode::LinearCpuScaled(RenderScale::TWO),
             "Linear3x" => GpuFilterMode::LinearCpuScaled(RenderScale::THREE),
+            _ => return,
+        };
+        *self.gpu_filter_mode.borrow_mut() = gpu_filter_mode;
+    }
+
+    #[cfg(not(feature = "webgl"))]
+    pub fn set_filter_mode(&self, gpu_filter_mode: &str) {
+        let gpu_filter_mode = match gpu_filter_mode {
+            "NearestNeighbor" => GpuFilterMode::NearestNeighbor,
+            "Linear" => GpuFilterMode::Linear(RenderScale::ONE),
+            "Linear2x" => GpuFilterMode::Linear(RenderScale::TWO),
+            "Linear3x" => GpuFilterMode::Linear(RenderScale::THREE),
             _ => return,
         };
         *self.gpu_filter_mode.borrow_mut() = gpu_filter_mode;
@@ -437,6 +450,16 @@ enum JgnesUserEvent {
     },
 }
 
+#[cfg(feature = "webgl")]
+fn get_wgpu_backend() -> WgpuBackend {
+    WgpuBackend::OpenGl
+}
+
+#[cfg(not(feature = "webgl"))]
+fn get_wgpu_backend() -> WgpuBackend {
+    WgpuBackend::WebGpu
+}
+
 #[allow(clippy::missing_panics_doc)]
 #[wasm_bindgen]
 pub async fn run(config: JgnesWebConfig) {
@@ -457,6 +480,8 @@ pub async fn run(config: JgnesWebConfig) {
         })
         .expect("Couldn't append canvas to document body");
 
+    let wgpu_backend = get_wgpu_backend();
+
     let gpu_filter_mode = *config.gpu_filter_mode.borrow();
     let aspect_ratio = *config.aspect_ratio.borrow();
     let renderer = WgpuRenderer::from_window(
@@ -464,13 +489,13 @@ pub async fn run(config: JgnesWebConfig) {
         window_size,
         RendererConfig {
             vsync_mode: VSyncMode::Enabled,
-            wgpu_backend: WgpuBackend::BrowserAuto,
+            wgpu_backend,
             gpu_filter_mode,
             aspect_ratio,
             overscan: Overscan::default(),
             frame_skip: FrameSkip::ZERO,
             forced_integer_height_scaling: false,
-            use_webgl2_limits: true,
+            use_webgl2_limits: wgpu_backend == WgpuBackend::OpenGl,
         },
     )
     .await

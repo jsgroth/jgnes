@@ -573,6 +573,8 @@ fn run_event_loop(
                     .emulator
                     .take()
                     .map(|emulator| emulator.hard_reset(Some(save_bytes)));
+
+                js::focusCanvas();
             }
             Event::WindowEvent {
                 event: win_event,

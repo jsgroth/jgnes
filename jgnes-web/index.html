@@ -227,6 +227,7 @@
 
             document.getElementById("jgnes-reset-button").addEventListener("click", () => {
                 config.reset_emulator();
+                document.querySelector("canvas").focus();
             });
 
             document.getElementById("jgnes-download-sav-button").addEventListener("click", () => {

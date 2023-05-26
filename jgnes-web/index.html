@@ -70,7 +70,8 @@
                     <div id="rom-file-name"></div>
                     <input id="jgnes-init-button" type="button" value="Open NES ROM file">
                     <input id="jgnes-reset-button" type="button" value="Reset" disabled>
-                    <input id="jgnes-download-sav-button" type="button" value="Download save file" disabled>
+                    <input id="jgnes-download-sav-button" class="save-button" type="button" value="Download save file" disabled>
+                    <input id="jgnes-upload-sav-button" class="save-button" type="button" value="Upload save file and reset" disabled>
                 </div>
                 <fieldset>
                     <legend>Aspect ratio</legend>
@@ -251,6 +252,10 @@
                 } else {
                     alert(`No save file found for '${currentFilename}'; game most likely does not have persistent saves`);
                 }
+            });
+
+            document.getElementById("jgnes-upload-sav-button").addEventListener("click", () => {
+                config.upload_save_file();
             });
 
             run(config.clone());

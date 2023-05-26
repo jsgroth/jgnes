@@ -648,7 +648,7 @@ where
                                 }
                                 Hotkey::HardReset => {
                                     log::info!("Performing hard reset");
-                                    emulator = emulator.hard_reset();
+                                    emulator = emulator.hard_reset(None);
                                 }
                                 Hotkey::FastForward => {
                                     let frame_skip =

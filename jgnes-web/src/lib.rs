@@ -272,6 +272,7 @@ pub struct JgnesWebConfig {
     reconfig_input_request: Rc<RefCell<Option<NesButton>>>,
     open_file_requested: Rc<RefCell<bool>>,
     reset_requested: Rc<RefCell<bool>>,
+    upload_save_file_requested: Rc<RefCell<bool>>,
     current_filename: Rc<RefCell<String>>,
 }
 
@@ -290,6 +291,7 @@ impl JgnesWebConfig {
             reconfig_input_request: Rc::new(RefCell::new(None)),
             open_file_requested: Rc::new(RefCell::new(false)),
             reset_requested: Rc::new(RefCell::new(false)),
+            upload_save_file_requested: Rc::new(RefCell::new(false)),
             current_filename: Rc::new(RefCell::new(String::new())),
         }
     }
@@ -354,6 +356,10 @@ impl JgnesWebConfig {
         *self.reset_requested.borrow_mut() = true;
     }
 
+    pub fn upload_save_file(&self) {
+        *self.upload_save_file_requested.borrow_mut() = true;
+    }
+
     #[must_use]
     pub fn get_current_filename(&self) -> String {
         self.current_filename.borrow().clone()
@@ -393,21 +399,6 @@ fn set_rom_file_name_text(file_name: &str) {
         .expect("Unable to write file name into the DOM");
 }
 
-fn set_download_save_enabled(enabled: bool) {
-    web_sys::window()
-        .and_then(|win| win.document())
-        .and_then(|doc| {
-            let button = doc.get_element_by_id("jgnes-download-sav-button")?;
-            if enabled {
-                button.remove_attribute("disabled").ok()?;
-            } else {
-                button.set_attribute("disabled", "").ok()?;
-            }
-            Some(())
-        })
-        .expect("Unable to enable/disable download save button");
-}
-
 async fn open_file_in_event_loop(event_loop_proxy: EventLoopProxy<JgnesUserEvent>) {
     let Some(file) = AsyncFileDialog::new().add_filter("nes", &["nes"]).pick_file().await else { return };
 
@@ -421,10 +412,27 @@ async fn open_file_in_event_loop(event_loop_proxy: EventLoopProxy<JgnesUserEvent
         .unwrap();
 }
 
+async fn upload_save_file(event_loop_proxy: EventLoopProxy<JgnesUserEvent>, file_name: String) {
+    let Some(save_file) = AsyncFileDialog::new().add_filter("sav", &["sav"]).pick_file().await else { return };
+
+    let save_bytes = save_file.read().await;
+
+    event_loop_proxy
+        .send_event(JgnesUserEvent::SaveFileLoaded {
+            save_bytes,
+            file_name,
+        })
+        .unwrap();
+}
+
 #[derive(Debug, Clone)]
 enum JgnesUserEvent {
     RomFileLoaded {
         file_bytes: Vec<u8>,
+        file_name: String,
+    },
+    SaveFileLoaded {
+        save_bytes: Vec<u8>,
         file_name: String,
     },
 }
@@ -543,7 +551,7 @@ fn run_event_loop(
 
                         set_rom_file_name_text(&file_name);
                         *config.current_filename.borrow_mut() = file_name;
-                        set_download_save_enabled(emulator.has_persistent_ram());
+                        js::setSaveButtonsEnabled(emulator.has_persistent_ram());
                         js::focusCanvas();
                         state.emulator = Some(emulator);
                     }
@@ -552,6 +560,19 @@ fn run_event_loop(
                         log::error!("Error initializing emulator: {err}");
                     }
                 }
+            }
+            Event::UserEvent(JgnesUserEvent::SaveFileLoaded {
+                save_bytes,
+                file_name,
+            }) => {
+                let save_bytes_b64 = general_purpose::STANDARD.encode(&save_bytes);
+                js::saveToLocalStorage(&file_name, &save_bytes_b64);
+
+                // Hard reset after uploading a save file
+                state.emulator = state
+                    .emulator
+                    .take()
+                    .map(|emulator| emulator.hard_reset(Some(save_bytes)));
             }
             Event::WindowEvent {
                 event: win_event,
@@ -601,6 +622,14 @@ fn run_event_loop(
                     if let Some(emulator) = &mut state.emulator {
                         emulator.soft_reset();
                     }
+                }
+
+                if *config.upload_save_file_requested.borrow() {
+                    *config.upload_save_file_requested.borrow_mut() = false;
+                    wasm_bindgen_futures::spawn_local(upload_save_file(
+                        event_loop_proxy.clone(),
+                        config.get_current_filename(),
+                    ));
                 }
 
                 if let Some(button) = config.reconfig_input_request.borrow_mut().take() {

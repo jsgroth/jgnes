@@ -19,6 +19,8 @@ extern "C" {
     pub fn afterInputReconfigure(buttonId: &str, buttonText: &str);
 
     pub fn focusCanvas();
+
+    pub fn setSaveButtonsEnabled(enabled: bool);
 }
 
 #[must_use]

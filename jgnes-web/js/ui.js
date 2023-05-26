@@ -27,3 +27,9 @@ export function afterInputReconfigure(buttonId, buttonText) {
 export function focusCanvas() {
     document.querySelector("canvas").focus();
 }
+
+export function setSaveButtonsEnabled(enabled) {
+    document.querySelectorAll("input.save-button").forEach((element) => {
+        element.disabled = !enabled;
+    });
+}

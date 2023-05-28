@@ -22,3 +22,6 @@ tinyvec = "1"
 git = "https://github.com/Rust-SDL2/rust-sdl2.git"
 rev = "819ab438ac971a922d6ee1da558822002d343b4e"
 features = ["raw-window-handle"]
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.48", features = ["Win32_Media"] }

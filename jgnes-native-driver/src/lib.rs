@@ -129,7 +129,9 @@ impl SdlAudioPlayer {
 }
 
 const AUDIO_OUTPUT_FREQUENCY: f64 = 48000.0;
+const DEVICE_BUFFER_SIZE: u16 = 64;
 const DISPLAY_RATE: f64 = 60.0;
+const SAMPLES_PER_FRAME: usize = 800;
 
 impl AudioPlayer for SdlAudioPlayer {
     type Err = anyhow::Error;
@@ -146,11 +148,10 @@ impl AudioPlayer for SdlAudioPlayer {
             }
         }
 
-        // Arbitrary threshold
-        if self.sample_queue.len() >= 16 {
+        if self.sample_queue.len() >= SAMPLES_PER_FRAME {
             // 1024 samples * 4 bytes per sample
             while self.sync_to_audio && self.audio_queue.size() >= 4096 {
-                thread::sleep(Duration::from_micros(250));
+                sleep(Duration::from_micros(250));
             }
 
             if self.audio_queue.size() < 8192 {
@@ -327,7 +328,7 @@ pub fn run(config: &JgnesNativeConfig) -> anyhow::Result<()> {
             &AudioSpecDesired {
                 freq: Some(AUDIO_OUTPUT_FREQUENCY as i32),
                 channels: Some(1),
-                samples: Some(1024),
+                samples: Some(DEVICE_BUFFER_SIZE),
             },
         )
         .map_err(anyhow::Error::msg)?;
@@ -481,12 +482,31 @@ impl RewindState {
             while SystemTime::now().duration_since(start_time).unwrap()
                 < Duration::from_nanos(THREE_FRAME_TIMES_NANOS)
             {
-                thread::sleep(Duration::from_micros(250));
+                sleep(Duration::from_micros(250));
             }
         }
 
         Ok(())
     }
+}
+
+// Windows needs a special implementation of sleep because by default, std::thread::sleep will always
+// sleep for a minimum of about 15ms on Windows. The timeBeginPeriod syscall makes it possible to
+// reduce the timer period to about 1ms.
+#[cfg(target_os = "windows")]
+fn sleep(duration: Duration) {
+    // SAFETY: FFI calls to Windows syscalls. `thread::sleep` cannot panic, so each `timeBeginPeriod`
+    // call will have a corresponding `timeEndPeriod` call with the same period value.
+    unsafe {
+        windows::Win32::Media::timeBeginPeriod(1);
+        thread::sleep(duration);
+        windows::Win32::Media::timeEndPeriod(1);
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn sleep(duration: Duration) {
+    thread::sleep(duration);
 }
 
 fn run_emulator<R, I, S, P>(

@@ -58,6 +58,10 @@
                 margin-right: auto;
                 color: white;
             }
+
+            #last-updated-at {
+                font-style: italic;
+            }
         </style>
     </head>
     <body>
@@ -138,10 +142,11 @@
                     <li>Select: <input type="button" id="select-key" class="input-config" value="RShift"></li>
                 </ul>
                 <p>Download the native version and/or source code: <a href="https://github.com/jsgroth/jgnes">https://github.com/jsgroth/jgnes</a></p>
+                <p id="last-updated-at">Last updated at: <span id="build-time"></span></p>
             </div>
         </div>
         <script type="module">
-            import init, { b64_to_bytes, run, JgnesWebConfig, NesButton } from "./pkg/jgnes_web.js";
+            import init, { b64_to_bytes, get_build_timestamp, run, JgnesWebConfig, NesButton } from "./pkg/jgnes_web.js";
             await init();
 
             let config = new JgnesWebConfig();
@@ -268,6 +273,8 @@
             document.getElementById("jgnes-upload-sav-button").addEventListener("click", () => {
                 config.upload_save_file();
             });
+
+            document.getElementById("build-time").innerText = get_build_timestamp();
 
             run(config.clone());
         </script>

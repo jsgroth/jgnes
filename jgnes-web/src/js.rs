@@ -1,5 +1,6 @@
 use base64::engine::general_purpose;
 use base64::Engine;
+use jgnes_proc_macros::build_time_pretty_str;
 use js_sys::Uint8Array;
 use wasm_bindgen::prelude::*;
 
@@ -44,4 +45,10 @@ pub fn b64_to_bytes(s: &str) -> Option<Uint8Array> {
         }
         Err(_) => None,
     }
+}
+
+#[must_use]
+#[wasm_bindgen]
+pub fn get_build_timestamp() -> String {
+    build_time_pretty_str!().into()
 }

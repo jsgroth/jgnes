@@ -13,6 +13,7 @@ default = ["webgl"]
 webgl = ["wgpu/webgl"]
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
+jgnes-proc-macros = { path = "../jgnes-proc-macros" }
 jgnes-core = { path = "../jgnes-core" }
 jgnes-renderer = { path = "../jgnes-renderer" }
 

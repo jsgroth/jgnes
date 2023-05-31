@@ -626,7 +626,6 @@ dependencies = [
  "android-tzdata",
  "iana-time-zone",
  "num-traits",
- "wasm-bindgen",
  "winapi",
 ]
 

@@ -1,19 +1,20 @@
 #![cfg(target_arch = "wasm32")]
 
 mod audio;
+mod config;
 mod js;
 
 use crate::audio::{AudioQueue, EnqueueResult};
 use base64::engine::general_purpose;
 use base64::Engine;
+use config::JgnesWebConfig;
 use jgnes_core::audio::{DownsampleAction, DownsampleCounter, LowPassFilter};
 use jgnes_core::{
     AudioPlayer, ColorEmphasis, Emulator, EmulatorConfig, InputPoller, JoypadState, Renderer,
     SaveWriter, TickEffect,
 };
 use jgnes_renderer::config::{
-    AspectRatio, FrameSkip, GpuFilterMode, Overscan, RenderScale, RendererConfig, VSyncMode,
-    WgpuBackend,
+    AspectRatio, FrameSkip, GpuFilterMode, Overscan, RendererConfig, VSyncMode, WgpuBackend,
 };
 use jgnes_renderer::WgpuRenderer;
 use js_sys::Promise;
@@ -260,142 +261,6 @@ pub fn init_logger() {
     console_log::init_with_level(log::Level::Info).expect("Unable to initialize logger");
 }
 
-#[derive(Debug, Clone)]
-#[wasm_bindgen]
-pub struct JgnesWebConfig {
-    aspect_ratio: Rc<RefCell<AspectRatio>>,
-    gpu_filter_mode: Rc<RefCell<GpuFilterMode>>,
-    overscan: Rc<RefCell<Overscan>>,
-    audio_enabled: Rc<RefCell<bool>>,
-    audio_sync_enabled: Rc<RefCell<bool>>,
-    silence_ultrasonic_triangle_output: Rc<RefCell<bool>>,
-    reconfig_input_request: Rc<RefCell<Option<NesButton>>>,
-    open_file_requested: Rc<RefCell<bool>>,
-    reset_requested: Rc<RefCell<bool>>,
-    upload_save_file_requested: Rc<RefCell<bool>>,
-    current_filename: Rc<RefCell<String>>,
-}
-
-#[wasm_bindgen]
-impl JgnesWebConfig {
-    #[must_use]
-    #[wasm_bindgen(constructor)]
-    pub fn new() -> JgnesWebConfig {
-        JgnesWebConfig {
-            aspect_ratio: Rc::new(RefCell::new(AspectRatio::Ntsc)),
-            gpu_filter_mode: Rc::new(RefCell::new(GpuFilterMode::NearestNeighbor)),
-            overscan: Rc::default(),
-            audio_enabled: Rc::new(RefCell::new(true)),
-            audio_sync_enabled: Rc::new(RefCell::new(true)),
-            silence_ultrasonic_triangle_output: Rc::new(RefCell::new(false)),
-            reconfig_input_request: Rc::new(RefCell::new(None)),
-            open_file_requested: Rc::new(RefCell::new(false)),
-            reset_requested: Rc::new(RefCell::new(false)),
-            upload_save_file_requested: Rc::new(RefCell::new(false)),
-            current_filename: Rc::new(RefCell::new(String::new())),
-        }
-    }
-
-    pub fn set_aspect_ratio(&self, aspect_ratio: &str) {
-        let aspect_ratio = match aspect_ratio {
-            "Ntsc" => AspectRatio::Ntsc,
-            "SquarePixels" => AspectRatio::SquarePixels,
-            _ => return,
-        };
-        *self.aspect_ratio.borrow_mut() = aspect_ratio;
-    }
-
-    #[cfg(feature = "webgl")]
-    pub fn set_filter_mode(&self, gpu_filter_mode: &str) {
-        let gpu_filter_mode = match gpu_filter_mode {
-            "NearestNeighbor" => GpuFilterMode::NearestNeighbor,
-            "Linear" => GpuFilterMode::Linear(RenderScale::ONE),
-            "Linear2x" => GpuFilterMode::LinearCpuScaled(RenderScale::TWO),
-            "Linear3x" => GpuFilterMode::LinearCpuScaled(RenderScale::THREE),
-            _ => return,
-        };
-        *self.gpu_filter_mode.borrow_mut() = gpu_filter_mode;
-    }
-
-    #[cfg(not(feature = "webgl"))]
-    pub fn set_filter_mode(&self, gpu_filter_mode: &str) {
-        let gpu_filter_mode = match gpu_filter_mode {
-            "NearestNeighbor" => GpuFilterMode::NearestNeighbor,
-            "Linear" => GpuFilterMode::Linear(RenderScale::ONE),
-            "Linear2x" => GpuFilterMode::Linear(RenderScale::TWO),
-            "Linear3x" => GpuFilterMode::Linear(RenderScale::THREE),
-            _ => return,
-        };
-        *self.gpu_filter_mode.borrow_mut() = gpu_filter_mode;
-    }
-
-    pub fn set_overscan_left(&self, value: bool) {
-        set_overscan_field(value, &mut self.overscan.borrow_mut().left);
-    }
-
-    pub fn set_overscan_right(&self, value: bool) {
-        set_overscan_field(value, &mut self.overscan.borrow_mut().right);
-    }
-
-    pub fn set_overscan_top(&self, value: bool) {
-        set_overscan_field(value, &mut self.overscan.borrow_mut().top);
-    }
-
-    pub fn set_overscan_bottom(&self, value: bool) {
-        set_overscan_field(value, &mut self.overscan.borrow_mut().bottom);
-    }
-
-    pub fn set_audio_enabled(&self, value: bool) {
-        *self.audio_enabled.borrow_mut() = value;
-    }
-
-    pub fn set_audio_sync_enabled(&self, value: bool) {
-        *self.audio_sync_enabled.borrow_mut() = value;
-    }
-
-    pub fn set_silence_ultrasonic_triangle_output(&self, value: bool) {
-        *self.silence_ultrasonic_triangle_output.borrow_mut() = value;
-    }
-
-    pub fn reconfigure_input(&self, button: NesButton) {
-        *self.reconfig_input_request.borrow_mut() = Some(button);
-    }
-
-    pub fn open_new_file(&self) {
-        *self.open_file_requested.borrow_mut() = true;
-    }
-
-    pub fn reset_emulator(&self) {
-        *self.reset_requested.borrow_mut() = true;
-    }
-
-    pub fn upload_save_file(&self) {
-        *self.upload_save_file_requested.borrow_mut() = true;
-    }
-
-    #[must_use]
-    pub fn get_current_filename(&self) -> String {
-        self.current_filename.borrow().clone()
-    }
-
-    // Duplicated definition so clone() can be called from JS
-    #[allow(clippy::should_implement_trait)]
-    #[must_use]
-    pub fn clone(&self) -> JgnesWebConfig {
-        <JgnesWebConfig as Clone>::clone(self)
-    }
-}
-
-impl Default for JgnesWebConfig {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-fn set_overscan_field(value: bool, field: &mut u8) {
-    *field = if value { 8 } else { 0 };
-}
-
 fn load_sav_bytes(file_name: &str) -> Option<Vec<u8>> {
     js::loadFromLocalStorage(file_name)
         .and_then(|sav_b64| general_purpose::STANDARD.decode(sav_b64).ok())
@@ -484,6 +349,7 @@ pub async fn run(config: JgnesWebConfig) {
 
     let gpu_filter_mode = *config.gpu_filter_mode.borrow();
     let aspect_ratio = *config.aspect_ratio.borrow();
+    let overscan = *config.overscan.borrow();
     let renderer = WgpuRenderer::from_window(
         window,
         window_size,
@@ -492,7 +358,7 @@ pub async fn run(config: JgnesWebConfig) {
             wgpu_backend,
             gpu_filter_mode,
             aspect_ratio,
-            overscan: Overscan::default(),
+            overscan,
             frame_skip: FrameSkip::ZERO,
             forced_integer_height_scaling: false,
             use_webgl2_limits: wgpu_backend == WgpuBackend::OpenGl,

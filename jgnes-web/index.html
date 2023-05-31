@@ -148,43 +148,54 @@
             let running = false;
 
             document.querySelectorAll("input[name='aspect-ratio']").forEach((element) => {
+                element.checked = element.getAttribute("value") === config.get_aspect_ratio();
+
                 element.addEventListener("click", () => {
-                    let aspectRatio = new FormData(document.getElementById("jgnes-config")).get("aspect-ratio");
+                    let aspectRatio = document.querySelector("input[name='aspect-ratio']:checked").value;
                     config.set_aspect_ratio(aspectRatio);
                 });
             });
 
             document.querySelectorAll("input[name='image-filter']").forEach((element) => {
+                element.checked = element.getAttribute("value") === config.get_filter_mode();
+
                 element.addEventListener("click", () => {
-                    let filterMode = new FormData(document.getElementById("jgnes-config")).get("image-filter");
+                    let filterMode = document.querySelector("input[name='image-filter']:checked").value;
                     config.set_filter_mode(filterMode);
                 });
             });
 
+            document.getElementById("overscan-left").checked = config.get_overscan_left();
             document.getElementById("overscan-left").addEventListener("click", (event) => {
                 config.set_overscan_left(event.target.checked);
             });
 
+            document.getElementById("overscan-right").checked = config.get_overscan_right();
             document.getElementById("overscan-right").addEventListener("click", (event) => {
                 config.set_overscan_right(event.target.checked);
             });
 
+            document.getElementById("overscan-top").checked = config.get_overscan_top();
             document.getElementById("overscan-top").addEventListener("click", (event) => {
                 config.set_overscan_top(event.target.checked);
             });
 
+            document.getElementById("overscan-bottom").checked = config.get_overscan_bottom();
             document.getElementById("overscan-bottom").addEventListener("click", (event) => {
                 config.set_overscan_bottom(event.target.checked);
             });
 
+            document.getElementById("audio-enabled").checked = config.get_audio_enabled();
             document.getElementById("audio-enabled").addEventListener("click", (event) => {
                 config.set_audio_enabled(event.target.checked);
             });
 
+            document.getElementById("audio-sync-enabled").checked = config.get_audio_sync_enabled();
             document.getElementById("audio-sync-enabled").addEventListener("click", (event) => {
                 config.set_audio_sync_enabled(event.target.checked);
             });
 
+            document.getElementById("silence-triangle-ultrasonic").checked = config.get_silence_ultrasonic_triangle_output();
             document.getElementById("silence-triangle-ultrasonic").addEventListener("click", (event) => {
                 config.set_silence_ultrasonic_triangle_output(event.target.checked);
             });

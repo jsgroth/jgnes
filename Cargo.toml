@@ -8,6 +8,7 @@ members = [
     "jgnes-gui",
     "jgnes-web",
 ]
+resolver = "2"
 
 [profile.release-lto]
 inherits = "release"

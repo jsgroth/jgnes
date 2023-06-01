@@ -1658,7 +1658,6 @@ dependencies = [
  "bincode",
  "jgnes-proc-macros",
  "log",
- "once_cell",
  "rand",
  "serde",
  "thiserror",

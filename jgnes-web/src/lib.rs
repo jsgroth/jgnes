@@ -20,7 +20,7 @@ use jgnes_renderer::config::{
 use jgnes_renderer::WgpuRenderer;
 use js_sys::Promise;
 use rfd::AsyncFileDialog;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
@@ -91,7 +91,7 @@ enum InputHandlerState {
 
 struct InputHandler {
     button_mapping: HashMap<VirtualKeyCode, Vec<NesButton>>,
-    p1_joypad_state: Rc<RefCell<JoypadState>>,
+    p1_joypad_state: Rc<Cell<JoypadState>>,
     handler_state: InputHandlerState,
 }
 
@@ -152,12 +152,13 @@ impl InputHandler {
             match self.handler_state {
                 InputHandlerState::RunningEmulator => {
                     for &button in self.button_mapping.get(keycode).unwrap_or(&vec![]) {
-                        let mut joypad_state = self.p1_joypad_state.borrow_mut();
+                        let mut joypad_state = self.p1_joypad_state.get();
                         let field = Self::get_field_mut(&mut joypad_state, button);
                         *field = match state {
                             ElementState::Pressed => true,
                             ElementState::Released => false,
                         };
+                        self.p1_joypad_state.set(joypad_state);
                     }
                 }
                 InputHandlerState::WaitingForInput(button) => {
@@ -166,7 +167,7 @@ impl InputHandler {
                             .entry(*keycode)
                             .or_default()
                             .push(button);
-                        *self.p1_joypad_state.borrow_mut() = JoypadState::new();
+                        self.p1_joypad_state.set(JoypadState::new());
                         self.handler_state = InputHandlerState::RunningEmulator;
 
                         config.inputs.borrow_mut().set_key(button, *keycode);
@@ -180,12 +181,12 @@ impl InputHandler {
 }
 
 struct WebInputPoller {
-    p1_joypad_state: Rc<RefCell<JoypadState>>,
+    p1_joypad_state: Rc<Cell<JoypadState>>,
 }
 
 impl InputPoller for WebInputPoller {
     fn poll_p1_input(&self) -> JoypadState {
-        self.p1_joypad_state.borrow().sanitize_opposing_directions()
+        self.p1_joypad_state.get().sanitize_opposing_directions()
     }
 
     fn poll_p2_input(&self) -> JoypadState {
@@ -197,11 +198,11 @@ struct WebAudioPlayer {
     audio_queue: AudioQueue,
     low_pass_filter: LowPassFilter,
     downsample_counter: DownsampleCounter,
-    audio_enabled: Rc<RefCell<bool>>,
+    audio_enabled: Rc<Cell<bool>>,
 }
 
 impl WebAudioPlayer {
-    fn new(audio_queue: AudioQueue, audio_enabled: Rc<RefCell<bool>>) -> Self {
+    fn new(audio_queue: AudioQueue, audio_enabled: Rc<Cell<bool>>) -> Self {
         Self {
             audio_queue,
             low_pass_filter: LowPassFilter::new(),
@@ -222,7 +223,7 @@ impl AudioPlayer for WebAudioPlayer {
     type Err = JsValue;
 
     fn push_sample(&mut self, sample: f64) -> Result<(), Self::Err> {
-        if !*self.audio_enabled.borrow() {
+        if !self.audio_enabled.get() {
             return Ok(());
         }
 
@@ -354,9 +355,9 @@ pub async fn run(config: JgnesWebConfig) {
 
     let wgpu_backend = get_wgpu_backend();
 
-    let gpu_filter_mode = *config.gpu_filter_mode.borrow();
-    let aspect_ratio = *config.aspect_ratio.borrow();
-    let overscan = *config.overscan.borrow();
+    let gpu_filter_mode = config.gpu_filter_mode.get();
+    let aspect_ratio = config.aspect_ratio.get();
+    let overscan = config.overscan.get();
     let renderer = WgpuRenderer::from_window(
         window,
         window_size,
@@ -396,9 +397,9 @@ pub async fn run(config: JgnesWebConfig) {
         audio_player,
         audio_ctx,
         input_handler,
-        aspect_ratio: *config.aspect_ratio.borrow(),
-        filter_mode: *config.gpu_filter_mode.borrow(),
-        overscan: *config.overscan.borrow(),
+        aspect_ratio: config.aspect_ratio.get(),
+        filter_mode: config.gpu_filter_mode.get(),
+        overscan: config.overscan.get(),
         user_interacted: false,
     };
 
@@ -485,7 +486,7 @@ fn run_event_loop(
                 }
             }
             Event::MainEventsCleared => {
-                let config_aspect_ratio = *config.aspect_ratio.borrow();
+                let config_aspect_ratio = config.aspect_ratio.get();
                 if config_aspect_ratio != state.aspect_ratio {
                     state
                         .renderer
@@ -494,7 +495,7 @@ fn run_event_loop(
                     state.aspect_ratio = config_aspect_ratio;
                 }
 
-                let config_filter_mode = *config.gpu_filter_mode.borrow();
+                let config_filter_mode = config.gpu_filter_mode.get();
                 if config_filter_mode != state.filter_mode {
                     state
                         .renderer
@@ -503,36 +504,32 @@ fn run_event_loop(
                     state.filter_mode = config_filter_mode;
                 }
 
-                let config_overscan = *config.overscan.borrow();
+                let config_overscan = config.overscan.get();
                 if config_overscan != state.overscan {
                     state.renderer.borrow_mut().update_overscan(config_overscan);
                     state.overscan = config_overscan;
                 }
 
-                if *config.open_file_requested.borrow() {
-                    *config.open_file_requested.borrow_mut() = false;
-
+                if config.open_file_requested.replace(false) {
                     wasm_bindgen_futures::spawn_local(open_file_in_event_loop(
                         event_loop_proxy.clone(),
                     ));
                 }
 
-                if *config.reset_requested.borrow() {
-                    *config.reset_requested.borrow_mut() = false;
+                if config.reset_requested.replace(false) {
                     if let Some(emulator) = &mut state.emulator {
                         emulator.soft_reset();
                     }
                 }
 
-                if *config.upload_save_file_requested.borrow() {
-                    *config.upload_save_file_requested.borrow_mut() = false;
+                if config.upload_save_file_requested.replace(false) {
                     wasm_bindgen_futures::spawn_local(upload_save_file(
                         event_loop_proxy.clone(),
                         config.get_current_filename(),
                     ));
                 }
 
-                if let Some(button) = config.reconfig_input_request.borrow_mut().take() {
+                if let Some(button) = config.reconfig_input_request.replace(None) {
                     state.input_handler.remove_mapping_for_button(button);
                     state.input_handler.handler_state = InputHandlerState::WaitingForInput(button);
                 }
@@ -544,15 +541,15 @@ fn run_event_loop(
                 ) {
                     // If audio sync is enabled, only run the emulator if the audio queue isn't filling up
                     let audio_queue_len = state.audio_player.borrow().audio_queue.len().unwrap();
-                    let should_wait_for_audio = *config.audio_sync_enabled.borrow()
-                        && audio_queue_len > AUDIO_QUEUE_THRESHOLD;
+                    let should_wait_for_audio =
+                        config.audio_sync_enabled.get() && audio_queue_len > AUDIO_QUEUE_THRESHOLD;
                     if !should_wait_for_audio {
                         match &mut state.emulator {
                             Some(emulator) => {
                                 let emulator_config = EmulatorConfig {
-                                    silence_ultrasonic_triangle_output: *config
+                                    silence_ultrasonic_triangle_output: config
                                         .silence_ultrasonic_triangle_output
-                                        .borrow(),
+                                        .get(),
                                 };
 
                                 // Tick the emulator until it renders the next frame

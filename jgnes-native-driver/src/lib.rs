@@ -13,7 +13,7 @@ use sdl2::rect::Rect;
 use sdl2::render::{Texture, TextureCreator, WindowCanvas};
 use sdl2::video::{FullscreenType, Window};
 use sdl2::EventPump;
-use std::cell::RefCell;
+use std::cell::Cell;
 use std::collections::VecDeque;
 use std::ffi::OsStr;
 use std::fs::File;
@@ -168,17 +168,17 @@ impl AudioPlayer for SdlAudioPlayer {
 }
 
 struct SdlInputPoller {
-    p1_joypad_state: Rc<RefCell<JoypadState>>,
-    p2_joypad_state: Rc<RefCell<JoypadState>>,
+    p1_joypad_state: Rc<Cell<JoypadState>>,
+    p2_joypad_state: Rc<Cell<JoypadState>>,
 }
 
 impl InputPoller for SdlInputPoller {
     fn poll_p1_input(&self) -> JoypadState {
-        *self.p1_joypad_state.borrow()
+        self.p1_joypad_state.get()
     }
 
     fn poll_p2_input(&self) -> JoypadState {
-        *self.p2_joypad_state.borrow()
+        self.p2_joypad_state.get()
     }
 }
 

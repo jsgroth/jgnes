@@ -1,7 +1,7 @@
 use crate::{js, NesButton};
 use jgnes_renderer::config::{AspectRatio, GpuFilterMode, Overscan, RenderScale};
 use serde::{Deserialize, Serialize};
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 use winit::event::VirtualKeyCode;
@@ -122,16 +122,16 @@ impl Default for InputConfig {
 #[wasm_bindgen]
 pub struct JgnesWebConfig {
     pub(crate) inputs: Rc<RefCell<InputConfig>>,
-    pub(crate) aspect_ratio: Rc<RefCell<AspectRatio>>,
-    pub(crate) gpu_filter_mode: Rc<RefCell<GpuFilterMode>>,
-    pub(crate) overscan: Rc<RefCell<Overscan>>,
-    pub(crate) audio_enabled: Rc<RefCell<bool>>,
-    pub(crate) audio_sync_enabled: Rc<RefCell<bool>>,
-    pub(crate) silence_ultrasonic_triangle_output: Rc<RefCell<bool>>,
-    pub(crate) reconfig_input_request: Rc<RefCell<Option<NesButton>>>,
-    pub(crate) open_file_requested: Rc<RefCell<bool>>,
-    pub(crate) reset_requested: Rc<RefCell<bool>>,
-    pub(crate) upload_save_file_requested: Rc<RefCell<bool>>,
+    pub(crate) aspect_ratio: Rc<Cell<AspectRatio>>,
+    pub(crate) gpu_filter_mode: Rc<Cell<GpuFilterMode>>,
+    pub(crate) overscan: Rc<Cell<Overscan>>,
+    pub(crate) audio_enabled: Rc<Cell<bool>>,
+    pub(crate) audio_sync_enabled: Rc<Cell<bool>>,
+    pub(crate) silence_ultrasonic_triangle_output: Rc<Cell<bool>>,
+    pub(crate) reconfig_input_request: Rc<Cell<Option<NesButton>>>,
+    pub(crate) open_file_requested: Rc<Cell<bool>>,
+    pub(crate) reset_requested: Rc<Cell<bool>>,
+    pub(crate) upload_save_file_requested: Rc<Cell<bool>>,
     pub(crate) current_filename: Rc<RefCell<String>>,
 }
 
@@ -156,12 +156,12 @@ impl JgnesWebConfig {
             .and_then(|config_str| serde_json::from_str::<SerializableConfig>(&config_str).ok())
             .map_or_else(Self::default, |config| Self {
                 inputs: Rc::new(RefCell::new(inputs)),
-                aspect_ratio: Rc::new(RefCell::new(config.aspect_ratio)),
-                gpu_filter_mode: Rc::new(RefCell::new(config.gpu_filter_mode)),
-                overscan: Rc::new(RefCell::new(config.overscan)),
-                audio_enabled: Rc::new(RefCell::new(config.audio_enabled)),
-                audio_sync_enabled: Rc::new(RefCell::new(config.audio_sync_enabled)),
-                silence_ultrasonic_triangle_output: Rc::new(RefCell::new(
+                aspect_ratio: Rc::new(Cell::new(config.aspect_ratio)),
+                gpu_filter_mode: Rc::new(Cell::new(config.gpu_filter_mode)),
+                overscan: Rc::new(Cell::new(config.overscan)),
+                audio_enabled: Rc::new(Cell::new(config.audio_enabled)),
+                audio_sync_enabled: Rc::new(Cell::new(config.audio_sync_enabled)),
+                silence_ultrasonic_triangle_output: Rc::new(Cell::new(
                     config.silence_ultrasonic_triangle_output,
                 )),
                 ..Self::default()
@@ -169,7 +169,7 @@ impl JgnesWebConfig {
     }
 
     pub fn get_aspect_ratio(&self) -> String {
-        let s = match *self.aspect_ratio.borrow() {
+        let s = match self.aspect_ratio.get() {
             AspectRatio::Ntsc => NTSC,
             AspectRatio::SquarePixels => SQUARE_PIXELS,
             // Web frontend only supports NTSC / Square pixels
@@ -184,13 +184,13 @@ impl JgnesWebConfig {
             SQUARE_PIXELS => AspectRatio::SquarePixels,
             _ => return,
         };
-        *self.aspect_ratio.borrow_mut() = aspect_ratio;
+        self.aspect_ratio.set(aspect_ratio);
 
         self.save_to_local_storage();
     }
 
     pub fn get_filter_mode(&self) -> String {
-        let s = match *self.gpu_filter_mode.borrow() {
+        let s = match self.gpu_filter_mode.get() {
             GpuFilterMode::NearestNeighbor => NEAREST_NEIGHBOR,
             GpuFilterMode::Linear(RenderScale::ONE) => LINEAR_1X,
             GpuFilterMode::Linear(RenderScale::TWO)
@@ -212,7 +212,7 @@ impl JgnesWebConfig {
             LINEAR_3X => GpuFilterMode::LinearCpuScaled(RenderScale::THREE),
             _ => return,
         };
-        *self.gpu_filter_mode.borrow_mut() = gpu_filter_mode;
+        self.gpu_filter_mode.set(gpu_filter_mode);
 
         self.save_to_local_storage();
     }
@@ -226,71 +226,87 @@ impl JgnesWebConfig {
             LINEAR_3X => GpuFilterMode::Linear(RenderScale::THREE),
             _ => return,
         };
-        *self.gpu_filter_mode.borrow_mut() = gpu_filter_mode;
+        self.gpu_filter_mode.set(gpu_filter_mode);
 
         self.save_to_local_storage();
     }
 
     pub fn get_overscan_left(&self) -> bool {
-        self.overscan.borrow().left != 0
+        self.overscan.get().left != 0
     }
 
     pub fn set_overscan_left(&self, value: bool) {
-        set_overscan_field(value, &mut self.overscan.borrow_mut().left);
+        let overscan = Overscan {
+            left: overscan_value(value),
+            ..self.overscan.get()
+        };
+        self.overscan.set(overscan);
         self.save_to_local_storage();
     }
 
     pub fn get_overscan_right(&self) -> bool {
-        self.overscan.borrow().right != 0
+        self.overscan.get().right != 0
     }
 
     pub fn set_overscan_right(&self, value: bool) {
-        set_overscan_field(value, &mut self.overscan.borrow_mut().right);
+        let overscan = Overscan {
+            right: overscan_value(value),
+            ..self.overscan.get()
+        };
+        self.overscan.set(overscan);
         self.save_to_local_storage();
     }
 
     pub fn get_overscan_top(&self) -> bool {
-        self.overscan.borrow().top != 0
+        self.overscan.get().top != 0
     }
 
     pub fn set_overscan_top(&self, value: bool) {
-        set_overscan_field(value, &mut self.overscan.borrow_mut().top);
+        let overscan = Overscan {
+            top: overscan_value(value),
+            ..self.overscan.get()
+        };
+        self.overscan.set(overscan);
         self.save_to_local_storage();
     }
 
     pub fn get_overscan_bottom(&self) -> bool {
-        self.overscan.borrow().bottom != 0
+        self.overscan.get().bottom != 0
     }
 
     pub fn set_overscan_bottom(&self, value: bool) {
-        set_overscan_field(value, &mut self.overscan.borrow_mut().bottom);
+        let overscan = Overscan {
+            bottom: overscan_value(value),
+            ..self.overscan.get()
+        };
+        self.overscan.set(overscan);
         self.save_to_local_storage();
     }
 
     pub fn get_audio_enabled(&self) -> bool {
-        *self.audio_enabled.borrow()
+        self.audio_enabled.get()
     }
 
     pub fn set_audio_enabled(&self, value: bool) {
-        *self.audio_enabled.borrow_mut() = value;
+        self.audio_enabled.set(value);
         self.save_to_local_storage();
     }
 
     pub fn get_audio_sync_enabled(&self) -> bool {
-        *self.audio_sync_enabled.borrow()
+        self.audio_sync_enabled.get()
     }
 
     pub fn set_audio_sync_enabled(&self, value: bool) {
-        *self.audio_sync_enabled.borrow_mut() = value;
+        self.audio_sync_enabled.set(value);
         self.save_to_local_storage();
     }
 
     pub fn get_silence_ultrasonic_triangle_output(&self) -> bool {
-        *self.silence_ultrasonic_triangle_output.borrow()
+        self.silence_ultrasonic_triangle_output.get()
     }
 
     pub fn set_silence_ultrasonic_triangle_output(&self, value: bool) {
-        *self.silence_ultrasonic_triangle_output.borrow_mut() = value;
+        self.silence_ultrasonic_triangle_output.set(value);
         self.save_to_local_storage();
     }
 
@@ -299,19 +315,19 @@ impl JgnesWebConfig {
     }
 
     pub fn reconfigure_input(&self, button: NesButton) {
-        *self.reconfig_input_request.borrow_mut() = Some(button);
+        self.reconfig_input_request.set(Some(button));
     }
 
     pub fn open_new_file(&self) {
-        *self.open_file_requested.borrow_mut() = true;
+        self.open_file_requested.set(true);
     }
 
     pub fn reset_emulator(&self) {
-        *self.reset_requested.borrow_mut() = true;
+        self.reset_requested.set(true);
     }
 
     pub fn upload_save_file(&self) {
-        *self.upload_save_file_requested.borrow_mut() = true;
+        self.upload_save_file_requested.set(true);
     }
 
     #[must_use]
@@ -330,12 +346,12 @@ impl JgnesWebConfig {
 impl JgnesWebConfig {
     fn to_serializable_config(&self) -> SerializableConfig {
         SerializableConfig {
-            aspect_ratio: *self.aspect_ratio.borrow(),
-            gpu_filter_mode: *self.gpu_filter_mode.borrow(),
-            overscan: *self.overscan.borrow(),
-            audio_enabled: *self.audio_enabled.borrow(),
-            audio_sync_enabled: *self.audio_sync_enabled.borrow(),
-            silence_ultrasonic_triangle_output: *self.silence_ultrasonic_triangle_output.borrow(),
+            aspect_ratio: self.aspect_ratio.get(),
+            gpu_filter_mode: self.gpu_filter_mode.get(),
+            overscan: self.overscan.get(),
+            audio_enabled: self.audio_enabled.get(),
+            audio_sync_enabled: self.audio_sync_enabled.get(),
+            silence_ultrasonic_triangle_output: self.silence_ultrasonic_triangle_output.get(),
         }
     }
 
@@ -349,21 +365,25 @@ impl Default for JgnesWebConfig {
     fn default() -> Self {
         JgnesWebConfig {
             inputs: Rc::default(),
-            aspect_ratio: Rc::new(RefCell::new(AspectRatio::Ntsc)),
-            gpu_filter_mode: Rc::new(RefCell::new(GpuFilterMode::NearestNeighbor)),
+            aspect_ratio: Rc::new(Cell::new(AspectRatio::Ntsc)),
+            gpu_filter_mode: Rc::new(Cell::new(GpuFilterMode::NearestNeighbor)),
             overscan: Rc::default(),
-            audio_enabled: Rc::new(RefCell::new(true)),
-            audio_sync_enabled: Rc::new(RefCell::new(true)),
-            silence_ultrasonic_triangle_output: Rc::new(RefCell::new(false)),
-            reconfig_input_request: Rc::new(RefCell::new(None)),
-            open_file_requested: Rc::new(RefCell::new(false)),
-            reset_requested: Rc::new(RefCell::new(false)),
-            upload_save_file_requested: Rc::new(RefCell::new(false)),
+            audio_enabled: Rc::new(Cell::new(true)),
+            audio_sync_enabled: Rc::new(Cell::new(true)),
+            silence_ultrasonic_triangle_output: Rc::new(Cell::new(false)),
+            reconfig_input_request: Rc::new(Cell::new(None)),
+            open_file_requested: Rc::new(Cell::new(false)),
+            reset_requested: Rc::new(Cell::new(false)),
+            upload_save_file_requested: Rc::new(Cell::new(false)),
             current_filename: Rc::new(RefCell::new(String::new())),
         }
     }
 }
 
-fn set_overscan_field(value: bool, field: &mut u8) {
-    *field = if value { 8 } else { 0 };
+fn overscan_value(value: bool) -> u8 {
+    if value {
+        8
+    } else {
+        0
+    }
 }

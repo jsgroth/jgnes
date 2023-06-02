@@ -6,7 +6,7 @@ use sdl2::event::Event;
 use sdl2::joystick::{HatState, Joystick};
 use sdl2::keyboard::Keycode;
 use sdl2::JoystickSubsystem;
-use std::cell::RefCell;
+use std::cell::Cell;
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::rc::Rc;
@@ -50,9 +50,9 @@ enum Input {
 
 pub(crate) struct SdlInputHandler<'a> {
     raw_p1_joypad_state: JoypadState,
-    p1_joypad_state: Rc<RefCell<JoypadState>>,
+    p1_joypad_state: Rc<Cell<JoypadState>>,
     raw_p2_joypad_state: JoypadState,
-    p2_joypad_state: Rc<RefCell<JoypadState>>,
+    p2_joypad_state: Rc<Cell<JoypadState>>,
     keyboard_input_mapping: HashMap<Keycode, Vec<(Player, Button)>>,
     joystick_input_mapping: HashMap<JoystickInput, Vec<(Player, Button)>>,
     hotkey_mapping: HashMap<Keycode, Vec<Hotkey>>,
@@ -69,8 +69,8 @@ impl<'a> SdlInputHandler<'a> {
     pub(crate) fn new(
         joystick_subsystem: &'a JoystickSubsystem,
         input_config: &InputConfig,
-        p1_joypad_state: Rc<RefCell<JoypadState>>,
-        p2_joypad_state: Rc<RefCell<JoypadState>>,
+        p1_joypad_state: Rc<Cell<JoypadState>>,
+        p2_joypad_state: Rc<Cell<JoypadState>>,
     ) -> Self {
         let mut input_handler = Self {
             raw_p1_joypad_state: JoypadState::new(),
@@ -123,8 +123,8 @@ impl<'a> SdlInputHandler<'a> {
         // Clear all current joypad states in case there were any lingering pressed inputs
         self.raw_p1_joypad_state = JoypadState::default();
         self.raw_p2_joypad_state = JoypadState::default();
-        *self.p1_joypad_state.borrow_mut() = JoypadState::default();
-        *self.p2_joypad_state.borrow_mut() = JoypadState::default();
+        self.p1_joypad_state.set(JoypadState::default());
+        self.p2_joypad_state.set(JoypadState::default());
     }
 
     pub(crate) fn handle_event(&mut self, event: &Event) -> Result<(), anyhow::Error> {
@@ -251,16 +251,16 @@ impl<'a> SdlInputHandler<'a> {
             _ => {}
         }
 
-        *self.p1_joypad_state.borrow_mut() = if self.allow_opposite_directions {
+        self.p1_joypad_state.set(if self.allow_opposite_directions {
             self.raw_p1_joypad_state
         } else {
             self.raw_p1_joypad_state.sanitize_opposing_directions()
-        };
-        *self.p2_joypad_state.borrow_mut() = if self.allow_opposite_directions {
+        });
+        self.p2_joypad_state.set(if self.allow_opposite_directions {
             self.raw_p2_joypad_state
         } else {
             self.raw_p2_joypad_state.sanitize_opposing_directions()
-        };
+        });
 
         Ok(())
     }

@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
+use winit::event::VirtualKeyCode;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct SerializableConfig {
@@ -19,9 +20,108 @@ impl SerializableConfig {
     const LOCAL_STORAGE_KEY: &'static str = "__config";
 }
 
+fn save_to_local_storage<S: Serialize>(key: &str, value: &S) {
+    let s = match serde_json::to_string(value) {
+        Ok(s) => s,
+        Err(err) => {
+            log::error!("error serializing config: {err}");
+            return;
+        }
+    };
+
+    js::saveToLocalStorage(key, &s);
+}
+
+// Allow unsafe_derive_deserialize because the only unsafe usage here is a call to the JS
+// saveToLocalStorage function in `set_key(..)`
+#[allow(clippy::unsafe_derive_deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[wasm_bindgen]
+pub struct InputConfig {
+    pub(crate) up: VirtualKeyCode,
+    pub(crate) left: VirtualKeyCode,
+    pub(crate) right: VirtualKeyCode,
+    pub(crate) down: VirtualKeyCode,
+    pub(crate) a: VirtualKeyCode,
+    pub(crate) b: VirtualKeyCode,
+    pub(crate) start: VirtualKeyCode,
+    pub(crate) select: VirtualKeyCode,
+}
+
+impl InputConfig {
+    const LOCAL_STORAGE_KEY: &'static str = "__inputs";
+
+    pub fn set_key(&mut self, button: NesButton, keycode: VirtualKeyCode) {
+        let field = match button {
+            NesButton::Up => &mut self.up,
+            NesButton::Left => &mut self.left,
+            NesButton::Right => &mut self.right,
+            NesButton::Down => &mut self.down,
+            NesButton::A => &mut self.a,
+            NesButton::B => &mut self.b,
+            NesButton::Start => &mut self.start,
+            NesButton::Select => &mut self.select,
+        };
+        *field = keycode;
+
+        save_to_local_storage(Self::LOCAL_STORAGE_KEY, self);
+    }
+}
+
+#[wasm_bindgen]
+impl InputConfig {
+    pub fn up(&self) -> String {
+        format!("{:?}", self.up)
+    }
+
+    pub fn left(&self) -> String {
+        format!("{:?}", self.left)
+    }
+
+    pub fn right(&self) -> String {
+        format!("{:?}", self.right)
+    }
+
+    pub fn down(&self) -> String {
+        format!("{:?}", self.down)
+    }
+
+    pub fn a(&self) -> String {
+        format!("{:?}", self.a)
+    }
+
+    pub fn b(&self) -> String {
+        format!("{:?}", self.b)
+    }
+
+    pub fn start(&self) -> String {
+        format!("{:?}", self.start)
+    }
+
+    pub fn select(&self) -> String {
+        format!("{:?}", self.select)
+    }
+}
+
+impl Default for InputConfig {
+    fn default() -> Self {
+        Self {
+            up: VirtualKeyCode::Up,
+            left: VirtualKeyCode::Left,
+            right: VirtualKeyCode::Right,
+            down: VirtualKeyCode::Down,
+            a: VirtualKeyCode::Z,
+            b: VirtualKeyCode::X,
+            start: VirtualKeyCode::Return,
+            select: VirtualKeyCode::RShift,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 #[wasm_bindgen]
 pub struct JgnesWebConfig {
+    pub(crate) inputs: Rc<RefCell<InputConfig>>,
     pub(crate) aspect_ratio: Rc<RefCell<AspectRatio>>,
     pub(crate) gpu_filter_mode: Rc<RefCell<GpuFilterMode>>,
     pub(crate) overscan: Rc<RefCell<Overscan>>,
@@ -48,9 +148,14 @@ impl JgnesWebConfig {
     #[must_use]
     #[wasm_bindgen(constructor)]
     pub fn new() -> JgnesWebConfig {
+        let inputs = js::loadFromLocalStorage(InputConfig::LOCAL_STORAGE_KEY)
+            .and_then(|config_str| serde_json::from_str::<InputConfig>(&config_str).ok())
+            .unwrap_or_default();
+
         js::loadFromLocalStorage(SerializableConfig::LOCAL_STORAGE_KEY)
             .and_then(|config_str| serde_json::from_str::<SerializableConfig>(&config_str).ok())
             .map_or_else(Self::default, |config| Self {
+                inputs: Rc::new(RefCell::new(inputs)),
                 aspect_ratio: Rc::new(RefCell::new(config.aspect_ratio)),
                 gpu_filter_mode: Rc::new(RefCell::new(config.gpu_filter_mode)),
                 overscan: Rc::new(RefCell::new(config.overscan)),
@@ -189,6 +294,10 @@ impl JgnesWebConfig {
         self.save_to_local_storage();
     }
 
+    pub fn get_inputs(&self) -> InputConfig {
+        self.inputs.borrow().clone()
+    }
+
     pub fn reconfigure_input(&self, button: NesButton) {
         *self.reconfig_input_request.borrow_mut() = Some(button);
     }
@@ -232,21 +341,14 @@ impl JgnesWebConfig {
 
     fn save_to_local_storage(&self) {
         let config = self.to_serializable_config();
-        let config_str = match serde_json::to_string(&config) {
-            Ok(config) => config,
-            Err(err) => {
-                log::error!("error serializing config: {err}");
-                return;
-            }
-        };
-
-        js::saveToLocalStorage(SerializableConfig::LOCAL_STORAGE_KEY, &config_str);
+        save_to_local_storage(SerializableConfig::LOCAL_STORAGE_KEY, &config);
     }
 }
 
 impl Default for JgnesWebConfig {
     fn default() -> Self {
         JgnesWebConfig {
+            inputs: Rc::default(),
             aspect_ratio: Rc::new(RefCell::new(AspectRatio::Ntsc)),
             gpu_filter_mode: Rc::new(RefCell::new(GpuFilterMode::NearestNeighbor)),
             overscan: Rc::default(),

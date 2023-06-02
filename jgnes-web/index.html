@@ -132,14 +132,14 @@
             <div id="info-text">
                 <p>Input keys</p>
                 <ul>
-                    <li>Up: <input type="button" id="up-key" class="input-config" value="Up"></li>
-                    <li>Left: <input type="button" id="left-key" class="input-config" value="Left"></li>
-                    <li>Right: <input type="button" id="right-key" class="input-config" value="Right"></li>
-                    <li>Down: <input type="button" id="down-key" class="input-config" value="Down"></li>
-                    <li>A: <input type="button" id="a-key" class="input-config" value="Z"></li>
-                    <li>B: <input type="button" id="b-key" class="input-config" value="X"></li>
-                    <li>Start: <input type="button" id="start-key" class="input-config" value="Return"></li>
-                    <li>Select: <input type="button" id="select-key" class="input-config" value="RShift"></li>
+                    <li>Up: <input type="button" id="up-key" class="input-config" value=""></li>
+                    <li>Left: <input type="button" id="left-key" class="input-config" value=""></li>
+                    <li>Right: <input type="button" id="right-key" class="input-config" value=""></li>
+                    <li>Down: <input type="button" id="down-key" class="input-config" value=""></li>
+                    <li>A: <input type="button" id="a-key" class="input-config" value=""></li>
+                    <li>B: <input type="button" id="b-key" class="input-config" value=""></li>
+                    <li>Start: <input type="button" id="start-key" class="input-config" value=""></li>
+                    <li>Select: <input type="button" id="select-key" class="input-config" value=""></li>
                 </ul>
                 <p>Download the native version and/or source code: <a href="https://github.com/jsgroth/jgnes">https://github.com/jsgroth/jgnes</a></p>
                 <p id="last-updated-at">Last updated at: <span id="build-time"></span></p>
@@ -206,6 +206,18 @@
             });
 
             document.querySelectorAll("input.input-config").forEach((element) => {
+                let buttonText = {
+                    "up-key": config.get_inputs().up(),
+                    "left-key": config.get_inputs().left(),
+                    "right-key": config.get_inputs().right(),
+                    "down-key": config.get_inputs().down(),
+                    "a-key": config.get_inputs().a(),
+                    "b-key": config.get_inputs().b(),
+                    "start-key": config.get_inputs().start(),
+                    "select-key": config.get_inputs().select(),
+                }[element.id];
+                element.setAttribute("value", buttonText);
+
                 element.addEventListener("click", (event) => {
                     let button = {
                         "up-key": NesButton.Up,

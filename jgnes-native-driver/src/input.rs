@@ -304,53 +304,37 @@ fn populate_map<K>(
 ) where
     K: Eq + Hash + Copy,
 {
-    macro_rules! populate_map {
-        ($($field:expr => $button:expr),+$(,)?) => {
-            {
-                $(
-                    if let Some(field) = $field {
-                        add_to_map(map, field, (player, $button));
-                    }
-                )*
-            }
+    for (button, config_input) in [
+        (Button::Up, config.up),
+        (Button::Left, config.left),
+        (Button::Right, config.right),
+        (Button::Down, config.down),
+        (Button::A, config.a),
+        (Button::B, config.b),
+        (Button::Start, config.start),
+        (Button::Select, config.select),
+    ] {
+        if let Some(config_input) = config_input {
+            add_to_map(map, config_input, (player, button));
         }
     }
-
-    populate_map!(
-        config.up => Button::Up,
-        config.left => Button::Left,
-        config.right => Button::Right,
-        config.down => Button::Down,
-        config.a => Button::A,
-        config.b => Button::B,
-        config.start => Button::Start,
-        config.select => Button::Select,
-    );
 }
 
 fn populate_hotkey_map(map: &mut HashMap<Keycode, Vec<Hotkey>>, config: &HotkeyConfig) {
-    macro_rules! populate_hotkey_map {
-        ($($field:expr => $hotkey:expr),+$(,)?) => {
-            {
-                $(
-                    if let Some(field) = &$field {
-                        add_to_map(map, Keycode::from_name(field).unwrap(), $hotkey);
-                    }
-                )*
-            }
+    for (hotkey, config_input) in [
+        (Hotkey::Quit, config.quit.as_ref()),
+        (Hotkey::ToggleFullscreen, config.toggle_fullscreen.as_ref()),
+        (Hotkey::SaveState, config.save_state.as_ref()),
+        (Hotkey::LoadState, config.load_state.as_ref()),
+        (Hotkey::SoftReset, config.soft_reset.as_ref()),
+        (Hotkey::HardReset, config.hard_reset.as_ref()),
+        (Hotkey::FastForward, config.fast_forward.as_ref()),
+        (Hotkey::Rewind, config.rewind.as_ref()),
+    ] {
+        if let Some(config_input) = config_input {
+            add_to_map(map, Keycode::from_name(config_input).unwrap(), hotkey);
         }
     }
-
-    populate_hotkey_map!(
-        config.quit => Hotkey::Quit,
-        config.toggle_fullscreen => Hotkey::ToggleFullscreen,
-        config.save_state => Hotkey::SaveState,
-        config.load_state => Hotkey::LoadState,
-        config.soft_reset => Hotkey::SoftReset,
-        config.hard_reset => Hotkey::HardReset,
-        config.fast_forward => Hotkey::FastForward,
-        config.rewind => Hotkey::Rewind,
-    );
 }
 
 fn add_to_map<K, V>(map: &mut HashMap<K, Vec<V>>, key: K, value: V)

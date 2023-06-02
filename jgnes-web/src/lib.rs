@@ -5,6 +5,7 @@ mod config;
 mod js;
 
 use crate::audio::{AudioQueue, EnqueueResult};
+use crate::config::InputConfig;
 use base64::engine::general_purpose;
 use base64::Engine;
 use config::JgnesWebConfig;
@@ -95,19 +96,23 @@ struct InputHandler {
 }
 
 impl InputHandler {
-    fn new() -> Self {
-        let mut default_mapping = HashMap::new();
-        default_mapping.insert(VirtualKeyCode::Up, vec![NesButton::Up]);
-        default_mapping.insert(VirtualKeyCode::Left, vec![NesButton::Left]);
-        default_mapping.insert(VirtualKeyCode::Right, vec![NesButton::Right]);
-        default_mapping.insert(VirtualKeyCode::Down, vec![NesButton::Down]);
-        default_mapping.insert(VirtualKeyCode::Z, vec![NesButton::A]);
-        default_mapping.insert(VirtualKeyCode::X, vec![NesButton::B]);
-        default_mapping.insert(VirtualKeyCode::Return, vec![NesButton::Start]);
-        default_mapping.insert(VirtualKeyCode::RShift, vec![NesButton::Select]);
+    fn new(config: &InputConfig) -> Self {
+        let mut initial_mapping: HashMap<VirtualKeyCode, Vec<NesButton>> = HashMap::new();
+        for (button, keycode) in [
+            (NesButton::Up, config.up),
+            (NesButton::Left, config.left),
+            (NesButton::Right, config.right),
+            (NesButton::Down, config.down),
+            (NesButton::A, config.a),
+            (NesButton::B, config.b),
+            (NesButton::Start, config.start),
+            (NesButton::Select, config.select),
+        ] {
+            initial_mapping.entry(keycode).or_default().push(button);
+        }
 
         Self {
-            button_mapping: default_mapping,
+            button_mapping: initial_mapping,
             p1_joypad_state: Rc::default(),
             handler_state: InputHandlerState::RunningEmulator,
         }
@@ -133,7 +138,7 @@ impl InputHandler {
         self.button_mapping.retain(|_, buttons| !buttons.is_empty());
     }
 
-    fn handle_window_event(&mut self, event: &WindowEvent<'_>) {
+    fn handle_window_event(&mut self, event: &WindowEvent<'_>, config: &JgnesWebConfig) {
         if let WindowEvent::KeyboardInput {
             input:
                 KeyboardInput {
@@ -163,6 +168,8 @@ impl InputHandler {
                             .push(button);
                         *self.p1_joypad_state.borrow_mut() = JoypadState::new();
                         self.handler_state = InputHandlerState::RunningEmulator;
+
+                        config.inputs.borrow_mut().set_key(button, *keycode);
 
                         js::afterInputReconfigure(button.element_id(), &format!("{keycode:?}"));
                     }
@@ -381,7 +388,7 @@ pub async fn run(config: JgnesWebConfig) {
     let audio_player = WebAudioPlayer::new(audio_queue, Rc::clone(&config.audio_enabled));
     let audio_player = Rc::new(RefCell::new(audio_player));
 
-    let input_handler = InputHandler::new();
+    let input_handler = InputHandler::new(&config.inputs.borrow());
 
     let state = State {
         emulator: None,
@@ -471,7 +478,7 @@ fn run_event_loop(
                 event: win_event,
                 window_id,
             } if window_id == state.window_id() => {
-                state.input_handler.handle_window_event(&win_event);
+                state.input_handler.handle_window_event(&win_event, &config);
 
                 if let WindowEvent::CloseRequested = win_event {
                     *control_flow = ControlFlow::Exit;

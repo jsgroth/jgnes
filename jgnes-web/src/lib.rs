@@ -215,9 +215,9 @@ impl WebAudioPlayer {
 const AUDIO_OUTPUT_FREQUENCY: f64 = 48000.0;
 const DISPLAY_RATE: f64 = 60.0;
 
-// The emulator should generate 800 samples per frame, but setting the threshold to 800 causes
-// noticeable audio lag at high refresh rates, so set the threshold a little lower than that
-const AUDIO_QUEUE_THRESHOLD: u32 = 600;
+// This can cause audio lag in some configurations, but setting the threshold much lower than this
+// is likely to cause audio skips
+const AUDIO_QUEUE_THRESHOLD: u32 = 1200;
 
 impl AudioPlayer for WebAudioPlayer {
     type Err = JsValue;

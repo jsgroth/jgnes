@@ -25,8 +25,8 @@ use std::{fs, thread};
 
 pub use crate::config::{
     AxisDirection, HatDirection, HotkeyConfig, InputConfig, InputConfigBase, JgnesDynamicConfig,
-    JgnesNativeConfig, JoystickInput, JoystickInputConfig, KeyboardInput, KeyboardInputConfig,
-    NativeRenderer, PlayerInputConfig,
+    JgnesNativeConfig, JgnesSharedConfig, JoystickInput, JoystickInputConfig, KeyboardInput,
+    KeyboardInputConfig, NativeRenderer, PlayerInputConfig,
 };
 use crate::input::{Hotkey, SdlInputHandler};
 use jgnes_renderer::config::{FrameSkip, RendererConfig, VSyncMode};
@@ -272,9 +272,11 @@ impl SdlWindowRenderer for WgpuRenderer<Window> {
 /// reload the dynamic config, which should only happen if another thread panics while holding that
 /// lock.
 pub fn run(config: &JgnesNativeConfig) -> anyhow::Result<()> {
+    let dynamic_config = &config.shared_config.dynamic_config;
+
     log::info!("Running with config:\n{config}");
     {
-        let dynamic_config = &*config.dynamic_config.lock().unwrap();
+        let dynamic_config = &*dynamic_config.lock().unwrap();
         log::info!("Initial dynamic config:\n{dynamic_config}");
     }
 
@@ -308,7 +310,7 @@ pub fn run(config: &JgnesNativeConfig) -> anyhow::Result<()> {
     let window = init_window(window_builder.build()?)?;
 
     let renderer_config = {
-        let dynamic_config = config.dynamic_config.lock().unwrap();
+        let dynamic_config = dynamic_config.lock().unwrap();
 
         RendererConfig {
             vsync_mode: dynamic_config.vsync_mode,
@@ -333,10 +335,8 @@ pub fn run(config: &JgnesNativeConfig) -> anyhow::Result<()> {
         )
         .map_err(anyhow::Error::msg)?;
     audio_queue.resume();
-    let audio_player = SdlAudioPlayer::new(
-        audio_queue,
-        config.dynamic_config.lock().unwrap().sync_to_audio,
-    );
+    let audio_player =
+        SdlAudioPlayer::new(audio_queue, dynamic_config.lock().unwrap().sync_to_audio);
 
     let input_poller = SdlInputPoller {
         p1_joypad_state: Rc::default(),
@@ -344,7 +344,7 @@ pub fn run(config: &JgnesNativeConfig) -> anyhow::Result<()> {
     };
     let input_handler = SdlInputHandler::new(
         &joystick_subsystem,
-        &config.dynamic_config.lock().unwrap().input_config,
+        &dynamic_config.lock().unwrap().input_config,
         Rc::clone(&input_poller.p1_joypad_state),
         Rc::clone(&input_poller.p2_joypad_state),
     );
@@ -522,9 +522,11 @@ where
     S: SaveWriter<Err = anyhow::Error>,
     P: AsRef<Path>,
 {
-    let dynamic_config = &native_config.dynamic_config;
-    let config_reload_signal = &native_config.reload_signal;
-    let quit_signal = &native_config.quit_signal;
+    let JgnesSharedConfig {
+        dynamic_config,
+        config_reload_signal,
+        quit_signal,
+    } = &native_config.shared_config;
 
     let save_state_path = save_state_path.as_ref();
 

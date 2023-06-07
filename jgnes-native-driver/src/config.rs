@@ -3,7 +3,7 @@ use jgnes_renderer::config::{AspectRatio, GpuFilterMode, Overscan, VSyncMode, Wg
 use sdl2::keyboard::Keycode;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -329,9 +329,7 @@ pub struct JgnesNativeConfig {
     pub renderer: NativeRenderer,
     pub wgpu_backend: WgpuBackend,
     pub launch_fullscreen: bool,
-    pub dynamic_config: Arc<Mutex<JgnesDynamicConfig>>,
-    pub reload_signal: Arc<AtomicBool>,
-    pub quit_signal: Arc<AtomicBool>,
+    pub shared_config: JgnesSharedConfig,
 }
 
 impl Display for JgnesNativeConfig {
@@ -347,6 +345,7 @@ impl Display for JgnesNativeConfig {
     }
 }
 
+/// Configuration that can be modified while the emulator is running.
 #[derive(Debug, Clone)]
 pub struct JgnesDynamicConfig {
     pub gpu_filter_mode: GpuFilterMode,
@@ -391,5 +390,38 @@ impl Display for JgnesDynamicConfig {
         writeln!(f, "input_config: {}", self.input_config)?;
 
         Ok(())
+    }
+}
+
+/// A wrapper around shared dynamic configuration state and signals that the emulator driver can
+/// send to the emulator.
+#[derive(Debug, Clone)]
+pub struct JgnesSharedConfig {
+    pub(crate) dynamic_config: Arc<Mutex<JgnesDynamicConfig>>,
+    pub(crate) config_reload_signal: Arc<AtomicBool>,
+    pub(crate) quit_signal: Arc<AtomicBool>,
+}
+
+impl JgnesSharedConfig {
+    #[must_use]
+    pub fn new(initial_dynamic_config: JgnesDynamicConfig) -> Self {
+        Self {
+            dynamic_config: Arc::new(Mutex::new(initial_dynamic_config)),
+            config_reload_signal: Arc::new(AtomicBool::new(false)),
+            quit_signal: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    #[must_use]
+    pub fn get_dynamic_config(&self) -> &Arc<Mutex<JgnesDynamicConfig>> {
+        &self.dynamic_config
+    }
+
+    pub fn request_config_reload(&self) {
+        self.config_reload_signal.store(true, Ordering::Relaxed);
+    }
+
+    pub fn request_quit(&self) {
+        self.quit_signal.store(true, Ordering::Relaxed);
     }
 }

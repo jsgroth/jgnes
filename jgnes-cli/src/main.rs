@@ -1,10 +1,10 @@
 use clap::Parser;
 use env_logger::Env;
-use jgnes_native_driver::{InputConfig, JgnesDynamicConfig, JgnesNativeConfig, NativeRenderer};
+use jgnes_native_driver::{
+    InputConfig, JgnesDynamicConfig, JgnesNativeConfig, JgnesSharedConfig, NativeRenderer,
+};
 use jgnes_proc_macros::{EnumDisplay, EnumFromStr};
 use jgnes_renderer::config::{AspectRatio, GpuFilterMode, Overscan, VSyncMode, WgpuBackend};
-use std::sync::atomic::AtomicBool;
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, EnumDisplay, EnumFromStr)]
@@ -124,7 +124,7 @@ fn main() -> anyhow::Result<()> {
         renderer: args.renderer,
         wgpu_backend: args.wgpu_backend,
         launch_fullscreen: args.launch_fullscreen,
-        dynamic_config: Arc::new(Mutex::new(JgnesDynamicConfig {
+        shared_config: JgnesSharedConfig::new(JgnesDynamicConfig {
             gpu_filter_mode,
             aspect_ratio: args.aspect_ratio,
             overscan,
@@ -135,9 +135,7 @@ fn main() -> anyhow::Result<()> {
             fast_forward_multiplier: args.fast_forward_multiplier,
             rewind_buffer_len: Duration::from_secs(args.rewind_buffer_len_secs),
             input_config: InputConfig::default(),
-        })),
-        reload_signal: Arc::new(AtomicBool::new(false)),
-        quit_signal: Arc::new(AtomicBool::new(false)),
+        }),
     };
 
     jgnes_native_driver::run(&config)

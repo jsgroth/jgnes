@@ -10,7 +10,7 @@ use egui::{
 use egui_extras::{Column, TableBuilder};
 use jgnes_native_driver::{
     HotkeyConfig, InputConfig, InputConfigBase, JgnesDynamicConfig, JgnesNativeConfig,
-    JoystickInput, KeyboardInput, NativeRenderer,
+    JgnesSharedConfig, JoystickInput, KeyboardInput, NativeRenderer,
 };
 use jgnes_renderer::config::{
     AspectRatio, GpuFilterMode, Overscan, RenderScale, VSyncMode, WgpuBackend,
@@ -99,7 +99,7 @@ impl AppConfig {
             renderer: self.renderer,
             wgpu_backend: self.wgpu_backend,
             launch_fullscreen: self.launch_fullscreen,
-            dynamic_config: Arc::new(Mutex::new(JgnesDynamicConfig {
+            shared_config: JgnesSharedConfig::new(JgnesDynamicConfig {
                 gpu_filter_mode: match self.gpu_filter_type {
                     GpuFilterType::NearestNeighbor => GpuFilterMode::NearestNeighbor,
                     GpuFilterType::Linear => GpuFilterMode::Linear(self.gpu_render_scale),
@@ -113,9 +113,7 @@ impl AppConfig {
                 fast_forward_multiplier: self.fast_forward_multiplier,
                 rewind_buffer_len: Duration::from_secs(self.rewind_buffer_len_secs),
                 input_config: self.input.clone(),
-            })),
-            reload_signal: Arc::new(AtomicBool::new(false)),
-            quit_signal: Arc::new(AtomicBool::new(false)),
+            }),
         }
     }
 
@@ -483,9 +481,7 @@ impl AppState {
     fn stop_emulator_if_running(&self) {
         if self.emulator_is_running.load(Ordering::Relaxed) {
             log::info!("Setting quit signal to stop running emulator");
-            self.running_emulator_config
-                .quit_signal
-                .store(true, Ordering::Relaxed);
+            self.running_emulator_config.shared_config.request_quit();
         }
     }
 
@@ -611,7 +607,8 @@ impl App {
         let dynamic_config = &mut *self
             .state
             .running_emulator_config
-            .dynamic_config
+            .shared_config
+            .get_dynamic_config()
             .lock()
             .unwrap();
 
@@ -619,8 +616,8 @@ impl App {
 
         self.state
             .running_emulator_config
-            .reload_signal
-            .store(true, Ordering::Relaxed);
+            .shared_config
+            .request_config_reload();
     }
 
     fn render_central_panel(&mut self, ctx: &Context) {

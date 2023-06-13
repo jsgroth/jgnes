@@ -6,6 +6,7 @@ mod js;
 
 use crate::audio::{AudioQueue, EnqueueResult};
 use crate::config::InputConfig;
+use crate::js::alert;
 use base64::engine::general_purpose;
 use base64::Engine;
 use config::JgnesWebConfig;
@@ -553,9 +554,22 @@ fn run_event_loop(
                                 };
 
                                 // Tick the emulator until it renders the next frame
-                                while emulator.tick(&emulator_config).expect("emulation error")
-                                    != TickEffect::FrameRendered
-                                {}
+                                loop {
+                                    match emulator.tick(&emulator_config) {
+                                        Ok(TickEffect::None) => {}
+                                        Ok(TickEffect::FrameRendered) => {
+                                            break;
+                                        }
+                                        Err(err) => {
+                                            // Assume emulator is now invalid
+                                            state.emulator = None;
+                                            alert(&format!(
+                                                "Emulator terminated with error: {err:?}"
+                                            ));
+                                            break;
+                                        }
+                                    }
+                                }
                             }
                             None => {
                                 odd_frame = !odd_frame;

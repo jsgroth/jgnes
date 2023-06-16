@@ -1,8 +1,7 @@
-use crate::app::InputType;
-use jgnes_native_driver::{AxisDirection, HatDirection, JgnesNativeConfig, JoystickInput};
+use jgnes_native_driver::{
+    AxisDirection, HatDirection, InputCollectResult, InputType, JgnesNativeConfig, JoystickInput,
+};
 use sdl2::event::Event;
-use sdl2::joystick::HatState;
-use sdl2::keyboard::Keycode;
 use sdl2::pixels::{Color, PixelFormatEnum};
 use sdl2::render::WindowCanvas;
 use std::collections::HashMap;
@@ -17,11 +16,6 @@ pub(crate) enum EmuThreadTask {
         input_type: InputType,
         axis_deadzone: u16,
     },
-}
-
-pub(crate) enum InputCollectResult {
-    Keyboard(Keycode),
-    Gamepad(JoystickInput),
 }
 
 #[must_use]
@@ -159,11 +153,7 @@ fn collect_input(
                 } if input_type == InputType::Gamepad => {
                     if let Some(&device_id) = instance_id_to_device_id.get(&instance_id) {
                         if value.saturating_abs() as u16 >= axis_deadzone {
-                            let direction = if value > 0 {
-                                AxisDirection::Positive
-                            } else {
-                                AxisDirection::Negative
-                            };
+                            let direction = AxisDirection::from_value(value);
                             return Ok(Some(InputCollectResult::Gamepad(JoystickInput::Axis {
                                 device_id,
                                 axis_idx,
@@ -179,7 +169,7 @@ fn collect_input(
                     ..
                 } if input_type == InputType::Gamepad => {
                     if let Some(&device_id) = instance_id_to_device_id.get(&instance_id) {
-                        if let Some(direction) = hat_direction_for(state) {
+                        if let Some(direction) = HatDirection::from_hat_state(state) {
                             return Ok(Some(InputCollectResult::Gamepad(JoystickInput::Hat {
                                 device_id,
                                 hat_idx,
@@ -193,17 +183,6 @@ fn collect_input(
         }
 
         fill_with_random_colors(&mut canvas)?;
-    }
-}
-
-fn hat_direction_for(state: HatState) -> Option<HatDirection> {
-    match state {
-        HatState::Up => Some(HatDirection::Up),
-        HatState::Left => Some(HatDirection::Left),
-        HatState::Right => Some(HatDirection::Right),
-        HatState::Down => Some(HatDirection::Down),
-        // Ignore diagonals
-        _ => None,
     }
 }
 

@@ -1,4 +1,4 @@
-use crate::emuthread::{EmuThreadTask, InputCollectResult};
+use crate::emuthread::EmuThreadTask;
 use crate::romlist::RomMetadata;
 use crate::{emuthread, romlist};
 use eframe::Frame;
@@ -9,8 +9,8 @@ use egui::{
 };
 use egui_extras::{Column, TableBuilder};
 use jgnes_native_driver::{
-    HotkeyConfig, InputConfig, InputConfigBase, JgnesDynamicConfig, JgnesNativeConfig,
-    JgnesSharedConfig, JoystickInput, KeyboardInput, NativeRenderer,
+    HotkeyConfig, InputCollectResult, InputConfig, InputConfigBase, InputType, JgnesDynamicConfig,
+    JgnesNativeConfig, JgnesSharedConfig, JoystickInput, KeyboardInput, NativeRenderer,
 };
 use jgnes_renderer::config::{
     AspectRatio, GpuFilterMode, Overscan, RenderScale, VSyncMode, WgpuBackend,
@@ -91,15 +91,12 @@ struct AppConfig {
 }
 
 impl AppConfig {
-    fn to_jgnes_native_config(&self, nes_file_path: String) -> JgnesNativeConfig {
-        JgnesNativeConfig {
-            nes_file_path,
-            window_width: self.window_width,
-            window_height: self.window_height,
-            renderer: self.renderer,
-            wgpu_backend: self.wgpu_backend,
-            launch_fullscreen: self.launch_fullscreen,
-            shared_config: JgnesSharedConfig::new(JgnesDynamicConfig {
+    fn to_jgnes_native_config(
+        &self,
+        nes_file_path: String,
+    ) -> (JgnesNativeConfig, Receiver<Option<InputCollectResult>>) {
+        let (shared_config, input_reconfigure_receiver) =
+            JgnesSharedConfig::new(JgnesDynamicConfig {
                 gpu_filter_mode: match self.gpu_filter_type {
                     GpuFilterType::NearestNeighbor => GpuFilterMode::NearestNeighbor,
                     GpuFilterType::Linear => GpuFilterMode::Linear(self.gpu_render_scale),
@@ -113,8 +110,19 @@ impl AppConfig {
                 fast_forward_multiplier: self.fast_forward_multiplier,
                 rewind_buffer_len: Duration::from_secs(self.rewind_buffer_len_secs),
                 input_config: self.input.clone(),
-            }),
-        }
+            });
+
+        let native_config = JgnesNativeConfig {
+            nes_file_path,
+            window_width: self.window_width,
+            window_height: self.window_height,
+            renderer: self.renderer,
+            wgpu_backend: self.wgpu_backend,
+            launch_fullscreen: self.launch_fullscreen,
+            shared_config,
+        };
+
+        (native_config, input_reconfigure_receiver)
     }
 
     fn update_dynamic_config(&self, dynamic_config: &mut JgnesDynamicConfig) {
@@ -154,12 +162,6 @@ enum OpenWindow {
 pub(crate) enum Player {
     P1,
     P2,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum InputType {
-    Keyboard,
-    Gamepad,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -223,15 +225,10 @@ impl<'a> InputButton<'a> {
 
     fn ui(self, ui: &mut Ui) {
         if self.button.ui(ui).clicked() {
+            self.app_state
+                .send_input_configure_request(self.input_type, self.axis_deadzone);
             self.app_state.waiting_for_input =
                 Some(WaitingForInput::NesButton(self.player, self.nes_button));
-            self.app_state
-                .thread_task_sender
-                .send(EmuThreadTask::CollectInput {
-                    input_type: self.input_type,
-                    axis_deadzone: self.axis_deadzone,
-                })
-                .expect("Sending collect input task should not fail");
         }
     }
 }
@@ -267,25 +264,15 @@ impl<'a> HotkeyButton<'a> {
         }
     }
 
-    fn on_disabled_hover_text(mut self, s: impl Into<String>) -> Self {
-        self.on_disabled_hover_text = Some(s.into());
-        self
-    }
-
     fn ui(self, ui: &mut Ui) {
         let mut response = self.button.ui(ui);
         if let Some(on_disabled_hover_text) = self.on_disabled_hover_text {
             response = response.on_disabled_hover_text(on_disabled_hover_text);
         }
         if response.clicked() {
-            self.app_state
-                .thread_task_sender
-                .send(EmuThreadTask::CollectInput {
-                    input_type: InputType::Keyboard,
-                    axis_deadzone: self.axis_deadzone,
-                })
-                .unwrap();
             self.app_state.waiting_for_input = Some(WaitingForInput::Hotkey(self.hotkey));
+            self.app_state
+                .send_input_configure_request(InputType::Keyboard, self.axis_deadzone);
         }
     }
 }
@@ -411,6 +398,17 @@ enum WaitingForInput {
     Hotkey(Hotkey),
 }
 
+struct RunningEmulatorState {
+    shared_config: JgnesSharedConfig,
+    input_reconfigure_receiver: Receiver<Option<InputCollectResult>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum InputReceiveResult {
+    Received(Option<InputCollectResult>),
+    NotReceived,
+}
+
 struct AppState {
     render_scale_text: String,
     render_scale_invalid: bool,
@@ -426,7 +424,7 @@ struct AppState {
     open_input_window: Option<InputWindow>,
     waiting_for_input: Option<WaitingForInput>,
     emulator_is_running: Arc<AtomicBool>,
-    running_emulator_config: JgnesNativeConfig,
+    running_emulator_state: Option<RunningEmulatorState>,
     emulation_error: Arc<Mutex<Option<anyhow::Error>>>,
     thread_task_sender: Sender<EmuThreadTask>,
     thread_input_receiver: Receiver<Option<InputCollectResult>>,
@@ -471,7 +469,7 @@ impl AppState {
             open_input_window: None,
             waiting_for_input: None,
             emulator_is_running: is_running,
-            running_emulator_config: config.to_jgnes_native_config(String::new()),
+            running_emulator_state: None,
             emulation_error,
             thread_task_sender,
             thread_input_receiver,
@@ -481,12 +479,58 @@ impl AppState {
     fn stop_emulator_if_running(&self) {
         if self.emulator_is_running.load(Ordering::Relaxed) {
             log::info!("Setting quit signal to stop running emulator");
-            self.running_emulator_config.shared_config.request_quit();
+            if let Some(running_emulator_state) = &self.running_emulator_state {
+                running_emulator_state.shared_config.request_quit();
+            }
         }
     }
 
     fn is_any_window_open(&self) -> bool {
         self.open_window.is_some() || self.error_window_open || self.open_input_window.is_some()
+    }
+
+    fn send_input_configure_request(&self, input_type: InputType, axis_deadzone: u16) {
+        match (
+            self.emulator_is_running.load(Ordering::Relaxed),
+            &self.running_emulator_state,
+        ) {
+            (true, Some(running_emulator_state)) => {
+                running_emulator_state
+                    .shared_config
+                    .request_input_configure(input_type);
+            }
+            (true, None) => {
+                // ???
+                panic!("running emulator state should always be Some while emulator is running");
+            }
+            (false, _) => {
+                self.thread_task_sender
+                    .send(EmuThreadTask::CollectInput {
+                        input_type,
+                        axis_deadzone,
+                    })
+                    .expect("Sending collect input task should not fail");
+            }
+        }
+    }
+
+    fn recv_input_reconfigure_response(&self) -> InputReceiveResult {
+        if let Some(running_emulator_state) = &self.running_emulator_state {
+            if let Ok(input_collect_result) = running_emulator_state
+                .input_reconfigure_receiver
+                .recv_timeout(Duration::from_millis(1))
+            {
+                return InputReceiveResult::Received(input_collect_result);
+            }
+        }
+
+        self.thread_input_receiver
+            .recv_timeout(Duration::from_millis(1))
+            .ok()
+            .map_or(
+                InputReceiveResult::NotReceived,
+                InputReceiveResult::Received,
+            )
     }
 }
 
@@ -587,14 +631,18 @@ impl App {
         let path = path.as_ref();
 
         let file_path_str = path.to_string_lossy().to_string();
-        let native_config = self.config.to_jgnes_native_config(file_path_str);
+        let (native_config, input_reconfigure_receiver) =
+            self.config.to_jgnes_native_config(file_path_str);
 
         self.state
             .thread_task_sender
             .send(EmuThreadTask::RunEmulator(Box::new(native_config.clone())))
             .unwrap();
 
-        self.state.running_emulator_config = native_config;
+        self.state.running_emulator_state = Some(RunningEmulatorState {
+            shared_config: native_config.shared_config,
+            input_reconfigure_receiver,
+        });
     }
 
     fn save_config(&mut self) {
@@ -604,9 +652,9 @@ impl App {
     }
 
     fn update_running_emulator_config(&mut self) {
-        let dynamic_config = &mut *self
-            .state
-            .running_emulator_config
+        let Some(running_emulator_state) = &self.state.running_emulator_state else { return };
+
+        let dynamic_config = &mut *running_emulator_state
             .shared_config
             .get_dynamic_config()
             .lock()
@@ -614,10 +662,7 @@ impl App {
 
         self.config.update_dynamic_config(dynamic_config);
 
-        self.state
-            .running_emulator_config
-            .shared_config
-            .request_config_reload();
+        running_emulator_state.shared_config.request_config_reload();
     }
 
     fn render_central_panel(&mut self, ctx: &Context) {
@@ -973,19 +1018,14 @@ impl App {
             .show(ctx, |ui| {
                 ui.set_enabled(self.state.open_input_window.is_none() && self.state.waiting_for_input.is_none());
 
-                let emulator_running = self.state.emulator_is_running.load(Ordering::Relaxed);
-                let disabled_text = "Cannot reconfigure input bindings while emulator is running";
-
                 ui.horizontal(|ui| {
-                    ui.set_enabled(!emulator_running);
-
-                    if ui.button("P1 Keyboard Input").on_disabled_hover_text(disabled_text).clicked() {
+                    if ui.button("P1 Keyboard Input").clicked() {
                         self.state.open_input_window = Some(InputWindow(Player::P1, InputType::Keyboard));
                     }
 
                     ui.add_space(20.0);
 
-                    if ui.button("P1 Gamepad Input").on_disabled_hover_text(disabled_text).clicked() {
+                    if ui.button("P1 Gamepad Input").clicked() {
                         self.state.open_input_window = Some(InputWindow(Player::P1, InputType::Gamepad));
                     }
                 });
@@ -993,15 +1033,13 @@ impl App {
                 ui.add_space(10.0);
 
                 ui.horizontal(|ui| {
-                    ui.set_enabled(!emulator_running);
-
-                    if ui.button("P2 Keyboard Input").on_disabled_hover_text(disabled_text).clicked() {
+                    if ui.button("P2 Keyboard Input").clicked() {
                         self.state.open_input_window = Some(InputWindow(Player::P2, InputType::Keyboard));
                     }
 
                     ui.add_space(20.0);
 
-                    if ui.button("P2 Gamepad Input").on_disabled_hover_text(disabled_text).clicked() {
+                    if ui.button("P2 Gamepad Input").clicked() {
                         self.state.open_input_window = Some(InputWindow(Player::P2, InputType::Gamepad));
                     }
                 });
@@ -1086,22 +1124,16 @@ impl App {
     }
 
     fn render_hotkey_settings_window(&mut self, ctx: &Context) {
-        let disabled_text = "Cannot reconfigure hotkey bindings while emulator is running";
-
         let mut hotkey_settings_open = true;
         Window::new("Hotkey Settings")
             .resizable(false)
             .open(&mut hotkey_settings_open)
             .show(ctx, |ui| {
                 Grid::new("hotkey_settings_grid").show(ui, |ui| {
-                    ui.set_enabled(!self.state.emulator_is_running.load(Ordering::Relaxed));
-
                     for &hotkey in Hotkey::ALL {
                         ui.label(format!("{}:", hotkey.label()));
 
-                        HotkeyButton::new(hotkey, self)
-                            .on_disabled_hover_text(disabled_text)
-                            .ui(ui);
+                        HotkeyButton::new(hotkey, self).ui(ui);
 
                         if ui.button("Clear").clicked() {
                             *get_hotkey_field(&mut self.config.input.hotkeys, hotkey) = None;
@@ -1183,10 +1215,8 @@ impl App {
     fn poll_for_input_thread_result(&mut self) {
         let Some(waiting_for_input) = self.state.waiting_for_input else { return };
 
-        if let Ok(collect_result) = self
-            .state
-            .thread_input_receiver
-            .recv_timeout(Duration::from_millis(1))
+        if let InputReceiveResult::Received(collect_result) =
+            self.state.recv_input_reconfigure_response()
         {
             self.state.waiting_for_input = None;
 

@@ -1,10 +1,12 @@
 use jgnes_proc_macros::{EnumDisplay, EnumFromStr};
 use jgnes_renderer::config::{AspectRatio, GpuFilterMode, Overscan, VSyncMode, WgpuBackend};
+use sdl2::joystick::HatState;
 use sdl2::keyboard::Keycode;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+use std::sync::mpsc::{Receiver, Sender};
+use std::sync::{mpsc, Arc, Mutex};
 use std::time::Duration;
 
 #[derive(
@@ -100,6 +102,17 @@ pub enum AxisDirection {
 }
 
 impl AxisDirection {
+    #[must_use]
+    pub fn from_value(value: i16) -> Self {
+        if value >= 0 {
+            // Arbitrarily assign 0 to positive direction; this function should generally not be
+            // called with 0 due to deadzone
+            Self::Positive
+        } else {
+            Self::Negative
+        }
+    }
+
     fn sign_str(self) -> &'static str {
         match self {
             Self::Positive => "+",
@@ -119,6 +132,18 @@ pub enum HatDirection {
 
 impl HatDirection {
     pub(crate) const ALL: [Self; 4] = [Self::Up, Self::Left, Self::Right, Self::Down];
+
+    #[must_use]
+    pub fn from_hat_state(state: HatState) -> Option<Self> {
+        match state {
+            HatState::Up => Some(HatDirection::Up),
+            HatState::Left => Some(HatDirection::Left),
+            HatState::Right => Some(HatDirection::Right),
+            HatState::Down => Some(HatDirection::Down),
+            // Ignore diagonals
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -393,6 +418,32 @@ impl Display for JgnesDynamicConfig {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InputType {
+    Keyboard = 0,
+    Gamepad = 1,
+}
+
+impl InputType {
+    fn to_discriminant(self) -> u8 {
+        self as u8
+    }
+
+    pub(crate) fn from_discriminant(discriminant: u8) -> Option<Self> {
+        match discriminant {
+            0 => Some(Self::Keyboard),
+            1 => Some(Self::Gamepad),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InputCollectResult {
+    Keyboard(Keycode),
+    Gamepad(JoystickInput),
+}
+
 /// A wrapper around shared dynamic configuration state and signals that the emulator driver can
 /// send to the emulator.
 #[derive(Debug, Clone)]
@@ -400,16 +451,28 @@ pub struct JgnesSharedConfig {
     pub(crate) dynamic_config: Arc<Mutex<JgnesDynamicConfig>>,
     pub(crate) config_reload_signal: Arc<AtomicBool>,
     pub(crate) quit_signal: Arc<AtomicBool>,
+    pub(crate) input_reconfigure_sender: Sender<Option<InputCollectResult>>,
+    pub(crate) input_reconfigure_signal: Arc<AtomicU8>,
 }
 
 impl JgnesSharedConfig {
+    pub(crate) const NO_INPUT_RECONFIGURE: u8 = u8::MAX;
+
     #[must_use]
-    pub fn new(initial_dynamic_config: JgnesDynamicConfig) -> Self {
-        Self {
+    pub fn new(
+        initial_dynamic_config: JgnesDynamicConfig,
+    ) -> (Self, Receiver<Option<InputCollectResult>>) {
+        let (input_reconfigure_sender, input_reconfigure_recv) = mpsc::channel();
+
+        let config = Self {
             dynamic_config: Arc::new(Mutex::new(initial_dynamic_config)),
             config_reload_signal: Arc::new(AtomicBool::new(false)),
             quit_signal: Arc::new(AtomicBool::new(false)),
-        }
+            input_reconfigure_sender,
+            input_reconfigure_signal: Arc::new(AtomicU8::new(Self::NO_INPUT_RECONFIGURE)),
+        };
+
+        (config, input_reconfigure_recv)
     }
 
     #[must_use]
@@ -423,5 +486,23 @@ impl JgnesSharedConfig {
 
     pub fn request_quit(&self) {
         self.quit_signal.store(true, Ordering::Relaxed);
+    }
+
+    pub fn request_input_configure(&self, input_type: InputType) {
+        self.input_reconfigure_signal
+            .store(input_type.to_discriminant(), Ordering::Relaxed);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn no_input_reconfigure_returns_none() {
+        assert_eq!(
+            None,
+            InputType::from_discriminant(JgnesSharedConfig::NO_INPUT_RECONFIGURE)
+        );
     }
 }

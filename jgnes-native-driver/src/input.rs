@@ -295,6 +295,14 @@ impl<'a> SdlInputHandler<'a> {
             *field = value;
         }
     }
+
+    pub(crate) fn device_id_for(&self, instance_id: u32) -> Option<u32> {
+        self.instance_id_to_device_id.get(&instance_id).copied()
+    }
+
+    pub(crate) fn axis_deadzone(&self) -> u16 {
+        self.axis_deadzone
+    }
 }
 
 fn populate_map<K>(

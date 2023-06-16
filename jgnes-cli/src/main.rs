@@ -117,6 +117,18 @@ fn main() -> anyhow::Result<()> {
     };
 
     let overscan = args.overscan();
+    let (shared_config, _) = JgnesSharedConfig::new(JgnesDynamicConfig {
+        gpu_filter_mode,
+        aspect_ratio: args.aspect_ratio,
+        overscan,
+        forced_integer_height_scaling: args.forced_integer_height_scaling,
+        vsync_mode: args.vsync_mode,
+        sync_to_audio: args.sync_to_audio,
+        silence_ultrasonic_triangle_output: args.silence_ultrasonic_triangle_output,
+        fast_forward_multiplier: args.fast_forward_multiplier,
+        rewind_buffer_len: Duration::from_secs(args.rewind_buffer_len_secs),
+        input_config: InputConfig::default(),
+    });
     let config = JgnesNativeConfig {
         nes_file_path: args.nes_file_path,
         window_width: args.window_width,
@@ -124,18 +136,7 @@ fn main() -> anyhow::Result<()> {
         renderer: args.renderer,
         wgpu_backend: args.wgpu_backend,
         launch_fullscreen: args.launch_fullscreen,
-        shared_config: JgnesSharedConfig::new(JgnesDynamicConfig {
-            gpu_filter_mode,
-            aspect_ratio: args.aspect_ratio,
-            overscan,
-            forced_integer_height_scaling: args.forced_integer_height_scaling,
-            vsync_mode: args.vsync_mode,
-            sync_to_audio: args.sync_to_audio,
-            silence_ultrasonic_triangle_output: args.silence_ultrasonic_triangle_output,
-            fast_forward_multiplier: args.fast_forward_multiplier,
-            rewind_buffer_len: Duration::from_secs(args.rewind_buffer_len_secs),
-            input_config: InputConfig::default(),
-        }),
+        shared_config,
     };
 
     jgnes_native_driver::run(&config)

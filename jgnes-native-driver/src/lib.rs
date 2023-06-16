@@ -24,9 +24,9 @@ use std::time::{Duration, SystemTime};
 use std::{fs, thread};
 
 pub use crate::config::{
-    AxisDirection, HatDirection, HotkeyConfig, InputConfig, InputConfigBase, JgnesDynamicConfig,
-    JgnesNativeConfig, JgnesSharedConfig, JoystickInput, JoystickInputConfig, KeyboardInput,
-    KeyboardInputConfig, NativeRenderer, PlayerInputConfig,
+    AxisDirection, HatDirection, HotkeyConfig, InputCollectResult, InputConfig, InputConfigBase,
+    InputType, JgnesDynamicConfig, JgnesNativeConfig, JgnesSharedConfig, JoystickInput,
+    JoystickInputConfig, KeyboardInput, KeyboardInputConfig, NativeRenderer, PlayerInputConfig,
 };
 use crate::input::{Hotkey, SdlInputHandler};
 use jgnes_renderer::config::{FrameSkip, RendererConfig, VSyncMode};
@@ -526,6 +526,8 @@ where
         dynamic_config,
         config_reload_signal,
         quit_signal,
+        input_reconfigure_sender,
+        input_reconfigure_signal,
     } = &native_config.shared_config;
 
     let save_state_path = save_state_path.as_ref();
@@ -594,6 +596,30 @@ where
 
                 fast_forward_multiplier = dynamic_config.fast_forward_multiplier;
                 rewind_state.reload_buffer_len(dynamic_config.rewind_buffer_len);
+            }
+
+            if let Some(input_type) =
+                InputType::from_discriminant(input_reconfigure_signal.load(Ordering::Relaxed))
+            {
+                input_reconfigure_signal
+                    .store(JgnesSharedConfig::NO_INPUT_RECONFIGURE, Ordering::Relaxed);
+
+                // Attempt to ensure that pressed inputs will go to the SDL2 window; does not appear
+                // to work on all platforms / window managers
+                emulator.get_renderer_mut().window_mut().raise();
+
+                match handle_input_reconfigure(input_type, &mut event_pump, &mut input_handler)? {
+                    InputReconfigureResult::Input(input_collect_result) => {
+                        log::info!("Sending input collect result {input_collect_result:?}");
+                        input_reconfigure_sender
+                            .send(Some(input_collect_result))
+                            .unwrap();
+                    }
+                    InputReconfigureResult::Quit => {
+                        input_reconfigure_sender.send(None).unwrap();
+                        return Ok(());
+                    }
+                }
             }
 
             for event in event_pump.poll_iter() {
@@ -706,5 +732,96 @@ where
                 }
             }
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum InputReconfigureResult {
+    Input(InputCollectResult),
+    Quit,
+}
+
+fn handle_input_reconfigure(
+    input_type: InputType,
+    event_pump: &mut EventPump,
+    input_handler: &mut SdlInputHandler<'_>,
+) -> Result<InputReconfigureResult, anyhow::Error> {
+    log::info!("Input reconfigure requested for input type {input_type:?}");
+
+    let axis_deadzone = input_handler.axis_deadzone();
+
+    loop {
+        for event in event_pump.poll_iter() {
+            input_handler.handle_event(&event)?;
+
+            match event {
+                Event::Quit { .. } => {
+                    return Ok(InputReconfigureResult::Quit);
+                }
+                Event::KeyDown {
+                    keycode: Some(keycode),
+                    ..
+                } if input_type == InputType::Keyboard => {
+                    return Ok(InputReconfigureResult::Input(InputCollectResult::Keyboard(
+                        keycode,
+                    )));
+                }
+                Event::JoyButtonDown {
+                    which: instance_id,
+                    button_idx,
+                    ..
+                } if input_type == InputType::Gamepad => {
+                    if let Some(device_id) = input_handler.device_id_for(instance_id) {
+                        return Ok(InputReconfigureResult::Input(InputCollectResult::Gamepad(
+                            JoystickInput::Button {
+                                device_id,
+                                button_idx,
+                            },
+                        )));
+                    }
+                }
+                Event::JoyAxisMotion {
+                    which: instance_id,
+                    axis_idx,
+                    value,
+                    ..
+                } if input_type == InputType::Gamepad => {
+                    if value.saturating_abs() as u16 >= axis_deadzone {
+                        if let Some(device_id) = input_handler.device_id_for(instance_id) {
+                            let direction = AxisDirection::from_value(value);
+                            return Ok(InputReconfigureResult::Input(InputCollectResult::Gamepad(
+                                JoystickInput::Axis {
+                                    device_id,
+                                    axis_idx,
+                                    direction,
+                                },
+                            )));
+                        }
+                    }
+                }
+                Event::JoyHatMotion {
+                    which: instance_id,
+                    hat_idx,
+                    state,
+                    ..
+                } if input_type == InputType::Gamepad => {
+                    if let (Some(device_id), Some(direction)) = (
+                        input_handler.device_id_for(instance_id),
+                        HatDirection::from_hat_state(state),
+                    ) {
+                        return Ok(InputReconfigureResult::Input(InputCollectResult::Gamepad(
+                            JoystickInput::Hat {
+                                device_id,
+                                hat_idx,
+                                direction,
+                            },
+                        )));
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        sleep(Duration::from_millis(1));
     }
 }

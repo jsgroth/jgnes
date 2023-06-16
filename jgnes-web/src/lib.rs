@@ -6,8 +6,7 @@ mod js;
 
 use crate::audio::{AudioQueue, EnqueueResult};
 use crate::config::InputConfig;
-use crate::js::alert;
-use base64::engine::general_purpose;
+use base64::engine::GeneralPurpose;
 use base64::Engine;
 use config::JgnesWebConfig;
 use jgnes_core::audio::{DownsampleAction, DownsampleCounter, LowPassFilter};
@@ -31,6 +30,8 @@ use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEve
 use winit::event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopProxy};
 use winit::platform::web::WindowExtWebSys;
 use winit::window::{Window, WindowBuilder, WindowId};
+
+const BASE64_ENGINE: GeneralPurpose = base64::engine::general_purpose::STANDARD;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[wasm_bindgen]
@@ -78,7 +79,7 @@ impl SaveWriter for WebSaveWriter {
     type Err = ();
 
     fn persist_sram(&mut self, sram: &[u8]) -> Result<(), Self::Err> {
-        let sram_b64 = general_purpose::STANDARD.encode(sram);
+        let sram_b64 = BASE64_ENGINE.encode(sram);
         js::saveToLocalStorage(&self.file_name, &sram_b64);
         Ok(())
     }
@@ -271,8 +272,7 @@ pub fn init_logger() {
 }
 
 fn load_sav_bytes(file_name: &str) -> Option<Vec<u8>> {
-    js::loadFromLocalStorage(file_name)
-        .and_then(|sav_b64| general_purpose::STANDARD.decode(sav_b64).ok())
+    js::loadFromLocalStorage(file_name).and_then(|sav_b64| BASE64_ENGINE.decode(sav_b64).ok())
 }
 
 fn set_rom_file_name_text(file_name: &str) {
@@ -465,7 +465,7 @@ fn run_event_loop(
                 save_bytes,
                 file_name,
             }) => {
-                let save_bytes_b64 = general_purpose::STANDARD.encode(&save_bytes);
+                let save_bytes_b64 = BASE64_ENGINE.encode(&save_bytes);
                 js::saveToLocalStorage(&file_name, &save_bytes_b64);
 
                 // Hard reset after uploading a save file
@@ -563,7 +563,7 @@ fn run_event_loop(
                                         Err(err) => {
                                             // Assume emulator is now invalid
                                             state.emulator = None;
-                                            alert(&format!(
+                                            js::alert(&format!(
                                                 "Emulator terminated with error: {err:?}"
                                             ));
                                             break;

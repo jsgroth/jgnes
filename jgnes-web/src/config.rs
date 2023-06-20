@@ -136,6 +136,7 @@ pub struct JgnesWebConfig {
 }
 
 const NTSC: &str = "Ntsc";
+const PAL: &str = "Pal";
 const SQUARE_PIXELS: &str = "SquarePixels";
 
 const NEAREST_NEIGHBOR: &str = "NearestNeighbor";
@@ -181,6 +182,7 @@ impl JgnesWebConfig {
     pub fn set_aspect_ratio(&self, aspect_ratio: &str) {
         let aspect_ratio = match aspect_ratio {
             NTSC => AspectRatio::Ntsc,
+            PAL => AspectRatio::Pal,
             SQUARE_PIXELS => AspectRatio::SquarePixels,
             _ => return,
         };

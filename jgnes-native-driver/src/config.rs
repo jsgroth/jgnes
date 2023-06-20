@@ -378,6 +378,7 @@ pub struct JgnesDynamicConfig {
     pub overscan: Overscan,
     pub forced_integer_height_scaling: bool,
     pub vsync_mode: VSyncMode,
+    pub pal_black_border: bool,
     pub sync_to_audio: bool,
     pub silence_ultrasonic_triangle_output: bool,
     pub fast_forward_multiplier: u8,
@@ -396,6 +397,7 @@ impl Display for JgnesDynamicConfig {
             self.forced_integer_height_scaling
         )?;
         writeln!(f, "vsync_mode: {}", self.vsync_mode)?;
+        writeln!(f, "pal_black_border: {}", self.pal_black_border)?;
         writeln!(f, "sync_to_audio: {}", self.sync_to_audio)?;
         writeln!(
             f,

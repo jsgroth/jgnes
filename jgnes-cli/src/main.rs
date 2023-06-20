@@ -51,6 +51,10 @@ struct CliArgs {
     #[arg(long, default_value_t)]
     forced_integer_height_scaling: bool,
 
+    /// Emulate PAL black border
+    #[arg(long, default_value_t)]
+    pal_black_border: bool,
+
     /// Disable audio sync
     #[arg(long = "no-audio-sync", default_value_t = true, action = clap::ArgAction::SetFalse)]
     sync_to_audio: bool,
@@ -126,6 +130,7 @@ fn main() -> anyhow::Result<()> {
         overscan,
         forced_integer_height_scaling: args.forced_integer_height_scaling,
         vsync_mode: args.vsync_mode,
+        pal_black_border: args.pal_black_border,
         sync_to_audio: args.sync_to_audio,
         silence_ultrasonic_triangle_output: args.silence_ultrasonic_triangle_output,
         fast_forward_multiplier: args.fast_forward_multiplier,

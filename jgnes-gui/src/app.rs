@@ -73,6 +73,8 @@ struct AppConfig {
     overscan: Overscan,
     #[serde(default)]
     forced_integer_height_scaling: bool,
+    #[serde(default)]
+    pal_black_border: bool,
     #[serde(default = "true_fn")]
     sync_to_audio: bool,
     #[serde(default)]
@@ -91,26 +93,31 @@ struct AppConfig {
 }
 
 impl AppConfig {
+    fn to_jgnes_dynamic_config(&self) -> JgnesDynamicConfig {
+        JgnesDynamicConfig {
+            gpu_filter_mode: match self.gpu_filter_type {
+                GpuFilterType::NearestNeighbor => GpuFilterMode::NearestNeighbor,
+                GpuFilterType::Linear => GpuFilterMode::Linear(self.gpu_render_scale),
+            },
+            aspect_ratio: self.aspect_ratio,
+            overscan: self.overscan,
+            forced_integer_height_scaling: self.forced_integer_height_scaling,
+            vsync_mode: self.vsync_mode,
+            pal_black_border: self.pal_black_border,
+            sync_to_audio: self.sync_to_audio,
+            silence_ultrasonic_triangle_output: self.silence_ultrasonic_triangle_output,
+            fast_forward_multiplier: self.fast_forward_multiplier,
+            rewind_buffer_len: Duration::from_secs(self.rewind_buffer_len_secs),
+            input_config: self.input.clone(),
+        }
+    }
+
     fn to_jgnes_native_config(
         &self,
         nes_file_path: String,
     ) -> (JgnesNativeConfig, Receiver<Option<InputCollectResult>>) {
         let (shared_config, input_reconfigure_receiver) =
-            JgnesSharedConfig::new(JgnesDynamicConfig {
-                gpu_filter_mode: match self.gpu_filter_type {
-                    GpuFilterType::NearestNeighbor => GpuFilterMode::NearestNeighbor,
-                    GpuFilterType::Linear => GpuFilterMode::Linear(self.gpu_render_scale),
-                },
-                aspect_ratio: self.aspect_ratio,
-                overscan: self.overscan,
-                forced_integer_height_scaling: self.forced_integer_height_scaling,
-                vsync_mode: self.vsync_mode,
-                sync_to_audio: self.sync_to_audio,
-                silence_ultrasonic_triangle_output: self.silence_ultrasonic_triangle_output,
-                fast_forward_multiplier: self.fast_forward_multiplier,
-                rewind_buffer_len: Duration::from_secs(self.rewind_buffer_len_secs),
-                input_config: self.input.clone(),
-            });
+            JgnesSharedConfig::new(self.to_jgnes_dynamic_config());
 
         let native_config = JgnesNativeConfig {
             nes_file_path,
@@ -123,21 +130,6 @@ impl AppConfig {
         };
 
         (native_config, input_reconfigure_receiver)
-    }
-
-    fn update_dynamic_config(&self, dynamic_config: &mut JgnesDynamicConfig) {
-        dynamic_config.gpu_filter_mode = match self.gpu_filter_type {
-            GpuFilterType::NearestNeighbor => GpuFilterMode::NearestNeighbor,
-            GpuFilterType::Linear => GpuFilterMode::Linear(self.gpu_render_scale),
-        };
-        dynamic_config.aspect_ratio = self.aspect_ratio;
-        dynamic_config.overscan = self.overscan;
-        dynamic_config.forced_integer_height_scaling = self.forced_integer_height_scaling;
-        dynamic_config.vsync_mode = self.vsync_mode;
-        dynamic_config.sync_to_audio = self.sync_to_audio;
-        dynamic_config.silence_ultrasonic_triangle_output = self.silence_ultrasonic_triangle_output;
-        dynamic_config.fast_forward_multiplier = self.fast_forward_multiplier;
-        dynamic_config.input_config = self.input.clone();
     }
 }
 
@@ -660,7 +652,7 @@ impl App {
             .lock()
             .unwrap();
 
-        self.config.update_dynamic_config(dynamic_config);
+        *dynamic_config = self.config.to_jgnes_dynamic_config();
 
         running_emulator_state.shared_config.request_config_reload();
     }
@@ -926,6 +918,9 @@ impl App {
                             .on_hover_text("Image will be stretched to fill the entire display area");
                     });
                 });
+
+                ui.checkbox(&mut self.config.pal_black_border, "Emulate PAL black border")
+                    .on_hover_text("Removes top scanline plus two columns of pixels in each row");
 
                 ui.group(|ui| {
                     ui.label("Overscan in pixels");

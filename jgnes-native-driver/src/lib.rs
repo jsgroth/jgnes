@@ -207,6 +207,10 @@ impl AudioPlayer for SdlAudioPlayer {
 
         Ok(())
     }
+
+    fn set_timing_mode(&mut self, timing_mode: TimingMode) {
+        self.downsample_counter.set_timing_mode(timing_mode);
+    }
 }
 
 struct SdlInputPoller {

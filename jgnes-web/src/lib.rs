@@ -12,7 +12,7 @@ use config::JgnesWebConfig;
 use jgnes_core::audio::{DownsampleAction, DownsampleCounter, LowPassFilter};
 use jgnes_core::{
     AudioPlayer, ColorEmphasis, Emulator, EmulatorConfig, InputPoller, JoypadState, Renderer,
-    SaveWriter, TickEffect,
+    SaveWriter, TickEffect, TimingMode,
 };
 use jgnes_renderer::config::{
     AspectRatio, FrameSkip, GpuFilterMode, Overscan, RendererConfig, VSyncMode, WgpuBackend,
@@ -239,6 +239,10 @@ impl AudioPlayer for WebAudioPlayer {
         }
 
         Ok(())
+    }
+
+    fn set_timing_mode(&mut self, timing_mode: TimingMode) {
+        self.downsample_counter.set_timing_mode(timing_mode);
     }
 }
 

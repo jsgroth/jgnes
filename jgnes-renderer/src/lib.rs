@@ -3,6 +3,7 @@ pub mod config;
 mod renderer;
 
 use crate::config::AspectRatio;
+use jgnes_core::TimingMode;
 pub use renderer::WgpuRenderer;
 use std::cmp;
 
@@ -21,6 +22,7 @@ pub fn determine_display_area(
     window_height: u32,
     aspect_ratio: AspectRatio,
     forced_integer_height_scaling: bool,
+    timing_mode: TimingMode,
 ) -> DisplayArea {
     match aspect_ratio {
         AspectRatio::Stretched => DisplayArea {
@@ -29,15 +31,19 @@ pub fn determine_display_area(
             width: window_width,
             height: window_height,
         },
-        AspectRatio::Ntsc | AspectRatio::SquarePixels | AspectRatio::FourThree => {
+        AspectRatio::Ntsc
+        | AspectRatio::Pal
+        | AspectRatio::SquarePixels
+        | AspectRatio::FourThree => {
             let width_to_height_ratio = match aspect_ratio {
                 AspectRatio::Ntsc => 64.0 / 49.0,
+                AspectRatio::Pal => 11.0 / 7.0,
                 AspectRatio::SquarePixels => 8.0 / 7.0,
                 AspectRatio::FourThree => 4.0 / 3.0,
                 AspectRatio::Stretched => unreachable!("nested match expressions"),
             };
 
-            let visible_screen_height = u32::from(jgnes_core::VISIBLE_SCREEN_HEIGHT);
+            let visible_screen_height = timing_mode.visible_screen_height().into();
 
             let width = cmp::min(
                 window_width,

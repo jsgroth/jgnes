@@ -43,7 +43,7 @@ struct CliArgs {
     #[arg(long, default_value_t = 3)]
     gpu_render_scale: u32,
 
-    /// Aspect ratio (Ntsc / SquarePixels / FourThree / Stretched)
+    /// Aspect ratio (Ntsc / Pal / SquarePixels / FourThree / Stretched)
     #[arg(long, default_value_t)]
     aspect_ratio: AspectRatio,
 

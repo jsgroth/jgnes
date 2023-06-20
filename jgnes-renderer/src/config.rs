@@ -36,6 +36,7 @@ impl WgpuBackend {
 pub enum AspectRatio {
     #[default]
     Ntsc,
+    Pal,
     SquarePixels,
     FourThree,
     Stretched,

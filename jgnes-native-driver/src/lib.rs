@@ -4,7 +4,7 @@ mod input;
 use jgnes_core::audio::{DownsampleAction, DownsampleCounter, LowPassFilter};
 use jgnes_core::{
     AudioPlayer, ColorEmphasis, EmulationError, EmulationState, Emulator, EmulatorConfig,
-    FrameBuffer, InputPoller, JoypadState, Renderer, SaveWriter, TickEffect,
+    FrameBuffer, InputPoller, JoypadState, Renderer, SaveWriter, TickEffect, TimingMode,
 };
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
 use sdl2::event::{Event, EventType, WindowEvent};
@@ -32,34 +32,40 @@ use crate::input::{Hotkey, SdlInputHandler};
 use jgnes_renderer::config::{FrameSkip, RendererConfig, VSyncMode};
 use jgnes_renderer::{colors, WgpuRenderer};
 
-struct SdlRenderer<'a> {
+const SDL_PIXEL_FORMAT: PixelFormatEnum = PixelFormatEnum::RGB24;
+
+struct SdlRenderer<'a, T> {
     canvas: WindowCanvas,
+    texture_creator: &'a TextureCreator<T>,
     texture: Texture<'a>,
     config: RendererConfig,
     total_frames: u64,
+    timing_mode: TimingMode,
 }
 
-impl<'a> SdlRenderer<'a> {
-    fn new<T>(
+impl<'a, T> SdlRenderer<'a, T> {
+    fn new(
         canvas: WindowCanvas,
         texture_creator: &'a TextureCreator<T>,
         config: RendererConfig,
     ) -> anyhow::Result<Self> {
         let texture = texture_creator.create_texture_streaming(
-            PixelFormatEnum::RGB24,
+            SDL_PIXEL_FORMAT,
             jgnes_core::SCREEN_WIDTH.into(),
-            jgnes_core::VISIBLE_SCREEN_HEIGHT.into(),
+            TimingMode::Ntsc.visible_screen_height().into(),
         )?;
         Ok(Self {
             canvas,
+            texture_creator,
             texture,
             config,
             total_frames: 0,
+            timing_mode: TimingMode::Ntsc,
         })
     }
 }
 
-impl<'a> Renderer for SdlRenderer<'a> {
+impl<'a, T> Renderer for SdlRenderer<'a, T> {
     type Err = anyhow::Error;
 
     fn render_frame(
@@ -76,7 +82,12 @@ impl<'a> Renderer for SdlRenderer<'a> {
         self.texture
             .with_lock(
                 None,
-                colors::sdl_texture_updater(frame_buffer, color_emphasis, self.config.overscan),
+                colors::sdl_texture_updater(
+                    frame_buffer,
+                    color_emphasis,
+                    self.config.overscan,
+                    self.timing_mode,
+                ),
             )
             .map_err(anyhow::Error::msg)?;
 
@@ -86,19 +97,32 @@ impl<'a> Renderer for SdlRenderer<'a> {
             window_height,
             self.config.aspect_ratio,
             self.config.forced_integer_height_scaling,
+            self.timing_mode,
         );
 
         self.canvas.clear();
-        let rect = Rect::new(
+        let dst = Rect::new(
             display_area.x as i32,
             display_area.y as i32,
             display_area.width,
             display_area.height,
         );
         self.canvas
-            .copy(&self.texture, None, rect)
+            .copy(&self.texture, None, dst)
             .map_err(anyhow::Error::msg)?;
         self.canvas.present();
+
+        Ok(())
+    }
+
+    fn set_timing_mode(&mut self, timing_mode: TimingMode) -> Result<(), Self::Err> {
+        self.timing_mode = timing_mode;
+
+        self.texture = self.texture_creator.create_texture_streaming(
+            SDL_PIXEL_FORMAT,
+            jgnes_core::SCREEN_WIDTH.into(),
+            timing_mode.visible_screen_height().into(),
+        )?;
 
         Ok(())
     }
@@ -212,7 +236,7 @@ trait SdlWindowRenderer {
     fn reload_config(&mut self, config: &JgnesDynamicConfig) -> Result<(), anyhow::Error>;
 }
 
-impl<'a> SdlWindowRenderer for SdlRenderer<'a> {
+impl<'a, T> SdlWindowRenderer for SdlRenderer<'a, T> {
     fn window_mut(&mut self) -> &mut Window {
         self.canvas.window_mut()
     }

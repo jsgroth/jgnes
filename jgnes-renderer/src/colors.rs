@@ -1,5 +1,5 @@
 use crate::config::Overscan;
-use jgnes_core::{ColorEmphasis, FrameBuffer};
+use jgnes_core::{ColorEmphasis, FrameBuffer, TimingMode};
 use std::ops::Range;
 
 // TODO support color customization
@@ -14,7 +14,7 @@ fn get_color_emphasis_offset(color_emphasis: ColorEmphasis) -> u16 {
 fn clear_rows_rgb(rows: Range<usize>, pixels: &mut [u8], pitch: usize) {
     for row in rows {
         for col in 0..jgnes_core::SCREEN_WIDTH as usize {
-            let start = (row - 8) * pitch + 3 * col;
+            let start = row * pitch + 3 * col;
             pixels[start..start + 3].copy_from_slice(&[0, 0, 0]);
         }
     }
@@ -23,27 +23,39 @@ fn clear_rows_rgb(rows: Range<usize>, pixels: &mut [u8], pitch: usize) {
 fn clear_rows_rgba(rows: Range<usize>, pixels: &mut [u8], pitch: usize) {
     for row in rows {
         for col in 0..jgnes_core::SCREEN_WIDTH as usize {
-            let start = (row - 8) * pitch + 4 * col;
+            let start = row * pitch + 4 * col;
             pixels[start..start + 4].copy_from_slice(&[0, 0, 0, 255]);
         }
     }
 }
 
-fn clear_cols_rgb(cols: Range<usize>, pixels: &mut [u8], pitch: usize) {
+fn clear_cols_rgb(cols: Range<usize>, pixels: &mut [u8], pitch: usize, visible_screen_height: u16) {
     for col in cols {
-        for row in 0..jgnes_core::VISIBLE_SCREEN_HEIGHT as usize {
+        for row in 0..visible_screen_height as usize {
             let start = row * pitch + 3 * col;
             pixels[start..start + 3].copy_from_slice(&[0, 0, 0]);
         }
     }
 }
 
-fn clear_cols_rgba(cols: Range<usize>, pixels: &mut [u8], pitch: usize) {
+fn clear_cols_rgba(
+    cols: Range<usize>,
+    pixels: &mut [u8],
+    pitch: usize,
+    visible_screen_height: u16,
+) {
     for col in cols {
-        for row in 0..jgnes_core::VISIBLE_SCREEN_HEIGHT as usize {
+        for row in 0..visible_screen_height as usize {
             let start = row * pitch + 4 * col;
             pixels[start..start + 4].copy_from_slice(&[0, 0, 0, 255]);
         }
+    }
+}
+
+fn row_offset_for(timing_mode: TimingMode) -> usize {
+    match timing_mode {
+        TimingMode::Ntsc => 8,
+        TimingMode::Pal => 0,
     }
 }
 
@@ -51,19 +63,32 @@ pub fn sdl_texture_updater(
     frame_buffer: &FrameBuffer,
     color_emphasis: ColorEmphasis,
     overscan: Overscan,
+    timing_mode: TimingMode,
 ) -> impl FnOnce(&mut [u8], usize) + '_ {
-    let top = 8 + overscan.top as usize;
-    let bottom = jgnes_core::SCREEN_HEIGHT as usize - 8 - overscan.bottom as usize;
+    let screen_height = jgnes_core::SCREEN_HEIGHT as usize;
+    let visible_screen_height = timing_mode.visible_screen_height();
+
+    let row_offset = row_offset_for(timing_mode);
+
+    let top = row_offset + overscan.top as usize;
+    let bottom = screen_height - row_offset - overscan.bottom as usize;
     let left = overscan.left as usize;
     let right = jgnes_core::SCREEN_WIDTH as usize - overscan.right as usize;
 
-    let screen_height = jgnes_core::SCREEN_HEIGHT as usize;
+    let top_clear_range = 0..overscan.top as usize;
+    let bottom_clear_range = (screen_height - overscan.bottom as usize)..screen_height;
+
     let color_emphasis_offset = get_color_emphasis_offset(color_emphasis) as usize;
     move |pixels, pitch| {
-        clear_rows_rgb(8..top, pixels, pitch);
-        clear_rows_rgb(bottom..screen_height - 8, pixels, pitch);
-        clear_cols_rgb(0..left, pixels, pitch);
-        clear_cols_rgb(right..jgnes_core::SCREEN_WIDTH as usize, pixels, pitch);
+        clear_rows_rgb(top_clear_range, pixels, pitch);
+        clear_rows_rgb(bottom_clear_range, pixels, pitch);
+        clear_cols_rgb(0..left, pixels, pitch, visible_screen_height);
+        clear_cols_rgb(
+            right..jgnes_core::SCREEN_WIDTH as usize,
+            pixels,
+            pitch,
+            visible_screen_height,
+        );
 
         for (i, scanline) in frame_buffer
             .iter()
@@ -77,7 +102,7 @@ pub fn sdl_texture_updater(
                 .filter(|(j, _)| (left..right).contains(j))
             {
                 let color_map_index = color_emphasis_offset + (3 * nes_color) as usize;
-                let start = (i - 8) * pitch + 3 * j;
+                let start = (i - row_offset) * pitch + 3 * j;
                 pixels[start..start + 3]
                     .copy_from_slice(&COLOR_MAPPING[color_map_index..color_map_index + 3]);
             }
@@ -89,21 +114,28 @@ pub fn to_rgba(
     frame_buffer: &FrameBuffer,
     color_emphasis: ColorEmphasis,
     overscan: Overscan,
+    timing_mode: TimingMode,
     out: &mut [u8],
 ) {
-    let top = 8 + overscan.top as usize;
-    let bottom = jgnes_core::SCREEN_HEIGHT as usize - 8 - overscan.bottom as usize;
-    let left = overscan.left as usize;
-    let right = jgnes_core::SCREEN_WIDTH as usize - overscan.right as usize;
+    let row_offset = row_offset_for(timing_mode);
 
     let screen_width = jgnes_core::SCREEN_WIDTH as usize;
     let screen_height = jgnes_core::SCREEN_HEIGHT as usize;
+    let visible_screen_height = timing_mode.visible_screen_height();
+
+    let top = row_offset + overscan.top as usize;
+    let bottom = screen_height - row_offset - overscan.bottom as usize;
+    let left = overscan.left as usize;
+    let right = screen_width - overscan.right as usize;
+
+    let top_clear_range = 0..overscan.top as usize;
+    let bottom_clear_range = (screen_height - overscan.bottom as usize)..screen_height;
 
     let pitch = 4 * screen_width;
-    clear_rows_rgba(8..top, out, pitch);
-    clear_rows_rgba(bottom..screen_height - 8, out, pitch);
-    clear_cols_rgba(0..left, out, pitch);
-    clear_cols_rgba(right..screen_width, out, pitch);
+    clear_rows_rgba(top_clear_range, out, pitch);
+    clear_rows_rgba(bottom_clear_range, out, pitch);
+    clear_cols_rgba(0..left, out, pitch, visible_screen_height);
+    clear_cols_rgba(right..screen_width, out, pitch, visible_screen_height);
 
     let color_emphasis_offset = get_color_emphasis_offset(color_emphasis) as usize;
     for (i, scanline) in frame_buffer
@@ -123,7 +155,7 @@ pub fn to_rgba(
                 unreachable!("destructuring a slice of size 3 into [a, b, c]")
             };
 
-            let out_index = (i - 8) * 4 * screen_width + j * 4;
+            let out_index = (i - row_offset) * 4 * screen_width + j * 4;
             out[out_index..out_index + 4].copy_from_slice(&[r, g, b, 255]);
         }
     }

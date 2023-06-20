@@ -916,6 +916,8 @@ impl App {
                     ui.horizontal(|ui| {
                         ui.radio_value(&mut self.config.aspect_ratio, AspectRatio::Ntsc, "NTSC")
                             .on_hover_text("8:7 pixel aspect ratio, 64:49 screen aspect ratio");
+                        ui.radio_value(&mut self.config.aspect_ratio, AspectRatio::Pal, "PAL")
+                            .on_hover_text("11:8 pixel aspect ratio, 11:7 screen aspect ratio");
                         ui.radio_value(&mut self.config.aspect_ratio, AspectRatio::SquarePixels, "Square pixels")
                             .on_hover_text("1:1 pixel aspect ratio, 8:7 screen aspect ratio");
                         ui.radio_value(&mut self.config.aspect_ratio, AspectRatio::FourThree, "4:3")

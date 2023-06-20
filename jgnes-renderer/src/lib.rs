@@ -37,7 +37,7 @@ pub fn determine_display_area(
         | AspectRatio::FourThree => {
             let width_to_height_ratio = match aspect_ratio {
                 AspectRatio::Ntsc => 64.0 / 49.0,
-                AspectRatio::Pal => 11.0 / 7.0,
+                AspectRatio::Pal => 22.0 / 15.0,
                 AspectRatio::SquarePixels => 8.0 / 7.0,
                 AspectRatio::FourThree => 4.0 / 3.0,
                 AspectRatio::Stretched => unreachable!("nested match expressions"),

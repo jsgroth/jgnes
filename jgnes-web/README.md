@@ -17,6 +17,11 @@ To install the latest nightly toolchain, including the standard library source (
 rustup toolchain add nightly --component rust-src
 ```
 
+As nightly is unstable, the project (or its dependencies) may not always build on the latest nightly version. To install a specific nightly version (e.g. the 2023-06-01 version):
+```shell
+rustup toolchain add nightly-2023-06-01 --component rust-src
+```
+
 ### wasm-pack
 
 wasm-pack is required to build a WASM/JavaScript package that can run in the browser. It's possible
@@ -40,6 +45,11 @@ wasm-pack build --target web . -- -Z build-std=panic_abort,std
 Alternatively, you can just run the provided `build.sh` script which runs that command:
 ```shell
 ./build.sh
+```
+
+By default `build.sh` will use the toolchain `nightly`. To use a different toolchain, set the `JGNES_WEB_TOOLCHAIN` environment variable:
+```shell
+JGNES_WEB_TOOLCHAIN=nightly-2023-06-01 ./build.sh
 ```
 
 For local testing, the `--dev` flag (passed on to wasm-pack) will disable link-time optimizations and skip running

@@ -10,7 +10,7 @@ use sdl2::audio::{AudioQueue, AudioSpecDesired};
 use sdl2::event::{Event, EventType, WindowEvent};
 use sdl2::pixels::{Color, PixelFormatEnum};
 use sdl2::rect::Rect;
-use sdl2::render::{Texture, TextureCreator, WindowCanvas};
+use sdl2::render::{Texture, TextureCreator, TextureValueError, WindowCanvas};
 use sdl2::video::{FullscreenType, Window};
 use sdl2::EventPump;
 use std::cell::Cell;
@@ -22,6 +22,7 @@ use std::rc::Rc;
 use std::sync::atomic::Ordering;
 use std::time::{Duration, SystemTime};
 use std::{fs, thread};
+use thiserror::Error;
 
 pub use crate::config::{
     AxisDirection, HatDirection, HotkeyConfig, InputCollectResult, InputConfig, InputConfigBase,
@@ -33,6 +34,23 @@ use jgnes_renderer::config::{FrameSkip, RendererConfig, VSyncMode};
 use jgnes_renderer::{colors, WgpuRenderer};
 
 const SDL_PIXEL_FORMAT: PixelFormatEnum = PixelFormatEnum::RGB24;
+
+#[derive(Debug, Error)]
+enum SdlRendererError {
+    #[error("Error creating SDL2 texture: {source}")]
+    CreateTexture {
+        #[from]
+        source: TextureValueError,
+    },
+    #[error("Error in SDL2 renderer: {msg}")]
+    Other { msg: String },
+}
+
+impl SdlRendererError {
+    fn msg(s: impl Into<String>) -> Self {
+        Self::Other { msg: s.into() }
+    }
+}
 
 struct SdlRenderer<'a, T> {
     canvas: WindowCanvas,
@@ -66,7 +84,7 @@ impl<'a, T> SdlRenderer<'a, T> {
 }
 
 impl<'a, T> Renderer for SdlRenderer<'a, T> {
-    type Err = anyhow::Error;
+    type Err = SdlRendererError;
 
     fn render_frame(
         &mut self,
@@ -89,7 +107,7 @@ impl<'a, T> Renderer for SdlRenderer<'a, T> {
                     self.timing_mode,
                 ),
             )
-            .map_err(anyhow::Error::msg)?;
+            .map_err(SdlRendererError::msg)?;
 
         let (window_width, window_height) = self.canvas.window().size();
         let display_area = jgnes_renderer::determine_display_area(
@@ -109,7 +127,7 @@ impl<'a, T> Renderer for SdlRenderer<'a, T> {
         );
         self.canvas
             .copy(&self.texture, None, dst)
-            .map_err(anyhow::Error::msg)?;
+            .map_err(SdlRendererError::msg)?;
         self.canvas.present();
 
         Ok(())
@@ -541,7 +559,8 @@ fn run_emulator<R, I, S, P>(
     save_state_path: P,
 ) -> anyhow::Result<()>
 where
-    R: Renderer<Err = anyhow::Error> + SdlWindowRenderer,
+    R: Renderer + SdlWindowRenderer,
+    R::Err: std::error::Error + Send + Sync + 'static,
     I: InputPoller,
     S: SaveWriter<Err = anyhow::Error>,
     P: AsRef<Path>,
@@ -582,9 +601,8 @@ where
                 }
                 Err(err) => {
                     return match err {
-                        EmulationError::Render(err)
-                        | EmulationError::Audio(err)
-                        | EmulationError::Save(err) => Err(err),
+                        EmulationError::Render(err) => Err(err.into()),
+                        EmulationError::Audio(err) | EmulationError::Save(err) => Err(err),
                         EmulationError::CpuInvalidOpcode(..) => {
                             Err(anyhow::Error::msg(err.to_string()))
                         }

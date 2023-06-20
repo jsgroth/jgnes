@@ -6,6 +6,7 @@ use crate::config::{AspectRatio, FrameSkip, GpuFilterMode, Overscan, RendererCon
 use jgnes_core::{ColorEmphasis, FrameBuffer, Renderer, TimingMode};
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 use std::{iter, mem};
+use thiserror::Error;
 use wgpu::util::DeviceExt;
 
 #[repr(C)]
@@ -55,6 +56,33 @@ impl Vertex2d {
     }
 }
 
+#[derive(Debug, Error)]
+pub enum WgpuRendererError {
+    #[error("Error creating wgpu surface: {source}")]
+    CreateSurface {
+        #[from]
+        source: wgpu::CreateSurfaceError,
+    },
+    #[error("Error requesting wgpu device: {source}")]
+    RequestDevice {
+        #[from]
+        source: wgpu::RequestDeviceError,
+    },
+    #[error("Error retrieving wgpu output surface: {source}")]
+    OutputSurface {
+        #[from]
+        source: wgpu::SurfaceError,
+    },
+    #[error("Error in wgpu renderer: {msg}")]
+    Other { msg: String },
+}
+
+impl WgpuRendererError {
+    fn msg(s: impl Into<String>) -> Self {
+        Self::Other { msg: s.into() }
+    }
+}
+
 pub type WindowSizeFn<W> = fn(&W) -> (u32, u32);
 
 pub struct WgpuRenderer<W> {
@@ -96,7 +124,7 @@ where
         window: W,
         window_size_fn: WindowSizeFn<W>,
         render_config: RendererConfig,
-    ) -> anyhow::Result<Self> {
+    ) -> Result<Self, WgpuRendererError> {
         let timing_mode = TimingMode::Ntsc;
 
         let output_buffer = vec![0; output_buffer_len(timing_mode)];
@@ -123,7 +151,7 @@ where
                 force_fallback_adapter: false,
             })
             .await
-            .ok_or_else(|| anyhow::Error::msg("Unable to obtain wgpu adapter"))?;
+            .ok_or_else(|| WgpuRendererError::msg("Unable to obtain wgpu adapter"))?;
 
         log::info!(
             "Using GPU adapter with backend {:?}",
@@ -164,7 +192,7 @@ where
             .present_modes
             .contains(&desired_present_mode)
         {
-            return Err(anyhow::Error::msg(unsupported_vsync_mode_error(
+            return Err(WgpuRendererError::msg(unsupported_vsync_mode_error(
                 render_config.vsync_mode,
                 &surface_capabilities.present_modes,
             )));
@@ -469,14 +497,14 @@ where
     /// # Errors
     ///
     /// This method will return an error if the GPU driver does not support the specified vsync mode.
-    pub fn update_vsync_mode(&mut self, vsync_mode: VSyncMode) -> Result<(), anyhow::Error> {
+    pub fn update_vsync_mode(&mut self, vsync_mode: VSyncMode) -> Result<(), WgpuRendererError> {
         let present_mode = vsync_mode.to_present_mode();
         if !self
             .surface_capabilities
             .present_modes
             .contains(&present_mode)
         {
-            return Err(anyhow::Error::msg(unsupported_vsync_mode_error(
+            return Err(WgpuRendererError::msg(unsupported_vsync_mode_error(
                 vsync_mode,
                 &self.surface_capabilities.present_modes,
             )));
@@ -713,7 +741,7 @@ fn cpu_scale_texture(
 }
 
 impl<W: HasRawDisplayHandle + HasRawWindowHandle> Renderer for WgpuRenderer<W> {
-    type Err = anyhow::Error;
+    type Err = WgpuRendererError;
 
     fn render_frame(
         &mut self,

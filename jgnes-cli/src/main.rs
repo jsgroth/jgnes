@@ -111,7 +111,10 @@ fn main() -> anyhow::Result<()> {
     let gpu_filter_mode = match args.gpu_filter_type {
         GpuFilterType::NearestNeighbor => GpuFilterMode::NearestNeighbor,
         GpuFilterType::Linear => {
-            let render_scale = args.gpu_render_scale.try_into()?;
+            let render_scale = args
+                .gpu_render_scale
+                .try_into()
+                .expect("invalid GPU render scale");
             GpuFilterMode::Linear(render_scale)
         }
     };

@@ -9,9 +9,9 @@ edition = "2021"
 jgnes-proc-macros = { path = "../jgnes-proc-macros" }
 jgnes-core = { path = "../jgnes-core" }
 
-anyhow = "1"
 bytemuck = { version = "1", features = ["derive"] }
 log = "0.4"
 serde = { version = "1", features = ["derive"] }
 raw-window-handle = "0.5"
+thiserror = "1"
 wgpu = "0.16"

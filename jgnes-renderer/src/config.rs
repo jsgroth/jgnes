@@ -36,6 +36,7 @@ impl WgpuBackend {
 pub enum AspectRatio {
     #[default]
     Ntsc,
+    Pal,
     SquarePixels,
     FourThree,
     Stretched,
@@ -100,14 +101,12 @@ impl Default for RenderScale {
 }
 
 impl TryFrom<u32> for RenderScale {
-    type Error = anyhow::Error;
+    type Error = String;
 
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         match value {
             1..=16 => Ok(Self(value)),
-            _ => Err(anyhow::Error::msg(format!(
-                "Invalid render scale value: {value}"
-            ))),
+            _ => Err(format!("Invalid render scale value: {value}")),
         }
     }
 }

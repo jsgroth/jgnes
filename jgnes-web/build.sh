@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-toolchain=${NIGHTLY_TOOLCHAIN:-nightly}
+toolchain=${JGNES_WEB_TOOLCHAIN:-nightly}
 
 RUSTFLAGS=""
 cargo_args=""

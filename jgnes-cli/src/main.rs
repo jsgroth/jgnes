@@ -43,13 +43,17 @@ struct CliArgs {
     #[arg(long, default_value_t = 3)]
     gpu_render_scale: u32,
 
-    /// Aspect ratio (Ntsc / SquarePixels / FourThree / Stretched)
+    /// Aspect ratio (Ntsc / Pal / SquarePixels / FourThree / Stretched)
     #[arg(long, default_value_t)]
     aspect_ratio: AspectRatio,
 
     /// Enable forced integer scaling for height
     #[arg(long, default_value_t)]
     forced_integer_height_scaling: bool,
+
+    /// Emulate PAL black border
+    #[arg(long, default_value_t)]
+    pal_black_border: bool,
 
     /// Disable audio sync
     #[arg(long = "no-audio-sync", default_value_t = true, action = clap::ArgAction::SetFalse)]
@@ -111,7 +115,10 @@ fn main() -> anyhow::Result<()> {
     let gpu_filter_mode = match args.gpu_filter_type {
         GpuFilterType::NearestNeighbor => GpuFilterMode::NearestNeighbor,
         GpuFilterType::Linear => {
-            let render_scale = args.gpu_render_scale.try_into()?;
+            let render_scale = args
+                .gpu_render_scale
+                .try_into()
+                .expect("invalid GPU render scale");
             GpuFilterMode::Linear(render_scale)
         }
     };
@@ -123,6 +130,7 @@ fn main() -> anyhow::Result<()> {
         overscan,
         forced_integer_height_scaling: args.forced_integer_height_scaling,
         vsync_mode: args.vsync_mode,
+        pal_black_border: args.pal_black_border,
         sync_to_audio: args.sync_to_audio,
         silence_ultrasonic_triangle_output: args.silence_ultrasonic_triangle_output,
         fast_forward_multiplier: args.fast_forward_multiplier,

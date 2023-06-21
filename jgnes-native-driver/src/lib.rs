@@ -4,13 +4,13 @@ mod input;
 use jgnes_core::audio::{DownsampleAction, DownsampleCounter, LowPassFilter};
 use jgnes_core::{
     AudioPlayer, ColorEmphasis, EmulationError, EmulationState, Emulator, EmulatorConfig,
-    FrameBuffer, InputPoller, JoypadState, Renderer, SaveWriter, TickEffect,
+    FrameBuffer, InputPoller, JoypadState, Renderer, SaveWriter, TickEffect, TimingMode,
 };
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
 use sdl2::event::{Event, EventType, WindowEvent};
 use sdl2::pixels::{Color, PixelFormatEnum};
 use sdl2::rect::Rect;
-use sdl2::render::{Texture, TextureCreator, WindowCanvas};
+use sdl2::render::{Texture, TextureCreator, TextureValueError, WindowCanvas};
 use sdl2::video::{FullscreenType, Window};
 use sdl2::EventPump;
 use std::cell::Cell;
@@ -22,6 +22,7 @@ use std::rc::Rc;
 use std::sync::atomic::Ordering;
 use std::time::{Duration, SystemTime};
 use std::{fs, thread};
+use thiserror::Error;
 
 pub use crate::config::{
     AxisDirection, HatDirection, HotkeyConfig, InputCollectResult, InputConfig, InputConfigBase,
@@ -32,35 +33,58 @@ use crate::input::{Hotkey, SdlInputHandler};
 use jgnes_renderer::config::{FrameSkip, RendererConfig, VSyncMode};
 use jgnes_renderer::{colors, WgpuRenderer};
 
-struct SdlRenderer<'a> {
+const SDL_PIXEL_FORMAT: PixelFormatEnum = PixelFormatEnum::RGB24;
+
+#[derive(Debug, Error)]
+enum SdlRendererError {
+    #[error("Error creating SDL2 texture: {source}")]
+    CreateTexture {
+        #[from]
+        source: TextureValueError,
+    },
+    #[error("Error in SDL2 renderer: {msg}")]
+    Other { msg: String },
+}
+
+impl SdlRendererError {
+    fn msg(s: impl Into<String>) -> Self {
+        Self::Other { msg: s.into() }
+    }
+}
+
+struct SdlRenderer<'a, T> {
     canvas: WindowCanvas,
+    texture_creator: &'a TextureCreator<T>,
     texture: Texture<'a>,
     config: RendererConfig,
     total_frames: u64,
+    timing_mode: TimingMode,
 }
 
-impl<'a> SdlRenderer<'a> {
-    fn new<T>(
+impl<'a, T> SdlRenderer<'a, T> {
+    fn new(
         canvas: WindowCanvas,
         texture_creator: &'a TextureCreator<T>,
         config: RendererConfig,
     ) -> anyhow::Result<Self> {
         let texture = texture_creator.create_texture_streaming(
-            PixelFormatEnum::RGB24,
+            SDL_PIXEL_FORMAT,
             jgnes_core::SCREEN_WIDTH.into(),
-            jgnes_core::VISIBLE_SCREEN_HEIGHT.into(),
+            TimingMode::Ntsc.visible_screen_height().into(),
         )?;
         Ok(Self {
             canvas,
+            texture_creator,
             texture,
             config,
             total_frames: 0,
+            timing_mode: TimingMode::Ntsc,
         })
     }
 }
 
-impl<'a> Renderer for SdlRenderer<'a> {
-    type Err = anyhow::Error;
+impl<'a, T> Renderer for SdlRenderer<'a, T> {
+    type Err = SdlRendererError;
 
     fn render_frame(
         &mut self,
@@ -76,9 +100,14 @@ impl<'a> Renderer for SdlRenderer<'a> {
         self.texture
             .with_lock(
                 None,
-                colors::sdl_texture_updater(frame_buffer, color_emphasis, self.config.overscan),
+                colors::sdl_texture_updater(
+                    frame_buffer,
+                    color_emphasis,
+                    self.config.overscan,
+                    self.timing_mode,
+                ),
             )
-            .map_err(anyhow::Error::msg)?;
+            .map_err(SdlRendererError::msg)?;
 
         let (window_width, window_height) = self.canvas.window().size();
         let display_area = jgnes_renderer::determine_display_area(
@@ -86,19 +115,32 @@ impl<'a> Renderer for SdlRenderer<'a> {
             window_height,
             self.config.aspect_ratio,
             self.config.forced_integer_height_scaling,
+            self.timing_mode,
         );
 
         self.canvas.clear();
-        let rect = Rect::new(
+        let dst = Rect::new(
             display_area.x as i32,
             display_area.y as i32,
             display_area.width,
             display_area.height,
         );
         self.canvas
-            .copy(&self.texture, None, rect)
-            .map_err(anyhow::Error::msg)?;
+            .copy(&self.texture, None, dst)
+            .map_err(SdlRendererError::msg)?;
         self.canvas.present();
+
+        Ok(())
+    }
+
+    fn set_timing_mode(&mut self, timing_mode: TimingMode) -> Result<(), Self::Err> {
+        self.timing_mode = timing_mode;
+
+        self.texture = self.texture_creator.create_texture_streaming(
+            SDL_PIXEL_FORMAT,
+            jgnes_core::SCREEN_WIDTH.into(),
+            timing_mode.visible_screen_height().into(),
+        )?;
 
         Ok(())
     }
@@ -165,6 +207,10 @@ impl AudioPlayer for SdlAudioPlayer {
 
         Ok(())
     }
+
+    fn set_timing_mode(&mut self, timing_mode: TimingMode) {
+        self.downsample_counter.set_timing_mode(timing_mode);
+    }
 }
 
 struct SdlInputPoller {
@@ -212,7 +258,7 @@ trait SdlWindowRenderer {
     fn reload_config(&mut self, config: &JgnesDynamicConfig) -> Result<(), anyhow::Error>;
 }
 
-impl<'a> SdlWindowRenderer for SdlRenderer<'a> {
+impl<'a, T> SdlWindowRenderer for SdlRenderer<'a, T> {
     fn window_mut(&mut self) -> &mut Window {
         self.canvas.window_mut()
     }
@@ -517,7 +563,8 @@ fn run_emulator<R, I, S, P>(
     save_state_path: P,
 ) -> anyhow::Result<()>
 where
-    R: Renderer<Err = anyhow::Error> + SdlWindowRenderer,
+    R: Renderer + SdlWindowRenderer,
+    R::Err: std::error::Error + Send + Sync + 'static,
     I: InputPoller,
     S: SaveWriter<Err = anyhow::Error>,
     P: AsRef<Path>,
@@ -532,9 +579,15 @@ where
 
     let save_state_path = save_state_path.as_ref();
 
-    let (initial_silence_ultrasonic_triangle, initial_ff_multiplier, initial_rewind_buffer_len) = {
+    let (
+        initial_pal_black_border,
+        initial_silence_ultrasonic_triangle,
+        initial_ff_multiplier,
+        initial_rewind_buffer_len,
+    ) = {
         let dynamic_config = dynamic_config.lock().unwrap();
         (
+            dynamic_config.pal_black_border,
             dynamic_config.silence_ultrasonic_triangle_output,
             dynamic_config.fast_forward_multiplier,
             dynamic_config.rewind_buffer_len,
@@ -542,6 +595,7 @@ where
     };
 
     let mut emulator_config = EmulatorConfig {
+        pal_black_border: initial_pal_black_border,
         silence_ultrasonic_triangle_output: initial_silence_ultrasonic_triangle,
     };
 
@@ -558,9 +612,8 @@ where
                 }
                 Err(err) => {
                     return match err {
-                        EmulationError::Render(err)
-                        | EmulationError::Audio(err)
-                        | EmulationError::Save(err) => Err(err),
+                        EmulationError::Render(err) => Err(err.into()),
+                        EmulationError::Audio(err) | EmulationError::Save(err) => Err(err),
                         EmulationError::CpuInvalidOpcode(..) => {
                             Err(anyhow::Error::msg(err.to_string()))
                         }
@@ -589,10 +642,13 @@ where
 
                 let renderer = emulator.get_renderer_mut();
                 renderer.reload_config(dynamic_config)?;
+                emulator_config.pal_black_border = dynamic_config.pal_black_border;
+
                 emulator.get_audio_player_mut().sync_to_audio = dynamic_config.sync_to_audio;
-                input_handler.reload_input_config(&dynamic_config.input_config);
                 emulator_config.silence_ultrasonic_triangle_output =
                     dynamic_config.silence_ultrasonic_triangle_output;
+
+                input_handler.reload_input_config(&dynamic_config.input_config);
 
                 fast_forward_multiplier = dynamic_config.fast_forward_multiplier;
                 rewind_state.reload_buffer_len(dynamic_config.rewind_buffer_len);

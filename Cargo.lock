@@ -1706,6 +1706,7 @@ dependencies = [
  "pollster",
  "sdl2",
  "serde",
+ "thiserror",
  "tinyvec",
  "windows 0.48.0",
 ]
@@ -1723,13 +1724,13 @@ dependencies = [
 name = "jgnes-renderer"
 version = "0.5.0"
 dependencies = [
- "anyhow",
  "bytemuck",
  "jgnes-core",
  "jgnes-proc-macros",
  "log",
  "raw-window-handle",
  "serde",
+ "thiserror",
  "wgpu",
 ]
 

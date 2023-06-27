@@ -4,6 +4,8 @@ set -euo pipefail
 
 toolchain=${JGNES_WEB_TOOLCHAIN:-nightly}
 
+echo "Building using toolchain '$toolchain'"
+
 RUSTFLAGS=""
 cargo_args=""
 if [[ -n "${JGNES_WEBGPU:-}" ]]; then

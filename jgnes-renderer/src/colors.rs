@@ -76,7 +76,8 @@ pub fn sdl_texture_updater(
     let right = jgnes_core::SCREEN_WIDTH as usize - overscan.right as usize;
 
     let top_clear_range = 0..overscan.top as usize;
-    let bottom_clear_range = (screen_height - overscan.bottom as usize)..screen_height;
+    let bottom_clear_range = (visible_screen_height as usize - overscan.bottom as usize)
+        ..(visible_screen_height as usize);
 
     let color_emphasis_offset = get_color_emphasis_offset(color_emphasis) as usize;
     move |pixels, pitch| {
@@ -158,6 +159,81 @@ pub fn to_rgba(
 
             let out_index = (scanline_idx - row_offset) * 4 * screen_width + color_idx * 4;
             out[out_index..out_index + 4].copy_from_slice(&[r, g, b, 255]);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn to_rgba_does_not_panic() {
+        let frame_buffer =
+            [[0; jgnes_core::SCREEN_WIDTH as usize]; jgnes_core::SCREEN_HEIGHT as usize];
+
+        for &timing_mode in TimingMode::all() {
+            let mut output_buffer = vec![
+                0;
+                4 * jgnes_core::SCREEN_WIDTH as usize
+                    * timing_mode.visible_screen_height() as usize
+            ];
+
+            to_rgba(
+                &frame_buffer,
+                ColorEmphasis::default(),
+                Overscan::default(),
+                timing_mode,
+                &mut output_buffer,
+            );
+            to_rgba(
+                &frame_buffer,
+                ColorEmphasis::default(),
+                Overscan {
+                    top: 8,
+                    bottom: 8,
+                    left: 8,
+                    right: 8,
+                },
+                timing_mode,
+                &mut output_buffer,
+            );
+        }
+    }
+
+    #[test]
+    fn sdl_texture_updater_does_not_panic() {
+        let frame_buffer =
+            [[0; jgnes_core::SCREEN_WIDTH as usize]; jgnes_core::SCREEN_HEIGHT as usize];
+
+        for &timing_mode in TimingMode::all() {
+            let mut pixels = vec![
+                0;
+                3 * jgnes_core::SCREEN_WIDTH as usize
+                    * timing_mode.visible_screen_height() as usize
+            ];
+            let pitch = 3 * jgnes_core::SCREEN_WIDTH as usize;
+
+            let updater = sdl_texture_updater(
+                &frame_buffer,
+                ColorEmphasis::default(),
+                Overscan::default(),
+                timing_mode,
+            );
+            updater(&mut pixels, pitch);
+
+            let updater = sdl_texture_updater(
+                &frame_buffer,
+                ColorEmphasis::default(),
+                Overscan {
+                    top: 8,
+                    bottom: 8,
+                    left: 8,
+                    right: 8,
+                },
+                timing_mode,
+            );
+            updater(&mut pixels, pitch);
         }
     }
 }

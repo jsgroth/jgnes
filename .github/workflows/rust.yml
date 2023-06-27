@@ -57,10 +57,8 @@ jobs:
         command: test
 
     - name: Add nightly toolchain
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: $JGNES_WEB_TOOLCHAIN
-        components: rust-src, clippy
+      run: |
+        rustup toolchain add $JGNES_WEB_TOOLCHAIN --component rust-src --component clippy
 
     - name: Install wasm-pack
       uses: actions-rs/cargo@v1

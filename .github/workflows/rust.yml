@@ -13,6 +13,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    env:
+      JGNES_WEB_TOOLCHAIN: nightly-2023-06-01
+
     steps:
     - uses: actions/checkout@v3
 
@@ -56,7 +59,7 @@ jobs:
     - name: Add nightly toolchain
       uses: actions-rs/toolchain@v1
       with:
-        toolchain: nightly-2023-06-01
+        toolchain: $JGNES_WEB_TOOLCHAIN
         components: rust-src, clippy
 
     - name: Install wasm-pack
@@ -67,11 +70,11 @@ jobs:
       
     - name: Build web
       run: |
-        cd jgnes-web && JGNES_WEB_TOOLCHAIN=nightly-2023-06-01 ./build.sh
+        cd jgnes-web && ./build.sh
 
     - name: Check warnings for web
       run: |
-        cd jgnes-web && cargo +nightly-2023-06-01 cranky --target wasm32-unknown-unknown -- -D warnings
+        cd jgnes-web && cargo +$JGNES_WEB_TOOLCHAIN cranky --target wasm32-unknown-unknown -- -D warnings
   linux-release:
     runs-on: ubuntu-latest
 

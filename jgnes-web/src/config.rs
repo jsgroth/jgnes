@@ -172,8 +172,9 @@ impl JgnesWebConfig {
     pub fn get_aspect_ratio(&self) -> String {
         let s = match self.aspect_ratio.get() {
             AspectRatio::Ntsc => NTSC,
+            AspectRatio::Pal => PAL,
             AspectRatio::SquarePixels => SQUARE_PIXELS,
-            // Web frontend only supports NTSC / Square pixels
+            // Web frontend only supports NTSC / PAL / Square pixels
             _ => "",
         };
         s.into()

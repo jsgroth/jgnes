@@ -4,7 +4,8 @@ mod input;
 use jgnes_core::audio::{DownsampleAction, DownsampleCounter, LowPassFilter};
 use jgnes_core::{
     AudioPlayer, ColorEmphasis, EmulationError, EmulationState, Emulator, EmulatorConfig,
-    FrameBuffer, InputPoller, JoypadState, Renderer, SaveWriter, TickEffect, TimingMode,
+    EmulatorCreateArgs, FrameBuffer, InputPoller, JoypadState, Renderer, SaveWriter, TickEffect,
+    TimingMode,
 };
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
 use sdl2::event::{Event, EventType, WindowEvent};
@@ -420,14 +421,15 @@ pub fn run(config: &JgnesNativeConfig) -> anyhow::Result<()> {
             let texture_creator = canvas.texture_creator();
             let renderer = SdlRenderer::new(canvas, &texture_creator, renderer_config)?;
 
-            let emulator = Emulator::create(
+            let emulator = Emulator::create(EmulatorCreateArgs {
                 rom_bytes,
                 sav_bytes,
+                forced_timing_mode: config.forced_timing_mode,
                 renderer,
                 audio_player,
                 input_poller,
                 save_writer,
-            )?;
+            })?;
             run_emulator(
                 emulator,
                 config,
@@ -442,14 +444,15 @@ pub fn run(config: &JgnesNativeConfig) -> anyhow::Result<()> {
                 Window::size,
                 renderer_config,
             ))?;
-            let emulator = Emulator::create(
+            let emulator = Emulator::create(EmulatorCreateArgs {
                 rom_bytes,
                 sav_bytes,
+                forced_timing_mode: config.forced_timing_mode,
                 renderer,
                 audio_player,
                 input_poller,
                 save_writer,
-            )?;
+            })?;
             run_emulator(
                 emulator,
                 config,

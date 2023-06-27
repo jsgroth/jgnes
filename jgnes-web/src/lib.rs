@@ -11,8 +11,8 @@ use base64::Engine;
 use config::JgnesWebConfig;
 use jgnes_core::audio::{DownsampleAction, DownsampleCounter, LowPassFilter};
 use jgnes_core::{
-    AudioPlayer, ColorEmphasis, Emulator, EmulatorConfig, InputPoller, JoypadState, Renderer,
-    SaveWriter, TickEffect, TimingMode,
+    AudioPlayer, ColorEmphasis, Emulator, EmulatorConfig, EmulatorCreateArgs, InputPoller,
+    JoypadState, Renderer, SaveWriter, TickEffect, TimingMode,
 };
 use jgnes_renderer::config::{
     AspectRatio, FrameSkip, GpuFilterMode, Overscan, RendererConfig, VSyncMode, WgpuBackend,
@@ -438,14 +438,15 @@ fn run_event_loop(
                     file_name: file_name.clone(),
                 };
 
-                match Emulator::create(
-                    file_bytes,
+                match Emulator::create(EmulatorCreateArgs {
+                    rom_bytes: file_bytes,
                     sav_bytes,
-                    Rc::clone(&state.renderer),
-                    Rc::clone(&state.audio_player),
+                    forced_timing_mode: None,
+                    renderer: Rc::clone(&state.renderer),
+                    audio_player: Rc::clone(&state.audio_player),
                     input_poller,
                     save_writer,
-                ) {
+                }) {
                     Ok(emulator) => {
                         if !state.user_interacted {
                             state.user_interacted = true;

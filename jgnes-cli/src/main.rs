@@ -1,5 +1,6 @@
 use clap::Parser;
 use env_logger::Env;
+use jgnes_core::TimingMode;
 use jgnes_native_driver::{
     InputConfig, JgnesDynamicConfig, JgnesNativeConfig, JgnesSharedConfig, NativeRenderer,
 };
@@ -11,6 +12,24 @@ use std::time::Duration;
 enum GpuFilterType {
     NearestNeighbor,
     Linear,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, EnumDisplay, EnumFromStr)]
+enum OptionalTimingMode {
+    Ntsc,
+    Pal,
+    #[default]
+    None,
+}
+
+impl OptionalTimingMode {
+    fn to_timing_mode(self) -> Option<TimingMode> {
+        match self {
+            Self::Ntsc => Some(TimingMode::Ntsc),
+            Self::Pal => Some(TimingMode::Pal),
+            Self::None => None,
+        }
+    }
 }
 
 #[derive(Parser)]
@@ -46,6 +65,10 @@ struct CliArgs {
     /// Aspect ratio (Ntsc / Pal / SquarePixels / FourThree / Stretched)
     #[arg(long, default_value_t)]
     aspect_ratio: AspectRatio,
+
+    /// Force a timing mode instead of relying on cartridge header (Ntsc / Pal)
+    #[arg(long, default_value_t)]
+    forced_timing_mode: OptionalTimingMode,
 
     /// Enable forced integer scaling for height
     #[arg(long, default_value_t)]
@@ -139,6 +162,7 @@ fn main() -> anyhow::Result<()> {
     });
     let config = JgnesNativeConfig {
         nes_file_path: args.nes_file_path,
+        forced_timing_mode: args.forced_timing_mode.to_timing_mode(),
         window_width: args.window_width,
         window_height: args.window_height,
         renderer: args.renderer,

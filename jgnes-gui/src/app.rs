@@ -8,6 +8,7 @@ use egui::{
     Modifiers, TextEdit, TopBottomPanel, Ui, Vec2, Widget, Window,
 };
 use egui_extras::{Column, TableBuilder};
+use jgnes_core::TimingMode;
 use jgnes_native_driver::{
     HotkeyConfig, InputCollectResult, InputConfig, InputConfigBase, InputType, JgnesDynamicConfig,
     JgnesNativeConfig, JgnesSharedConfig, JoystickInput, KeyboardInput, NativeRenderer,
@@ -74,6 +75,8 @@ struct AppConfig {
     #[serde(default)]
     forced_integer_height_scaling: bool,
     #[serde(default)]
+    forced_timing_mode: Option<TimingMode>,
+    #[serde(default)]
     pal_black_border: bool,
     #[serde(default = "true_fn")]
     sync_to_audio: bool,
@@ -121,6 +124,7 @@ impl AppConfig {
 
         let native_config = JgnesNativeConfig {
             nes_file_path,
+            forced_timing_mode: self.forced_timing_mode,
             window_width: self.window_width,
             window_height: self.window_height,
             renderer: self.renderer,
@@ -142,11 +146,11 @@ impl Default for AppConfig {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum OpenWindow {
+    GeneralSettings,
     VideoSettings,
     AudioSettings,
     InputSettings,
     HotkeySettings,
-    UiSettings,
     About,
 }
 
@@ -747,15 +751,13 @@ impl App {
         });
     }
 
-    fn render_ui_settings_window(&mut self, ctx: &Context) {
-        let mut ui_settings_open = true;
-        Window::new("UI Settings")
+    fn render_general_settings_window(&mut self, ctx: &Context) {
+        let mut general_settings_open = true;
+        Window::new("General Settings")
             .resizable(false)
-            .open(&mut ui_settings_open)
+            .open(&mut general_settings_open)
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label("ROM search directory:");
-
                     let button_text = self.config.rom_search_dir.as_deref().unwrap_or("<None>");
                     if ui.button(button_text).clicked() {
                         if let Some(dir) = FileDialog::new().pick_folder() {
@@ -763,12 +765,44 @@ impl App {
                         }
                     }
 
+                    ui.label("ROM search directory");
+
                     if ui.button("Clear").clicked() {
                         self.config.rom_search_dir = None;
                     }
                 });
+
+                ui.group(|ui| {
+                    ui.set_enabled(!self.state.emulator_is_running.load(Ordering::Relaxed));
+
+                    let disabled_hover_text =
+                        "Cannot change forced timing mode while emulator is running";
+
+                    ui.label("Forced timing mode")
+                        .on_hover_text("If set, ignore timing mode in cartridge header")
+                        .on_disabled_hover_text(disabled_hover_text);
+
+                    ui.horizontal(|ui| {
+                        ui.radio_value(&mut self.config.forced_timing_mode, None, "None")
+                            .on_disabled_hover_text(disabled_hover_text);
+
+                        ui.radio_value(
+                            &mut self.config.forced_timing_mode,
+                            Some(TimingMode::Ntsc),
+                            "NTSC",
+                        )
+                        .on_disabled_hover_text(disabled_hover_text);
+
+                        ui.radio_value(
+                            &mut self.config.forced_timing_mode,
+                            Some(TimingMode::Pal),
+                            "PAL",
+                        )
+                        .on_disabled_hover_text(disabled_hover_text);
+                    });
+                });
             });
-        if !ui_settings_open {
+        if !general_settings_open {
             self.state.open_window = None;
         }
     }
@@ -1304,6 +1338,11 @@ impl eframe::App for App {
                 });
 
                 ui.menu_button("Settings", |ui| {
+                    if ui.button("General").clicked() {
+                        self.state.open_window = Some(OpenWindow::GeneralSettings);
+                        ui.close_menu();
+                    }
+
                     if ui.button("Video").clicked() {
                         self.state.open_window = Some(OpenWindow::VideoSettings);
                         ui.close_menu();
@@ -1323,11 +1362,6 @@ impl eframe::App for App {
                         self.state.open_window = Some(OpenWindow::HotkeySettings);
                         ui.close_menu();
                     }
-
-                    if ui.button("Interface").clicked() {
-                        self.state.open_window = Some(OpenWindow::UiSettings);
-                        ui.close_menu();
-                    }
                 });
 
                 ui.menu_button("Help", |ui| {
@@ -1342,6 +1376,9 @@ impl eframe::App for App {
         self.render_central_panel(ctx);
 
         match self.state.open_window {
+            Some(OpenWindow::GeneralSettings) => {
+                self.render_general_settings_window(ctx);
+            }
             Some(OpenWindow::VideoSettings) => {
                 self.render_video_settings_window(ctx);
             }
@@ -1353,9 +1390,6 @@ impl eframe::App for App {
             }
             Some(OpenWindow::HotkeySettings) => {
                 self.render_hotkey_settings_window(ctx);
-            }
-            Some(OpenWindow::UiSettings) => {
-                self.render_ui_settings_window(ctx);
             }
             Some(OpenWindow::About) => {
                 self.render_about_window(ctx);

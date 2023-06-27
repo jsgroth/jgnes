@@ -1,3 +1,4 @@
+use jgnes_core::TimingMode;
 use jgnes_proc_macros::{EnumDisplay, EnumFromStr};
 use jgnes_renderer::config::{AspectRatio, GpuFilterMode, Overscan, VSyncMode, WgpuBackend};
 use sdl2::joystick::HatState;
@@ -349,6 +350,7 @@ impl Display for InputConfig {
 #[derive(Debug, Clone)]
 pub struct JgnesNativeConfig {
     pub nes_file_path: String,
+    pub forced_timing_mode: Option<TimingMode>,
     pub window_width: u32,
     pub window_height: u32,
     pub renderer: NativeRenderer,
@@ -360,6 +362,11 @@ pub struct JgnesNativeConfig {
 impl Display for JgnesNativeConfig {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "nes_file_path: {}", self.nes_file_path)?;
+        writeln!(
+            f,
+            "forced_timing_mode: {}",
+            fmt_option(self.forced_timing_mode.as_ref())
+        )?;
         writeln!(f, "window_width: {}", self.window_width)?;
         writeln!(f, "window_height: {}", self.window_height)?;
         writeln!(f, "renderer: {}", self.renderer)?;

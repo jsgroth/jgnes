@@ -129,7 +129,8 @@ pub fn to_rgba(
     let right = screen_width - overscan.right as usize;
 
     let top_clear_range = 0..overscan.top as usize;
-    let bottom_clear_range = (screen_height - overscan.bottom as usize)..screen_height;
+    let bottom_clear_range = (visible_screen_height as usize - overscan.bottom as usize)
+        ..(visible_screen_height as usize);
 
     let pitch = 4 * screen_width;
     clear_rows_rgba(top_clear_range, out, pitch);
@@ -138,12 +139,12 @@ pub fn to_rgba(
     clear_cols_rgba(right..screen_width, out, pitch, visible_screen_height);
 
     let color_emphasis_offset = get_color_emphasis_offset(color_emphasis) as usize;
-    for (i, scanline) in frame_buffer
+    for (scanline_idx, scanline) in frame_buffer
         .iter()
         .enumerate()
         .filter(|(i, _)| (top..bottom).contains(i))
     {
-        for (j, nes_color) in scanline
+        for (color_idx, nes_color) in scanline
             .iter()
             .copied()
             .enumerate()
@@ -155,7 +156,7 @@ pub fn to_rgba(
                 unreachable!("destructuring a slice of size 3 into [a, b, c]")
             };
 
-            let out_index = (i - row_offset) * 4 * screen_width + j * 4;
+            let out_index = (scanline_idx - row_offset) * 4 * screen_width + color_idx * 4;
             out[out_index..out_index + 4].copy_from_slice(&[r, g, b, 255]);
         }
     }

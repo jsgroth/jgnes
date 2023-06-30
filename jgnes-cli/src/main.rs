@@ -50,7 +50,7 @@ struct CliArgs {
     #[arg(long, default_value_t)]
     renderer: NativeRenderer,
 
-    /// Wgpu backend (Auto / Vulkan / Direct3d12 / Metal)
+    /// Wgpu backend (Auto / Vulkan / Direct3d12 / Metal / OpenGl)
     #[arg(long, default_value_t)]
     wgpu_backend: WgpuBackend,
 

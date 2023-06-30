@@ -843,6 +843,8 @@ impl App {
                             .on_disabled_hover_text(disabled_text);
                         ui.radio_value(&mut self.config.wgpu_backend, WgpuBackend::Metal, "Metal")
                             .on_disabled_hover_text(disabled_text);
+                        ui.radio_value(&mut self.config.wgpu_backend, WgpuBackend::OpenGl, "OpenGL")
+                            .on_disabled_hover_text(disabled_text);
                     });
                 });
 

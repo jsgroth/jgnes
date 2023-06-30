@@ -813,6 +813,38 @@ impl App {
             .resizable(false)
             .open(&mut video_settings_open)
             .show(ctx, |ui| {
+                ui.checkbox(&mut self.config.launch_fullscreen, "Launch in fullscreen");
+
+                ui.horizontal(|ui| {
+                    NumericTextInput::new(
+                        &mut self.state.window_width_text,
+                        &mut self.config.window_width,
+                        &mut self.state.window_width_invalid,
+                        1..=u32::MAX,
+                    )
+                        .desired_width(60.0)
+                        .ui(ui);
+                    ui.label("Window width in pixels");
+                });
+                if self.state.window_width_invalid {
+                    ui.colored_label(Color32::RED, "Window width must be a non-negative integer");
+                }
+
+                ui.horizontal(|ui| {
+                    NumericTextInput::new(
+                        &mut self.state.window_height_text,
+                        &mut self.config.window_height,
+                        &mut self.state.window_height_invalid,
+                        1..=u32::MAX
+                    )
+                        .desired_width(60.0)
+                        .ui(ui);
+                    ui.label("Window height in pixels");
+                });
+                if self.state.window_height_invalid {
+                    ui.colored_label(Color32::RED, "Window height must be a non-negative integer");
+                }
+
                 ui.group(|ui| {
                     ui.set_enabled(!self.state.emulator_is_running.load(Ordering::Relaxed));
 
@@ -847,38 +879,6 @@ impl App {
                             .on_disabled_hover_text(disabled_text);
                     });
                 });
-
-                ui.checkbox(&mut self.config.launch_fullscreen, "Launch in fullscreen");
-
-                ui.horizontal(|ui| {
-                    NumericTextInput::new(
-                        &mut self.state.window_width_text,
-                        &mut self.config.window_width,
-                        &mut self.state.window_width_invalid,
-                        1..=u32::MAX,
-                    )
-                        .desired_width(60.0)
-                        .ui(ui);
-                    ui.label("Window width in pixels");
-                });
-                if self.state.window_width_invalid {
-                    ui.colored_label(Color32::RED, "Window width must be a non-negative integer");
-                }
-
-                ui.horizontal(|ui| {
-                    NumericTextInput::new(
-                        &mut self.state.window_height_text,
-                        &mut self.config.window_height,
-                        &mut self.state.window_height_invalid,
-                        1..=u32::MAX
-                    )
-                        .desired_width(60.0)
-                        .ui(ui);
-                    ui.label("Window height in pixels");
-                });
-                if self.state.window_height_invalid {
-                    ui.colored_label(Color32::RED, "Window height must be a non-negative integer");
-                }
 
                 ui.group(|ui| {
                     ui.label("VSync mode");
@@ -932,13 +932,6 @@ impl App {
                     ui.colored_label(Color32::RED, "Scaling factor must be an integer between 1 and 16");
                 }
 
-                ui.with_layout(Layout::top_down(Align::LEFT), |ui| {
-                    ui.set_enabled(self.config.aspect_ratio != AspectRatio::Stretched);
-                    ui.checkbox(&mut self.config.forced_integer_height_scaling, "Forced integer scaling for height")
-                        .on_hover_text("Image height will always be the highest possible integer multiple of native (224px)")
-                        .on_disabled_hover_text("This option is not available in stretched image mode");
-                });
-
                 ui.group(|ui| {
                     ui.label("Aspect ratio");
                     ui.horizontal(|ui| {
@@ -953,6 +946,13 @@ impl App {
                         ui.radio_value(&mut self.config.aspect_ratio, AspectRatio::Stretched, "Stretched")
                             .on_hover_text("Image will be stretched to fill the entire display area");
                     });
+                });
+
+                ui.with_layout(Layout::top_down(Align::LEFT), |ui| {
+                    ui.set_enabled(self.config.aspect_ratio != AspectRatio::Stretched);
+                    ui.checkbox(&mut self.config.forced_integer_height_scaling, "Forced integer scaling for height")
+                        .on_hover_text("Image height will always be the highest possible integer multiple of native (224px)")
+                        .on_disabled_hover_text("This option is not available in stretched image mode");
                 });
 
                 ui.checkbox(&mut self.config.pal_black_border, "Emulate PAL black border")

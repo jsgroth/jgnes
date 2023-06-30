@@ -169,7 +169,7 @@ impl JgnesWebConfig {
             })
     }
 
-    pub fn get_aspect_ratio(&self) -> String {
+    pub fn aspect_ratio(&self) -> String {
         let s = match self.aspect_ratio.get() {
             AspectRatio::Ntsc => NTSC,
             AspectRatio::Pal => PAL,
@@ -192,7 +192,7 @@ impl JgnesWebConfig {
         self.save_to_local_storage();
     }
 
-    pub fn get_filter_mode(&self) -> String {
+    pub fn filter_mode(&self) -> String {
         let s = match self.gpu_filter_mode.get() {
             GpuFilterMode::NearestNeighbor => NEAREST_NEIGHBOR,
             GpuFilterMode::Linear(RenderScale::ONE) => LINEAR_1X,
@@ -234,7 +234,7 @@ impl JgnesWebConfig {
         self.save_to_local_storage();
     }
 
-    pub fn get_overscan_left(&self) -> bool {
+    pub fn overscan_left(&self) -> bool {
         self.overscan.get().left != 0
     }
 
@@ -247,7 +247,7 @@ impl JgnesWebConfig {
         self.save_to_local_storage();
     }
 
-    pub fn get_overscan_right(&self) -> bool {
+    pub fn overscan_right(&self) -> bool {
         self.overscan.get().right != 0
     }
 
@@ -260,7 +260,7 @@ impl JgnesWebConfig {
         self.save_to_local_storage();
     }
 
-    pub fn get_overscan_top(&self) -> bool {
+    pub fn overscan_top(&self) -> bool {
         self.overscan.get().top != 0
     }
 
@@ -273,7 +273,7 @@ impl JgnesWebConfig {
         self.save_to_local_storage();
     }
 
-    pub fn get_overscan_bottom(&self) -> bool {
+    pub fn overscan_bottom(&self) -> bool {
         self.overscan.get().bottom != 0
     }
 
@@ -286,7 +286,7 @@ impl JgnesWebConfig {
         self.save_to_local_storage();
     }
 
-    pub fn get_audio_enabled(&self) -> bool {
+    pub fn audio_enabled(&self) -> bool {
         self.audio_enabled.get()
     }
 
@@ -295,7 +295,7 @@ impl JgnesWebConfig {
         self.save_to_local_storage();
     }
 
-    pub fn get_audio_sync_enabled(&self) -> bool {
+    pub fn audio_sync_enabled(&self) -> bool {
         self.audio_sync_enabled.get()
     }
 
@@ -304,7 +304,7 @@ impl JgnesWebConfig {
         self.save_to_local_storage();
     }
 
-    pub fn get_silence_ultrasonic_triangle_output(&self) -> bool {
+    pub fn silence_ultrasonic_triangle_output(&self) -> bool {
         self.silence_ultrasonic_triangle_output.get()
     }
 
@@ -313,8 +313,26 @@ impl JgnesWebConfig {
         self.save_to_local_storage();
     }
 
-    pub fn get_inputs(&self) -> InputConfig {
+    pub fn inputs(&self) -> InputConfig {
         self.inputs.borrow().clone()
+    }
+
+    pub fn restore_defaults(&self) {
+        let default = JgnesWebConfig::default();
+
+        *self.inputs.borrow_mut() = default.inputs.borrow().clone();
+        self.aspect_ratio.set(default.aspect_ratio.get());
+        self.gpu_filter_mode.set(default.gpu_filter_mode.get());
+        self.overscan.set(default.overscan.get());
+        self.audio_enabled.set(default.audio_enabled.get());
+        self.audio_sync_enabled
+            .set(default.audio_sync_enabled.get());
+        self.silence_ultrasonic_triangle_output
+            .set(default.silence_ultrasonic_triangle_output.get());
+
+        self.save_to_local_storage();
+
+        js::setConfigDisplayValues(self.clone());
     }
 
     pub fn reconfigure_input(&self, button: NesButton) {
@@ -334,7 +352,7 @@ impl JgnesWebConfig {
     }
 
     #[must_use]
-    pub fn get_current_filename(&self) -> String {
+    pub fn current_filename(&self) -> String {
         self.current_filename.borrow().clone()
     }
 
@@ -361,6 +379,8 @@ impl JgnesWebConfig {
     fn save_to_local_storage(&self) {
         let config = self.to_serializable_config();
         save_to_local_storage(SerializableConfig::LOCAL_STORAGE_KEY, &config);
+
+        save_to_local_storage(InputConfig::LOCAL_STORAGE_KEY, &*self.inputs.borrow());
     }
 }
 

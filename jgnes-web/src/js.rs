@@ -1,3 +1,5 @@
+use crate::config::JgnesWebConfig;
+use crate::NesButton;
 use base64::engine::general_purpose;
 use base64::Engine;
 use jgnes_proc_macros::build_time_pretty_str;
@@ -20,9 +22,12 @@ extern "C" {
     /// Remove the 'Loading...' text and unhide the UI.
     pub fn initComplete();
 
+    /// Set all config displays to the values in the given config.
+    pub fn setConfigDisplayValues(jgnesWebConfig: JgnesWebConfig);
+
     /// Un-gray the emulator display elements, and change the given button's text to the newly
     /// configured key.
-    pub fn afterInputReconfigure(buttonId: &str, buttonText: &str);
+    pub fn afterInputReconfigure(button: NesButton, buttonText: &str);
 
     /// Focus the canvas element. Useful because the emulator can only receive inputs while the
     /// canvas has focus, and clicking on any UI element will take focus away.
@@ -45,6 +50,12 @@ pub fn b64_to_bytes(s: &str) -> Option<Uint8Array> {
         }
         Err(_) => None,
     }
+}
+
+#[must_use]
+#[wasm_bindgen]
+pub fn button_name(button: NesButton) -> String {
+    format!("{button}")
 }
 
 #[must_use]

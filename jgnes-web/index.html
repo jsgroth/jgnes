@@ -184,6 +184,9 @@
                             <li>Select: <input type="button" id="select-key" class="input-config" value=""></li>
                         </ul>
                     </div>
+                    <div>
+                        <input id="restore-defaults" type="button" value="Restore defaults">
+                    </div>
                 </div>
             </div>
         </div>
@@ -193,61 +196,47 @@
         </div>
         <script type="module">
             import init, { b64_to_bytes, get_build_timestamp, run_emulator, JgnesWebConfig, NesButton } from "./pkg/jgnes_web.js";
+            import { setConfigDisplayValues } from "./js/ui.js";
+
             await init();
 
             let config = new JgnesWebConfig();
             let firstRomLoaded = false;
 
-            document.querySelectorAll("input[name='aspect-ratio']").forEach((element) => {
-                element.checked = element.value === config.get_aspect_ratio();
+            setConfigDisplayValues(config);
 
+            document.querySelectorAll("input[name='aspect-ratio']").forEach((element) => {
                 element.addEventListener("click", (event) => {
                     config.set_aspect_ratio(event.target.value);
                 });
             });
 
             document.querySelectorAll("input[name='image-filter']").forEach((element) => {
-                element.checked = element.value === config.get_filter_mode();
-
                 element.addEventListener("click", (event) => {
                     config.set_filter_mode(event.target.value);
                 });
             });
 
-            function initCheckboxElement(id, initialValue, setter) {
+            function initCheckboxElement(id, setter) {
                 let element = document.getElementById(id);
-                element.checked = initialValue;
                 element.addEventListener("click", (event) => {
                     setter(event.target.checked);
                 });
             }
 
-            initCheckboxElement("overscan-left", config.get_overscan_left(), (value) => config.set_overscan_left(value));
-            initCheckboxElement("overscan-right", config.get_overscan_right(), (value) => config.set_overscan_right(value));
-            initCheckboxElement("overscan-top", config.get_overscan_top(), (value) => config.set_overscan_top(value));
-            initCheckboxElement("overscan-bottom", config.get_overscan_bottom(), (value) => config.set_overscan_bottom(value));
+            initCheckboxElement("overscan-left", (value) => config.set_overscan_left(value));
+            initCheckboxElement("overscan-right", (value) => config.set_overscan_right(value));
+            initCheckboxElement("overscan-top", (value) => config.set_overscan_top(value));
+            initCheckboxElement("overscan-bottom", (value) => config.set_overscan_bottom(value));
 
-            initCheckboxElement("audio-enabled", config.get_audio_enabled(), (value) => config.set_audio_enabled(value));
-            initCheckboxElement("audio-sync-enabled", config.get_audio_sync_enabled(), (value) => config.set_audio_sync_enabled(value));
+            initCheckboxElement("audio-enabled", (value) => config.set_audio_enabled(value));
+            initCheckboxElement("audio-sync-enabled", (value) => config.set_audio_sync_enabled(value));
             initCheckboxElement(
                 "silence-triangle-ultrasonic",
-                config.get_silence_ultrasonic_triangle_output(),
                 (value) => config.set_silence_ultrasonic_triangle_output(value),
             );
 
             document.querySelectorAll("input.input-config").forEach((element) => {
-                let buttonText = {
-                    "up-key": config.get_inputs().up(),
-                    "left-key": config.get_inputs().left(),
-                    "right-key": config.get_inputs().right(),
-                    "down-key": config.get_inputs().down(),
-                    "a-key": config.get_inputs().a(),
-                    "b-key": config.get_inputs().b(),
-                    "start-key": config.get_inputs().start(),
-                    "select-key": config.get_inputs().select(),
-                }[element.id];
-                element.value = buttonText;
-
                 element.addEventListener("click", (event) => {
                     let button = {
                         "up-key": NesButton.Up,
@@ -275,6 +264,10 @@
                 });
             });
 
+            document.getElementById("restore-defaults").addEventListener("click", () => {
+                config.restore_defaults();
+            });
+
             document.getElementById("jgnes-init-button").addEventListener("click", () => {
                 if (!firstRomLoaded) {
                     document.getElementById("jgnes-reset-button").disabled = false;
@@ -290,7 +283,7 @@
             });
 
             document.getElementById("jgnes-download-sav-button").addEventListener("click", () => {
-                let currentFilename = config.get_current_filename();
+                let currentFilename = config.current_filename();
                 let savB64 = localStorage.getItem(currentFilename);
                 if (savB64 !== null) {
                     let savBytes = b64_to_bytes(savB64);

@@ -14,6 +14,7 @@ use jgnes_core::{
     AudioPlayer, ColorEmphasis, Emulator, EmulatorConfig, EmulatorCreateArgs, InputPoller,
     JoypadState, Renderer, SaveWriter, TickEffect, TimingMode,
 };
+use jgnes_proc_macros::EnumDisplay;
 use jgnes_renderer::config::{
     AspectRatio, FrameSkip, GpuFilterMode, Overscan, RendererConfig, VSyncMode, WgpuBackend,
 };
@@ -33,7 +34,7 @@ use winit::window::{Window, WindowBuilder, WindowId};
 
 const BASE64_ENGINE: GeneralPurpose = base64::engine::general_purpose::STANDARD;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumDisplay)]
 #[wasm_bindgen]
 pub enum NesButton {
     Up,
@@ -44,21 +45,6 @@ pub enum NesButton {
     B,
     Start,
     Select,
-}
-
-impl NesButton {
-    fn element_id(self) -> &'static str {
-        match self {
-            Self::Up => "up-key",
-            Self::Left => "left-key",
-            Self::Right => "right-key",
-            Self::Down => "down-key",
-            Self::A => "a-key",
-            Self::B => "b-key",
-            Self::Start => "start-key",
-            Self::Select => "select-key",
-        }
-    }
 }
 
 fn alert_and_panic(s: &str) -> ! {
@@ -174,7 +160,7 @@ impl InputHandler {
 
                         config.inputs.borrow_mut().set_key(button, *keycode);
 
-                        js::afterInputReconfigure(button.element_id(), &format!("{keycode:?}"));
+                        js::afterInputReconfigure(button, &format!("{keycode:?}"));
                     }
                 }
             }
@@ -531,7 +517,7 @@ fn run_event_loop(
                 if config.upload_save_file_requested.replace(false) {
                     wasm_bindgen_futures::spawn_local(upload_save_file(
                         event_loop_proxy.clone(),
-                        config.get_current_filename(),
+                        config.current_filename(),
                     ));
                 }
 

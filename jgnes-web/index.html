@@ -6,42 +6,71 @@
         <style>
             body {
                 background-color: black;
+                font-family: sans-serif;
+            }
+
+            .hidden {
+                visibility: hidden;
+            }
+
+            #jgnes {
+                display: flex;
+                flex-direction: column;
+                margin-bottom: 50px;
+            }
+
+            #jgnes-web-text {
+                margin-left: auto;
+                margin-right: auto;
+                margin-bottom: 10px;
+                font-size: 24px;
+                text-align: center;
+                color: white;
+            }
+
+            #jgnes-wasm-and-config {
+                display: flex;
+                flex-direction: row;
+                margin-top: 10px;
+                margin-left: 50px;
+                margin-right: 50px;
+            }
+
+            #jgnes-wasm-and-init {
+                margin-right: 50px;
+            }
+
+            #jgnes-wasm {
+                margin-bottom: 10px;
             }
 
             canvas.grayed-out {
                 opacity: 0.5;
             }
 
-            #jgnes-wasm {
-                width: 878px;
-                margin-bottom: 15px;
-                margin-left: auto;
-                margin-right: auto;
-            }
-
             #jgnes-wasm.grayed-out {
                 background-color: white;
             }
 
-            #jgnes-web-text {
-                margin-left: auto;
-                margin-right: auto;
-                margin-bottom: 15px;
-                width: 878px;
-                font-size: 24px;
-                text-align: center;
+            #rom-file-name {
+                margin-bottom: 6px;
                 color: white;
             }
 
-            #rom-file-name {
-                margin-bottom: 6px;
+            #jgnes-init {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
             }
 
             #jgnes-config {
-                width: 1000px;
                 margin-left: auto;
                 margin-right: auto;
                 color: white;
+            }
+
+            #jgnes-config > fieldset {
+                margin-bottom: 10px;
             }
 
             #loading-text {
@@ -52,161 +81,159 @@
                 color: white;
             }
 
+            #input-config {
+                color: white;
+            }
+
             #info-text {
-                width: 672px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
                 margin-left: auto;
                 margin-right: auto;
                 color: white;
             }
 
-            #last-updated-at {
+            #last-updated {
                 font-style: italic;
             }
         </style>
     </head>
     <body>
-        <div id="jgnes-web-text">jgnes web</div>
         <div id="loading-text">Loading...</div>
-        <div id="jgnes-wasm"></div>
-        <div id="jgnes-config-and-info" hidden>
-            <form id="jgnes-config">
-                <div id="jgnes-init">
-                    <div id="rom-file-name"></div>
-                    <input id="jgnes-init-button" type="button" value="Open NES ROM file">
-                    <input id="jgnes-reset-button" type="button" value="Reset" disabled>
-                    <input id="jgnes-download-sav-button" class="save-button" type="button" value="Download save file" disabled>
-                    <input id="jgnes-upload-sav-button" class="save-button" type="button" value="Upload save file and reset" disabled>
+        <div id="jgnes" class="hidden">
+            <div id="jgnes-web-text">jgnes web</div>
+            <div id="jgnes-wasm-and-config">
+                <div id="jgnes-wasm-and-init">
+                    <div id="jgnes-wasm"></div>
+                    <div id="jgnes-init">
+                        <div id="rom-file-name">(No ROM loaded)</div>
+                        <div id="jgnes-init-buttons">
+                            <input id="jgnes-init-button" type="button" value="Open NES ROM file">
+                            <input id="jgnes-reset-button" type="button" value="Reset" disabled>
+                            <input id="jgnes-download-sav-button" class="save-button" type="button" value="Download save file" disabled>
+                            <input id="jgnes-upload-sav-button" class="save-button" type="button" value="Upload save file and reset" disabled>
+                        </div>
+                    </div>
                 </div>
-                <fieldset>
-                    <legend>Aspect ratio</legend>
+                <div id="jgnes-config">
+                    <fieldset>
+                        <legend>Aspect ratio</legend>
 
-                    <input type="radio" id="aspect-ntsc" name="aspect-ratio" value="Ntsc" checked>
-                    <label for="aspect-ntsc">NTSC</label>
+                        <input type="radio" id="aspect-ntsc" name="aspect-ratio" value="Ntsc" checked>
+                        <label for="aspect-ntsc">NTSC</label>
 
-                    <input type="radio" id="aspect-pal" name="aspect-ratio" value="Pal">
-                    <label for="aspect-pal">PAL</label>
+                        <input type="radio" id="aspect-pal" name="aspect-ratio" value="Pal">
+                        <label for="aspect-pal">PAL</label>
 
-                    <input type="radio" id="aspect-square-pixels" name="aspect-ratio" value="SquarePixels">
-                    <label for="aspect-square-pixels">Square pixels</label>
-                </fieldset>
-                <fieldset>
-                    <legend>Image filtering</legend>
+                        <input type="radio" id="aspect-square-pixels" name="aspect-ratio" value="SquarePixels">
+                        <label for="aspect-square-pixels">Square pixels</label>
+                    </fieldset>
+                    <fieldset>
+                        <legend>Image filtering</legend>
 
-                    <input type="radio" id="filter-nearest" name="image-filter" value="NearestNeighbor" checked>
-                    <label for="filter-nearest">Nearest neighbor</label>
+                        <input type="radio" id="filter-nearest" name="image-filter" value="NearestNeighbor" checked>
+                        <label for="filter-nearest">Nearest neighbor</label>
 
-                    <input type="radio" id="filter-linear" name="image-filter" value="Linear">
-                    <label for="filter-linear">Linear interpolation</label>
+                        <input type="radio" id="filter-linear" name="image-filter" value="Linear">
+                        <label for="filter-linear">Linear interpolation</label>
 
-                    <input type="radio" id="filter-linear-2x" name="image-filter" value="Linear2x">
-                    <label for="filter-linear-2x">Linear interpolation (2x scaled)</label>
+                        <input type="radio" id="filter-linear-2x" name="image-filter" value="Linear2x">
+                        <label for="filter-linear-2x">Linear interpolation (2x scaled)</label>
 
-                    <input type="radio" id="filter-linear-3x" name="image-filter" value="Linear3x">
-                    <label for="filter-linear-3x">Linear interpolation (3x scaled)</label>
-                </fieldset>
-                <fieldset>
-                    <legend>Overscan</legend>
+                        <input type="radio" id="filter-linear-3x" name="image-filter" value="Linear3x">
+                        <label for="filter-linear-3x">Linear interpolation (3x scaled)</label>
+                    </fieldset>
+                    <fieldset>
+                        <legend>Overscan</legend>
 
-                    <input type="checkbox" id="overscan-left" name="overscan-left">
-                    <label for="overscan-left">Left</label>
+                        <input type="checkbox" id="overscan-left" name="overscan-left">
+                        <label for="overscan-left">Left</label>
 
-                    <input type="checkbox" id="overscan-right" name="overscan-right">
-                    <label for="overscan-right">Right</label>
+                        <input type="checkbox" id="overscan-right" name="overscan-right">
+                        <label for="overscan-right">Right</label>
 
-                    <input type="checkbox" id="overscan-top" name="overscan-top">
-                    <label for="overscan-top">Top</label>
+                        <input type="checkbox" id="overscan-top" name="overscan-top">
+                        <label for="overscan-top">Top</label>
 
-                    <input type="checkbox" id="overscan-bottom" name="overscan-bottom">
-                    <label for="overscan-bottom">Bottom</label>
-                </fieldset>
-                <fieldset>
-                    <legend>Audio</legend>
+                        <input type="checkbox" id="overscan-bottom" name="overscan-bottom">
+                        <label for="overscan-bottom">Bottom</label>
+                    </fieldset>
+                    <fieldset>
+                        <legend>Audio</legend>
 
-                    <input type="checkbox" id="audio-enabled" name="audio-enabled" checked>
-                    <label for="audio-enabled">Audio enabled</label>
+                        <input type="checkbox" id="audio-enabled" name="audio-enabled" checked>
+                        <label for="audio-enabled">Audio enabled</label>
 
-                    <input type="checkbox" id="audio-sync-enabled" name="audio-sync-enabled" checked>
-                    <label for="audio-sync-enabled">Audio sync enabled</label>
+                        <input type="checkbox" id="audio-sync-enabled" name="audio-sync-enabled" checked>
+                        <label for="audio-sync-enabled">Audio sync enabled</label>
 
-                    <input type="checkbox" id="silence-triangle-ultrasonic" name="silence-triangle-ultrasonic">
-                    <label for="silence-triangle-ultrasonic">Silence ultrasonic triangle channel output (reduce pops)</label>
-                </fieldset>
-            </form>
-            <div id="info-text">
-                <p>Input keys</p>
-                <ul>
-                    <li>Up: <input type="button" id="up-key" class="input-config" value=""></li>
-                    <li>Left: <input type="button" id="left-key" class="input-config" value=""></li>
-                    <li>Right: <input type="button" id="right-key" class="input-config" value=""></li>
-                    <li>Down: <input type="button" id="down-key" class="input-config" value=""></li>
-                    <li>A: <input type="button" id="a-key" class="input-config" value=""></li>
-                    <li>B: <input type="button" id="b-key" class="input-config" value=""></li>
-                    <li>Start: <input type="button" id="start-key" class="input-config" value=""></li>
-                    <li>Select: <input type="button" id="select-key" class="input-config" value=""></li>
-                </ul>
-                <p>Download the native version and/or source code: <a href="https://github.com/jsgroth/jgnes">https://github.com/jsgroth/jgnes</a></p>
-                <p id="last-updated-at">Last updated at: <span id="build-time"></span></p>
+                        <input type="checkbox" id="silence-triangle-ultrasonic" name="silence-triangle-ultrasonic">
+                        <label for="silence-triangle-ultrasonic">Silence ultrasonic triangle channel output (reduce pops)</label>
+                    </fieldset>
+                    <div id="input-config">
+                        <p>Input keys</p>
+                        <ul>
+                            <li>Up: <input type="button" id="up-key" class="input-config" value=""></li>
+                            <li>Left: <input type="button" id="left-key" class="input-config" value=""></li>
+                            <li>Right: <input type="button" id="right-key" class="input-config" value=""></li>
+                            <li>Down: <input type="button" id="down-key" class="input-config" value=""></li>
+                            <li>A: <input type="button" id="a-key" class="input-config" value=""></li>
+                            <li>B: <input type="button" id="b-key" class="input-config" value=""></li>
+                            <li>Start: <input type="button" id="start-key" class="input-config" value=""></li>
+                            <li>Select: <input type="button" id="select-key" class="input-config" value=""></li>
+                        </ul>
+                    </div>
+                </div>
             </div>
         </div>
+        <div id="info-text" class="hidden">
+            <p>Download the native version and/or source code: <a href="https://github.com/jsgroth/jgnes">https://github.com/jsgroth/jgnes</a></p>
+            <div id="last-updated">Last updated: <span id="build-time"></span></div>
+        </div>
         <script type="module">
-            import init, { b64_to_bytes, get_build_timestamp, run, JgnesWebConfig, NesButton } from "./pkg/jgnes_web.js";
+            import init, { b64_to_bytes, get_build_timestamp, run_emulator, JgnesWebConfig, NesButton } from "./pkg/jgnes_web.js";
             await init();
 
             let config = new JgnesWebConfig();
-            let running = false;
+            let firstRomLoaded = false;
 
             document.querySelectorAll("input[name='aspect-ratio']").forEach((element) => {
-                element.checked = element.getAttribute("value") === config.get_aspect_ratio();
+                element.checked = element.value === config.get_aspect_ratio();
 
-                element.addEventListener("click", () => {
-                    let aspectRatio = document.querySelector("input[name='aspect-ratio']:checked").value;
-                    config.set_aspect_ratio(aspectRatio);
+                element.addEventListener("click", (event) => {
+                    config.set_aspect_ratio(event.target.value);
                 });
             });
 
             document.querySelectorAll("input[name='image-filter']").forEach((element) => {
-                element.checked = element.getAttribute("value") === config.get_filter_mode();
+                element.checked = element.value === config.get_filter_mode();
 
-                element.addEventListener("click", () => {
-                    let filterMode = document.querySelector("input[name='image-filter']:checked").value;
-                    config.set_filter_mode(filterMode);
+                element.addEventListener("click", (event) => {
+                    config.set_filter_mode(event.target.value);
                 });
             });
 
-            document.getElementById("overscan-left").checked = config.get_overscan_left();
-            document.getElementById("overscan-left").addEventListener("click", (event) => {
-                config.set_overscan_left(event.target.checked);
-            });
+            function initCheckboxElement(id, initialValue, setter) {
+                let element = document.getElementById(id);
+                element.checked = initialValue;
+                element.addEventListener("click", (event) => {
+                    setter(event.target.checked);
+                });
+            }
 
-            document.getElementById("overscan-right").checked = config.get_overscan_right();
-            document.getElementById("overscan-right").addEventListener("click", (event) => {
-                config.set_overscan_right(event.target.checked);
-            });
+            initCheckboxElement("overscan-left", config.get_overscan_left(), (value) => config.set_overscan_left(value));
+            initCheckboxElement("overscan-right", config.get_overscan_right(), (value) => config.set_overscan_right(value));
+            initCheckboxElement("overscan-top", config.get_overscan_top(), (value) => config.set_overscan_top(value));
+            initCheckboxElement("overscan-bottom", config.get_overscan_bottom(), (value) => config.set_overscan_bottom(value));
 
-            document.getElementById("overscan-top").checked = config.get_overscan_top();
-            document.getElementById("overscan-top").addEventListener("click", (event) => {
-                config.set_overscan_top(event.target.checked);
-            });
-
-            document.getElementById("overscan-bottom").checked = config.get_overscan_bottom();
-            document.getElementById("overscan-bottom").addEventListener("click", (event) => {
-                config.set_overscan_bottom(event.target.checked);
-            });
-
-            document.getElementById("audio-enabled").checked = config.get_audio_enabled();
-            document.getElementById("audio-enabled").addEventListener("click", (event) => {
-                config.set_audio_enabled(event.target.checked);
-            });
-
-            document.getElementById("audio-sync-enabled").checked = config.get_audio_sync_enabled();
-            document.getElementById("audio-sync-enabled").addEventListener("click", (event) => {
-                config.set_audio_sync_enabled(event.target.checked);
-            });
-
-            document.getElementById("silence-triangle-ultrasonic").checked = config.get_silence_ultrasonic_triangle_output();
-            document.getElementById("silence-triangle-ultrasonic").addEventListener("click", (event) => {
-                config.set_silence_ultrasonic_triangle_output(event.target.checked);
-            });
+            initCheckboxElement("audio-enabled", config.get_audio_enabled(), (value) => config.set_audio_enabled(value));
+            initCheckboxElement("audio-sync-enabled", config.get_audio_sync_enabled(), (value) => config.set_audio_sync_enabled(value));
+            initCheckboxElement(
+                "silence-triangle-ultrasonic",
+                config.get_silence_ultrasonic_triangle_output(),
+                (value) => config.set_silence_ultrasonic_triangle_output(value),
+            );
 
             document.querySelectorAll("input.input-config").forEach((element) => {
                 let buttonText = {
@@ -219,7 +246,7 @@
                     "start-key": config.get_inputs().start(),
                     "select-key": config.get_inputs().select(),
                 }[element.id];
-                element.setAttribute("value", buttonText);
+                element.value = buttonText;
 
                 element.addEventListener("click", (event) => {
                     let button = {
@@ -249,9 +276,9 @@
             });
 
             document.getElementById("jgnes-init-button").addEventListener("click", () => {
-                if (!running) {
+                if (!firstRomLoaded) {
                     document.getElementById("jgnes-reset-button").disabled = false;
-                    running = true;
+                    firstRomLoaded = true;
                 }
 
                 config.open_new_file();
@@ -291,7 +318,7 @@
 
             document.getElementById("build-time").innerText = get_build_timestamp();
 
-            run(config.clone());
+            run_emulator(config.clone());
         </script>
     </body>
 </html>

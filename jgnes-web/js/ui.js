@@ -9,7 +9,8 @@ export function saveToLocalStorage(key, value) {
 }
 
 export function initComplete() {
-    document.getElementById("jgnes-config-and-info").hidden = false;
+    document.getElementById("jgnes").classList.remove("hidden");
+    document.getElementById("info-text").classList.remove("hidden");
     document.getElementById("loading-text").remove();
 }
 

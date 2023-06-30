@@ -340,7 +340,7 @@ fn get_wgpu_backend() -> WgpuBackend {
 
 #[allow(clippy::missing_panics_doc)]
 #[wasm_bindgen]
-pub async fn run(config: JgnesWebConfig) {
+pub async fn run_emulator(config: JgnesWebConfig) {
     let event_loop = EventLoopBuilder::<JgnesUserEvent>::with_user_event().build();
     let window = WindowBuilder::new()
         .build(&event_loop)

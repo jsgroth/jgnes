@@ -77,3 +77,12 @@ export function setSaveButtonsEnabled(enabled) {
         element.disabled = !enabled;
     });
 }
+
+export function setCursorVisible(visible) {
+    let canvas = document.querySelector("canvas");
+    if (visible) {
+        canvas.classList.remove("cursor-hidden");
+    } else {
+        canvas.classList.add("cursor-hidden");
+    }
+}

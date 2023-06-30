@@ -485,15 +485,18 @@ fn run_event_loop(
                             },
                         ..
                     } => {
-                        let new_fullscreen = match state.renderer.borrow().window().fullscreen() {
+                        let mut renderer = state.renderer.borrow_mut();
+                        let window = renderer.window_mut();
+
+                        let new_fullscreen = match window.fullscreen() {
                             None => Some(Fullscreen::Borderless(None)),
                             Some(_) => None,
                         };
-                        state
-                            .renderer
-                            .borrow_mut()
-                            .window_mut()
-                            .set_fullscreen(new_fullscreen);
+
+                        // Show cursor over canvas only when not in fullscreen mode
+                        js::setCursorVisible(new_fullscreen.is_none());
+
+                        window.set_fullscreen(new_fullscreen);
                     }
                     WindowEvent::Resized(_) => {
                         state.renderer.borrow_mut().reconfigure_surface();

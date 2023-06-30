@@ -34,6 +34,9 @@ extern "C" {
 
     /// Enable or disable the Download Save / Upload Save buttons.
     pub fn setSaveButtonsEnabled(enabled: bool);
+
+    /// Set whether the cursor is visible when over the canvas element.
+    pub fn setCursorVisible(visible: bool);
 }
 
 #[must_use]

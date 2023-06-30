@@ -1,7 +1,5 @@
 // Miscellaneous UI functions called from Rust
 
-import { button_name, NesButton } from "/pkg/jgnes_web.js";
-
 export function loadFromLocalStorage(key) {
     return localStorage.getItem(key);
 }
@@ -16,7 +14,7 @@ export function initComplete() {
     document.getElementById("loading-text").remove();
 }
 
-function setInputButtonText(nesButton, buttonText) {
+function setInputButtonText(buttonName, buttonText) {
     let buttonId = {
         "Up": "up-key",
         "Left": "left-key",
@@ -26,7 +24,7 @@ function setInputButtonText(nesButton, buttonText) {
         "B": "b-key",
         "Start": "start-key",
         "Select": "select-key",
-    }[button_name(nesButton)];
+    }[buttonName];
     document.getElementById(buttonId).value = buttonText;
 }
 
@@ -49,17 +47,17 @@ export function setConfigDisplayValues(jgnesWebConfig) {
     document.getElementById("silence-triangle-ultrasonic").checked = jgnesWebConfig.silence_ultrasonic_triangle_output();
 
     let inputConfig = jgnesWebConfig.inputs();
-    setInputButtonText(NesButton.Up, inputConfig.up());
-    setInputButtonText(NesButton.Left, inputConfig.left());
-    setInputButtonText(NesButton.Right, inputConfig.right());
-    setInputButtonText(NesButton.Down, inputConfig.down());
-    setInputButtonText(NesButton.A, inputConfig.a());
-    setInputButtonText(NesButton.B, inputConfig.b());
-    setInputButtonText(NesButton.Start, inputConfig.start());
-    setInputButtonText(NesButton.Select, inputConfig.select());
+    setInputButtonText("Up", inputConfig.up());
+    setInputButtonText("Left", inputConfig.left());
+    setInputButtonText("Right", inputConfig.right());
+    setInputButtonText("Down", inputConfig.down());
+    setInputButtonText("A", inputConfig.a());
+    setInputButtonText("B", inputConfig.b());
+    setInputButtonText("Start", inputConfig.start());
+    setInputButtonText("Select", inputConfig.select());
 }
 
-export function afterInputReconfigure(nesButton, buttonText) {
+export function afterInputReconfigure(buttonName, buttonText) {
     document.querySelectorAll("input.input-config").forEach((element) => {
         element.disabled = false;
     });
@@ -67,7 +65,7 @@ export function afterInputReconfigure(nesButton, buttonText) {
     document.querySelector("canvas").classList.remove("grayed-out");
     document.getElementById("jgnes-wasm").classList.remove("grayed-out");
 
-    setInputButtonText(nesButton, buttonText);
+    setInputButtonText(buttonName, buttonText);
 }
 
 export function focusCanvas() {

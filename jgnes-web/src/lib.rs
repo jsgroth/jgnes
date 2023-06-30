@@ -160,7 +160,7 @@ impl InputHandler {
 
                         config.inputs.borrow_mut().set_key(button, *keycode);
 
-                        js::afterInputReconfigure(button, &format!("{keycode:?}"));
+                        js::afterInputReconfigure(&format!("{button}"), &format!("{keycode:?}"));
                     }
                 }
             }

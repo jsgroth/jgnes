@@ -81,10 +81,6 @@
                 color: white;
             }
 
-            #input-config {
-                color: white;
-            }
-
             #info-text {
                 display: flex;
                 flex-direction: column;
@@ -171,22 +167,21 @@
                         <input type="checkbox" id="silence-triangle-ultrasonic" name="silence-triangle-ultrasonic">
                         <label for="silence-triangle-ultrasonic">Silence ultrasonic triangle channel output (reduce pops)</label>
                     </fieldset>
-                    <div id="input-config">
-                        <p>Input keys</p>
-                        <ul>
-                            <li>Up: <input type="button" id="up-key" class="input-config" value=""></li>
-                            <li>Left: <input type="button" id="left-key" class="input-config" value=""></li>
-                            <li>Right: <input type="button" id="right-key" class="input-config" value=""></li>
-                            <li>Down: <input type="button" id="down-key" class="input-config" value=""></li>
-                            <li>A: <input type="button" id="a-key" class="input-config" value=""></li>
-                            <li>B: <input type="button" id="b-key" class="input-config" value=""></li>
-                            <li>Start: <input type="button" id="start-key" class="input-config" value=""></li>
-                            <li>Select: <input type="button" id="select-key" class="input-config" value=""></li>
-                        </ul>
-                    </div>
+                    <fieldset id="input-config">
+                        <legend>Input keys</legend>
+                        <div>Up: <input type="button" id="up-key" class="input-config" value=""></div>
+                        <div>Left: <input type="button" id="left-key" class="input-config" value=""></div>
+                        <div>Right: <input type="button" id="right-key" class="input-config" value=""></div>
+                        <div>Down: <input type="button" id="down-key" class="input-config" value=""></div>
+                        <div>A: <input type="button" id="a-key" class="input-config" value=""></div>
+                        <div>B: <input type="button" id="b-key" class="input-config" value=""></div>
+                        <div>Start: <input type="button" id="start-key" class="input-config" value=""></div>
+                        <div>Select: <input type="button" id="select-key" class="input-config" value=""></div>
+                    </fieldset>
                     <div>
                         <input id="restore-defaults" type="button" value="Restore defaults">
                     </div>
+                    <p>Press F8 to toggle fullscreen</p>
                 </div>
             </div>
         </div>

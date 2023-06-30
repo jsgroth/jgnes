@@ -30,9 +30,11 @@ use winit::dpi::{LogicalSize, PhysicalSize};
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopProxy};
 use winit::platform::web::WindowExtWebSys;
-use winit::window::{Window, WindowBuilder, WindowId};
+use winit::window::{Fullscreen, Window, WindowBuilder, WindowId};
 
 const BASE64_ENGINE: GeneralPurpose = base64::engine::general_purpose::STANDARD;
+
+const FULLSCREEN_KEY: VirtualKeyCode = VirtualKeyCode::F8;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumDisplay)]
 #[wasm_bindgen]
@@ -473,8 +475,33 @@ fn run_event_loop(
             } if window_id == state.window_id() => {
                 state.input_handler.handle_window_event(&win_event, &config);
 
-                if let WindowEvent::CloseRequested = win_event {
-                    *control_flow = ControlFlow::Exit;
+                match win_event {
+                    WindowEvent::KeyboardInput {
+                        input:
+                            KeyboardInput {
+                                virtual_keycode: Some(FULLSCREEN_KEY),
+                                state: ElementState::Pressed,
+                                ..
+                            },
+                        ..
+                    } => {
+                        let new_fullscreen = match state.renderer.borrow().window().fullscreen() {
+                            None => Some(Fullscreen::Borderless(None)),
+                            Some(_) => None,
+                        };
+                        state
+                            .renderer
+                            .borrow_mut()
+                            .window_mut()
+                            .set_fullscreen(new_fullscreen);
+                    }
+                    WindowEvent::Resized(_) => {
+                        state.renderer.borrow_mut().reconfigure_surface();
+                    }
+                    WindowEvent::CloseRequested => {
+                        *control_flow = ControlFlow::Exit;
+                    }
+                    _ => {}
                 }
             }
             Event::MainEventsCleared => {

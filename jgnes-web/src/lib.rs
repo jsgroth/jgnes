@@ -86,8 +86,8 @@ struct InputHandler {
 }
 
 impl InputHandler {
-    fn new(config: &InputConfig) -> Self {
-        let mut initial_mapping: HashMap<VirtualKeyCode, Vec<NesButton>> = HashMap::new();
+    fn input_mapping_for(config: &InputConfig) -> HashMap<VirtualKeyCode, Vec<NesButton>> {
+        let mut mapping: HashMap<VirtualKeyCode, Vec<NesButton>> = HashMap::new();
         for (button, keycode) in [
             (NesButton::Up, config.up),
             (NesButton::Left, config.left),
@@ -98,8 +98,14 @@ impl InputHandler {
             (NesButton::Start, config.start),
             (NesButton::Select, config.select),
         ] {
-            initial_mapping.entry(keycode).or_default().push(button);
+            mapping.entry(keycode).or_default().push(button);
         }
+
+        mapping
+    }
+
+    fn new(config: &InputConfig) -> Self {
+        let initial_mapping = Self::input_mapping_for(config);
 
         Self {
             button_mapping: initial_mapping,
@@ -119,6 +125,11 @@ impl InputHandler {
             NesButton::Start => &mut joypad_state.start,
             NesButton::Select => &mut joypad_state.select,
         }
+    }
+
+    fn update_all_mappings(&mut self, config: &InputConfig) {
+        self.button_mapping = Self::input_mapping_for(config);
+        self.p1_joypad_state.set(JoypadState::default());
     }
 
     fn remove_mapping_for_button(&mut self, button: NesButton) {
@@ -549,6 +560,15 @@ fn run_event_loop(
                         event_loop_proxy.clone(),
                         config.current_filename(),
                     ));
+                }
+
+                if config.restore_defaults_requested.replace(false) {
+                    // JgnesWebConfig::restore_defaults updates the actual config values, but
+                    // updating the InputConfig does not automatically update the input mappings in
+                    // the InputHandler
+                    state
+                        .input_handler
+                        .update_all_mappings(&config.inputs.borrow());
                 }
 
                 if let Some(button) = config.reconfig_input_request.replace(None) {

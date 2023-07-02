@@ -132,6 +132,7 @@ pub struct JgnesWebConfig {
     pub(crate) open_file_requested: Rc<Cell<bool>>,
     pub(crate) reset_requested: Rc<Cell<bool>>,
     pub(crate) upload_save_file_requested: Rc<Cell<bool>>,
+    pub(crate) restore_defaults_requested: Rc<Cell<bool>>,
     pub(crate) current_filename: Rc<RefCell<String>>,
 }
 
@@ -318,6 +319,8 @@ impl JgnesWebConfig {
     }
 
     pub fn restore_defaults(&self) {
+        self.restore_defaults_requested.set(true);
+
         let default = JgnesWebConfig::default();
 
         *self.inputs.borrow_mut() = default.inputs.borrow().clone();
@@ -398,6 +401,7 @@ impl Default for JgnesWebConfig {
             open_file_requested: Rc::new(Cell::new(false)),
             reset_requested: Rc::new(Cell::new(false)),
             upload_save_file_requested: Rc::new(Cell::new(false)),
+            restore_defaults_requested: Rc::new(Cell::new(false)),
             current_filename: Rc::new(RefCell::new(String::new())),
         }
     }

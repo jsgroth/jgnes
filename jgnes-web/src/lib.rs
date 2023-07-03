@@ -271,6 +271,11 @@ impl State {
     }
 }
 
+/// Initialize `console_error_panic_hook` and `console_log`.
+///
+/// # Panics
+///
+/// This function will panic if it cannot initialize the console logger.
 #[wasm_bindgen(start)]
 pub fn init_logger() {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));

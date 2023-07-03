@@ -220,10 +220,12 @@ struct SdlInputPoller {
 }
 
 impl InputPoller for SdlInputPoller {
+    #[inline]
     fn poll_p1_input(&self) -> JoypadState {
         self.p1_joypad_state.get()
     }
 
+    #[inline]
     fn poll_p2_input(&self) -> JoypadState {
         self.p2_joypad_state.get()
     }
@@ -236,6 +238,7 @@ struct FsSaveWriter {
 impl SaveWriter for FsSaveWriter {
     type Err = anyhow::Error;
 
+    #[inline]
     fn persist_sram(&mut self, sram: &[u8]) -> Result<(), Self::Err> {
         let tmp_path = self.path.with_extension("tmp");
         fs::write(&tmp_path, sram)?;

@@ -66,6 +66,7 @@ struct WebSaveWriter {
 impl SaveWriter for WebSaveWriter {
     type Err = ();
 
+    #[inline]
     fn persist_sram(&mut self, sram: &[u8]) -> Result<(), Self::Err> {
         let sram_b64 = BASE64_ENGINE.encode(sram);
         js::saveToLocalStorage(&self.file_name, &sram_b64);
@@ -186,10 +187,12 @@ struct WebInputPoller {
 }
 
 impl InputPoller for WebInputPoller {
+    #[inline]
     fn poll_p1_input(&self) -> JoypadState {
         self.p1_joypad_state.get().sanitize_opposing_directions()
     }
 
+    #[inline]
     fn poll_p2_input(&self) -> JoypadState {
         JoypadState::default()
     }

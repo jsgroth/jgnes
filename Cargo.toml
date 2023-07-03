@@ -17,3 +17,7 @@ lto = true
 [profile.profiling]
 inherits = "release"
 debug = true
+
+[profile.profiling-lto]
+inherits = "profiling"
+lto = true

@@ -136,6 +136,12 @@ impl GpuFilterMode {
     }
 }
 
+impl Default for GpuFilterMode {
+    fn default() -> Self {
+        Self::NearestNeighbor
+    }
+}
+
 impl Display for GpuFilterMode {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {

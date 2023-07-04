@@ -77,6 +77,8 @@ struct AppConfig {
     #[serde(default)]
     forced_timing_mode: Option<TimingMode>,
     #[serde(default)]
+    remove_sprite_limit: bool,
+    #[serde(default)]
     pal_black_border: bool,
     #[serde(default = "true_fn")]
     sync_to_audio: bool,
@@ -106,6 +108,7 @@ impl AppConfig {
             overscan: self.overscan,
             forced_integer_height_scaling: self.forced_integer_height_scaling,
             vsync_mode: self.vsync_mode,
+            remove_sprite_limit: self.remove_sprite_limit,
             pal_black_border: self.pal_black_border,
             sync_to_audio: self.sync_to_audio,
             silence_ultrasonic_triangle_output: self.silence_ultrasonic_triangle_output,
@@ -771,6 +774,12 @@ impl App {
                         self.config.rom_search_dir = None;
                     }
                 });
+
+                ui.checkbox(
+                    &mut self.config.remove_sprite_limit,
+                    "Remove 8 sprite per scanline limit",
+                )
+                .on_hover_text("Eliminates sprite flickering but can cause bugs");
 
                 ui.group(|ui| {
                     ui.set_enabled(!self.state.emulator_is_running.load(Ordering::Relaxed));

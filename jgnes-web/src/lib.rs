@@ -597,6 +597,7 @@ fn run_event_loop(
                         match &mut state.emulator {
                             Some(emulator) => {
                                 let emulator_config = EmulatorConfig {
+                                    remove_sprite_limit: config.remove_sprite_limit.get(),
                                     pal_black_border: false,
                                     silence_ultrasonic_triangle_output: config
                                         .silence_ultrasonic_triangle_output

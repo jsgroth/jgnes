@@ -171,6 +171,12 @@
                         <input type="checkbox" id="silence-triangle-ultrasonic" name="silence-triangle-ultrasonic">
                         <label for="silence-triangle-ultrasonic">Silence ultrasonic triangle channel output (reduce pops)</label>
                     </fieldset>
+                    <fieldset>
+                        <legend>Enhancements</legend>
+
+                        <input type="checkbox" id="sprite-limit-disabled" name="sprite-limit-disabled">
+                        <label for="sprite-limit-disabled">Eliminate sprite flickering (can cause bugs)</label>
+                    </fieldset>
                     <fieldset id="input-config">
                         <legend>Input keys</legend>
                         <div>Up: <input type="button" id="up-key" class="input-config" value=""></div>
@@ -234,6 +240,8 @@
                 "silence-triangle-ultrasonic",
                 (value) => config.set_silence_ultrasonic_triangle_output(value),
             );
+
+            initCheckboxElement("sprite-limit-disabled", (value) => config.set_remove_sprite_limit(value));
 
             document.querySelectorAll("input.input-config").forEach((element) => {
                 element.addEventListener("click", (event) => {

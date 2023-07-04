@@ -1,4 +1,4 @@
-use jgnes_core::TimingMode;
+use jgnes_core::{EmulatorConfig, TimingMode};
 use jgnes_proc_macros::{EnumDisplay, EnumFromStr};
 use jgnes_renderer::config::{AspectRatio, GpuFilterMode, Overscan, VSyncMode, WgpuBackend};
 use sdl2::joystick::HatState;
@@ -385,6 +385,7 @@ pub struct JgnesDynamicConfig {
     pub overscan: Overscan,
     pub forced_integer_height_scaling: bool,
     pub vsync_mode: VSyncMode,
+    pub remove_sprite_limit: bool,
     pub pal_black_border: bool,
     pub sync_to_audio: bool,
     pub silence_ultrasonic_triangle_output: bool,
@@ -393,8 +394,18 @@ pub struct JgnesDynamicConfig {
     pub input_config: InputConfig,
 }
 
+impl JgnesDynamicConfig {
+    pub(crate) fn update_emulator_config(&self, emulator_config: &mut EmulatorConfig) {
+        emulator_config.remove_sprite_limit = self.remove_sprite_limit;
+        emulator_config.pal_black_border = self.pal_black_border;
+        emulator_config.silence_ultrasonic_triangle_output =
+            self.silence_ultrasonic_triangle_output;
+    }
+}
+
 impl Display for JgnesDynamicConfig {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "remove_sprite_limit: {}", self.remove_sprite_limit)?;
         writeln!(f, "gpu_filter_mode: {}", self.gpu_filter_mode)?;
         writeln!(f, "aspect_ratio: {}", self.aspect_ratio)?;
         writeln!(f, "overscan: {}", self.overscan)?;

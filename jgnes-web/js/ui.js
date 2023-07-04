@@ -46,6 +46,8 @@ export function setConfigDisplayValues(jgnesWebConfig) {
     document.getElementById("audio-sync-enabled").checked = jgnesWebConfig.audio_sync_enabled();
     document.getElementById("silence-triangle-ultrasonic").checked = jgnesWebConfig.silence_ultrasonic_triangle_output();
 
+    document.getElementById("sprite-limit-disabled").checked = jgnesWebConfig.get_remove_sprite_limit();
+
     let inputConfig = jgnesWebConfig.inputs();
     setInputButtonText("Up", inputConfig.up());
     setInputButtonText("Left", inputConfig.left());

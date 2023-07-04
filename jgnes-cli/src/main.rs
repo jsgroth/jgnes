@@ -74,6 +74,11 @@ struct CliArgs {
     #[arg(long, default_value_t)]
     forced_integer_height_scaling: bool,
 
+    /// Remove the 8 sprite per scanline limit, which eliminates sprite flickering but can cause
+    /// bugs
+    #[arg(long, default_value_t)]
+    remove_sprite_limit: bool,
+
     /// Emulate PAL black border
     #[arg(long, default_value_t)]
     pal_black_border: bool,
@@ -153,6 +158,7 @@ fn main() -> anyhow::Result<()> {
         overscan,
         forced_integer_height_scaling: args.forced_integer_height_scaling,
         vsync_mode: args.vsync_mode,
+        remove_sprite_limit: args.remove_sprite_limit,
         pal_black_border: args.pal_black_border,
         sync_to_audio: args.sync_to_audio,
         silence_ultrasonic_triangle_output: args.silence_ultrasonic_triangle_output,

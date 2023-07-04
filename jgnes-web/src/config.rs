@@ -6,13 +6,25 @@ use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 use winit::event::VirtualKeyCode;
 
+fn true_fn() -> bool {
+    true
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct SerializableConfig {
+    #[serde(default)]
     aspect_ratio: AspectRatio,
+    #[serde(default)]
     gpu_filter_mode: GpuFilterMode,
+    #[serde(default)]
     overscan: Overscan,
+    #[serde(default)]
+    remove_sprite_limit: bool,
+    #[serde(default = "true_fn")]
     audio_enabled: bool,
+    #[serde(default = "true_fn")]
     audio_sync_enabled: bool,
+    #[serde(default)]
     silence_ultrasonic_triangle_output: bool,
 }
 
@@ -125,6 +137,7 @@ pub struct JgnesWebConfig {
     pub(crate) aspect_ratio: Rc<Cell<AspectRatio>>,
     pub(crate) gpu_filter_mode: Rc<Cell<GpuFilterMode>>,
     pub(crate) overscan: Rc<Cell<Overscan>>,
+    pub(crate) remove_sprite_limit: Rc<Cell<bool>>,
     pub(crate) audio_enabled: Rc<Cell<bool>>,
     pub(crate) audio_sync_enabled: Rc<Cell<bool>>,
     pub(crate) silence_ultrasonic_triangle_output: Rc<Cell<bool>>,
@@ -161,6 +174,7 @@ impl JgnesWebConfig {
                 aspect_ratio: Rc::new(Cell::new(config.aspect_ratio)),
                 gpu_filter_mode: Rc::new(Cell::new(config.gpu_filter_mode)),
                 overscan: Rc::new(Cell::new(config.overscan)),
+                remove_sprite_limit: Rc::new(Cell::new(config.remove_sprite_limit)),
                 audio_enabled: Rc::new(Cell::new(config.audio_enabled)),
                 audio_sync_enabled: Rc::new(Cell::new(config.audio_sync_enabled)),
                 silence_ultrasonic_triangle_output: Rc::new(Cell::new(
@@ -287,6 +301,14 @@ impl JgnesWebConfig {
         self.save_to_local_storage();
     }
 
+    pub fn get_remove_sprite_limit(&self) -> bool {
+        self.remove_sprite_limit.get()
+    }
+
+    pub fn set_remove_sprite_limit(&self, value: bool) {
+        self.remove_sprite_limit.set(value);
+    }
+
     pub fn audio_enabled(&self) -> bool {
         self.audio_enabled.get()
     }
@@ -327,6 +349,8 @@ impl JgnesWebConfig {
         self.aspect_ratio.set(default.aspect_ratio.get());
         self.gpu_filter_mode.set(default.gpu_filter_mode.get());
         self.overscan.set(default.overscan.get());
+        self.remove_sprite_limit
+            .set(default.remove_sprite_limit.get());
         self.audio_enabled.set(default.audio_enabled.get());
         self.audio_sync_enabled
             .set(default.audio_sync_enabled.get());
@@ -373,6 +397,7 @@ impl JgnesWebConfig {
             aspect_ratio: self.aspect_ratio.get(),
             gpu_filter_mode: self.gpu_filter_mode.get(),
             overscan: self.overscan.get(),
+            remove_sprite_limit: self.remove_sprite_limit.get(),
             audio_enabled: self.audio_enabled.get(),
             audio_sync_enabled: self.audio_sync_enabled.get(),
             silence_ultrasonic_triangle_output: self.silence_ultrasonic_triangle_output.get(),
@@ -394,6 +419,7 @@ impl Default for JgnesWebConfig {
             aspect_ratio: Rc::new(Cell::new(AspectRatio::Ntsc)),
             gpu_filter_mode: Rc::new(Cell::new(GpuFilterMode::NearestNeighbor)),
             overscan: Rc::default(),
+            remove_sprite_limit: Rc::new(Cell::new(false)),
             audio_enabled: Rc::new(Cell::new(true)),
             audio_sync_enabled: Rc::new(Cell::new(true)),
             silence_ultrasonic_triangle_output: Rc::new(Cell::new(false)),

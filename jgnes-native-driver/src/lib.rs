@@ -585,28 +585,17 @@ where
 
     let save_state_path = save_state_path.as_ref();
 
-    let (
-        initial_pal_black_border,
-        initial_silence_ultrasonic_triangle,
-        initial_ff_multiplier,
-        initial_rewind_buffer_len,
-    ) = {
+    let mut emulator_config = EmulatorConfig::default();
+    let mut fast_forward_multiplier;
+    let mut rewind_state;
+
+    {
         let dynamic_config = dynamic_config.lock().unwrap();
-        (
-            dynamic_config.pal_black_border,
-            dynamic_config.silence_ultrasonic_triangle_output,
-            dynamic_config.fast_forward_multiplier,
-            dynamic_config.rewind_buffer_len,
-        )
-    };
 
-    let mut emulator_config = EmulatorConfig {
-        pal_black_border: initial_pal_black_border,
-        silence_ultrasonic_triangle_output: initial_silence_ultrasonic_triangle,
+        dynamic_config.update_emulator_config(&mut emulator_config);
+        fast_forward_multiplier = dynamic_config.fast_forward_multiplier;
+        rewind_state = RewindState::new(dynamic_config.rewind_buffer_len);
     };
-
-    let mut fast_forward_multiplier = initial_ff_multiplier;
-    let mut rewind_state = RewindState::new(initial_rewind_buffer_len);
 
     let mut ticks = 0_u64;
     loop {
@@ -646,13 +635,12 @@ where
 
                 log::info!("Reloading dynamic config: {dynamic_config}");
 
+                dynamic_config.update_emulator_config(&mut emulator_config);
+
                 let renderer = emulator.get_renderer_mut();
                 renderer.reload_config(dynamic_config)?;
-                emulator_config.pal_black_border = dynamic_config.pal_black_border;
 
                 emulator.get_audio_player_mut().sync_to_audio = dynamic_config.sync_to_audio;
-                emulator_config.silence_ultrasonic_triangle_output =
-                    dynamic_config.silence_ultrasonic_triangle_output;
 
                 input_handler.reload_input_config(&dynamic_config.input_config);
 

@@ -16,7 +16,8 @@ use jgnes_core::{
 };
 use jgnes_proc_macros::EnumDisplay;
 use jgnes_renderer::config::{
-    AspectRatio, FrameSkip, GpuFilterMode, Overscan, RendererConfig, VSyncMode, WgpuBackend,
+    AspectRatio, FrameSkip, GpuFilterMode, Overscan, RenderScale, RendererConfig, VSyncMode,
+    WgpuBackend,
 };
 use jgnes_renderer::WgpuRenderer;
 use js_sys::Promise;
@@ -261,6 +262,7 @@ struct State {
     input_handler: InputHandler,
     aspect_ratio: AspectRatio,
     filter_mode: GpuFilterMode,
+    render_scale: RenderScale,
     overscan: Overscan,
     user_interacted: bool,
 }
@@ -377,6 +379,7 @@ pub async fn run_emulator(config: JgnesWebConfig) {
             vsync_mode: VSyncMode::Enabled,
             wgpu_backend,
             gpu_filter_mode,
+            prescaling_mode: config.get_prescaling_mode(),
             aspect_ratio,
             overscan,
             frame_skip: FrameSkip::ZERO,
@@ -411,6 +414,7 @@ pub async fn run_emulator(config: JgnesWebConfig) {
         input_handler,
         aspect_ratio: config.aspect_ratio.get(),
         filter_mode: config.gpu_filter_mode.get(),
+        render_scale: config.render_scale.get(),
         overscan: config.overscan.get(),
         user_interacted: false,
     };
@@ -543,6 +547,15 @@ fn run_event_loop(
                         .borrow_mut()
                         .update_filter_mode(config_filter_mode);
                     state.filter_mode = config_filter_mode;
+                }
+
+                let config_render_scale = config.render_scale.get();
+                if config_render_scale != state.render_scale {
+                    state
+                        .renderer
+                        .borrow_mut()
+                        .update_prescaling_mode(config.get_prescaling_mode());
+                    state.render_scale = config_render_scale;
                 }
 
                 let config_overscan = config.overscan.get();

@@ -2,7 +2,9 @@
 #![allow(clippy::let_underscore_untyped)]
 
 use crate::colors;
-use crate::config::{AspectRatio, FrameSkip, GpuFilterMode, Overscan, RendererConfig, VSyncMode};
+use crate::config::{
+    AspectRatio, FrameSkip, GpuFilterMode, Overscan, PrescalingMode, RendererConfig, VSyncMode,
+};
 use jgnes_core::{ColorEmphasis, FrameBuffer, Renderer, TimingMode};
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 use std::{iter, mem};
@@ -129,7 +131,7 @@ where
 
         let output_buffer = vec![0; output_buffer_len(timing_mode)];
 
-        let cpu_render_scale = render_config.gpu_filter_mode.cpu_render_scale() as usize;
+        let cpu_render_scale = render_config.prescaling_mode.cpu_render_scale() as usize;
         let cpu_scale_output_buffer =
             vec![0; output_buffer.len() * cpu_render_scale * cpu_render_scale];
 
@@ -215,11 +217,11 @@ where
             wgpu::TextureFormat::Rgba8Unorm
         };
 
-        let cpu_render_scale = render_config.gpu_filter_mode.cpu_render_scale();
+        let cpu_render_scale = render_config.prescaling_mode.cpu_render_scale();
         let texture = create_texture(&device, texture_format, cpu_render_scale, timing_mode);
         let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        let gpu_render_scale = render_config.gpu_filter_mode.gpu_render_scale();
+        let gpu_render_scale = render_config.prescaling_mode.gpu_render_scale();
         let scaled_texture = create_scaled_texture(&device, gpu_render_scale, timing_mode);
         let scaled_texture_view =
             scaled_texture.create_view(&wgpu::TextureViewDescriptor::default());
@@ -369,22 +371,32 @@ where
     }
 
     pub fn update_aspect_ratio(&mut self, aspect_ratio: AspectRatio) {
-        self.render_config.aspect_ratio = aspect_ratio;
-        self.reconfigure_surface();
+        if aspect_ratio != self.render_config.aspect_ratio {
+            self.render_config.aspect_ratio = aspect_ratio;
+            self.reconfigure_surface();
+        }
     }
 
     pub fn update_filter_mode(&mut self, filter_mode: GpuFilterMode) {
-        self.render_config.gpu_filter_mode = filter_mode;
-        self.reinit_textures();
+        if filter_mode != self.render_config.gpu_filter_mode {
+            self.render_config.gpu_filter_mode = filter_mode;
+            self.reinit_textures();
+        }
+    }
+
+    pub fn update_prescaling_mode(&mut self, prescaling_mode: PrescalingMode) {
+        if prescaling_mode != self.render_config.prescaling_mode {
+            self.render_config.prescaling_mode = prescaling_mode;
+            self.reinit_textures();
+        }
     }
 
     fn reinit_textures(&mut self) {
-        let filter_mode = self.render_config.gpu_filter_mode;
+        let sampler = create_sampler(&self.device, self.render_config.gpu_filter_mode);
 
-        let sampler = create_sampler(&self.device, filter_mode);
-
-        match filter_mode {
-            GpuFilterMode::LinearCpuScaled(render_scale) => {
+        let prescaling_mode = self.render_config.prescaling_mode;
+        match prescaling_mode {
+            PrescalingMode::Cpu(render_scale) => {
                 let render_scale = render_scale.get() as usize;
                 self.cpu_scale_output_buffer =
                     vec![0; self.output_buffer.len() * render_scale * render_scale];
@@ -416,7 +428,7 @@ where
                     &sampler,
                 );
             }
-            GpuFilterMode::NearestNeighbor | GpuFilterMode::Linear(_) => {
+            PrescalingMode::Gpu(render_scale) => {
                 self.texture = self.device.create_texture(&wgpu::TextureDescriptor {
                     label: Some("texture"),
                     size: wgpu::Extent3d {
@@ -436,45 +448,32 @@ where
                     .texture
                     .create_view(&wgpu::TextureViewDescriptor::default());
 
-                match filter_mode {
-                    GpuFilterMode::NearestNeighbor => {
-                        self.render_bind_group = create_render_bind_group(
-                            &self.device,
-                            &self.render_bind_group_layout,
-                            &texture_view,
-                            &sampler,
-                        );
-                    }
-                    GpuFilterMode::Linear(render_scale) => {
-                        let render_scale = render_scale.get();
+                let render_scale = render_scale.get();
 
-                        let scaled_texture =
-                            create_scaled_texture(&self.device, render_scale, self.timing_mode);
-                        let scaled_texture_view =
-                            scaled_texture.create_view(&wgpu::TextureViewDescriptor::default());
+                let scaled_texture =
+                    create_scaled_texture(&self.device, render_scale, self.timing_mode);
+                let scaled_texture_view =
+                    scaled_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-                        self.compute_resources = create_compute_resources(
-                            &self.device,
-                            &scaled_texture,
-                            &texture_view,
-                            &scaled_texture_view,
-                            render_scale,
-                        );
+                self.compute_resources = create_compute_resources(
+                    &self.device,
+                    &scaled_texture,
+                    &texture_view,
+                    &scaled_texture_view,
+                    render_scale,
+                );
 
-                        let render_texture_view = if render_scale > 1 {
-                            &scaled_texture_view
-                        } else {
-                            &texture_view
-                        };
-                        self.render_bind_group = create_render_bind_group(
-                            &self.device,
-                            &self.render_bind_group_layout,
-                            render_texture_view,
-                            &sampler,
-                        );
-                    }
-                    GpuFilterMode::LinearCpuScaled(_) => unreachable!("nested match expressions"),
-                }
+                let render_texture_view = if render_scale > 1 {
+                    &scaled_texture_view
+                } else {
+                    &texture_view
+                };
+                self.render_bind_group = create_render_bind_group(
+                    &self.device,
+                    &self.render_bind_group_layout,
+                    render_texture_view,
+                    &sampler,
+                );
             }
         }
     }
@@ -490,14 +489,20 @@ where
     }
 
     pub fn update_forced_integer_height_scaling(&mut self, forced_integer_height_scaling: bool) {
-        self.render_config.forced_integer_height_scaling = forced_integer_height_scaling;
-        self.reconfigure_surface();
+        if forced_integer_height_scaling != self.render_config.forced_integer_height_scaling {
+            self.render_config.forced_integer_height_scaling = forced_integer_height_scaling;
+            self.reconfigure_surface();
+        }
     }
 
     /// # Errors
     ///
     /// This method will return an error if the GPU driver does not support the specified vsync mode.
     pub fn update_vsync_mode(&mut self, vsync_mode: VSyncMode) -> Result<(), WgpuRendererError> {
+        if vsync_mode == self.render_config.vsync_mode {
+            return Ok(());
+        }
+
         let present_mode = vsync_mode.to_present_mode();
         if !self
             .surface_capabilities
@@ -671,10 +676,7 @@ fn create_render_bind_group(
 }
 
 fn create_sampler(device: &wgpu::Device, filter_mode: GpuFilterMode) -> wgpu::Sampler {
-    let sampler_filter_mode = match filter_mode {
-        GpuFilterMode::NearestNeighbor => wgpu::FilterMode::Nearest,
-        GpuFilterMode::Linear(_) | GpuFilterMode::LinearCpuScaled(_) => wgpu::FilterMode::Linear,
-    };
+    let sampler_filter_mode = filter_mode.to_wgpu_filter_mode();
     device.create_sampler(&wgpu::SamplerDescriptor {
         label: Some("sampler"),
         address_mode_u: wgpu::AddressMode::ClampToEdge,
@@ -765,7 +767,7 @@ impl<W: HasRawDisplayHandle + HasRawWindowHandle> Renderer for WgpuRenderer<W> {
             &mut self.output_buffer,
         );
 
-        let cpu_render_scale = self.render_config.gpu_filter_mode.cpu_render_scale();
+        let cpu_render_scale = self.render_config.prescaling_mode.cpu_render_scale();
         let render_buffer = if cpu_render_scale > 1 {
             cpu_scale_texture(
                 &self.output_buffer,

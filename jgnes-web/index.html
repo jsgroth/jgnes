@@ -135,14 +135,20 @@
                         <input type="radio" id="filter-nearest" name="image-filter" value="NearestNeighbor" checked>
                         <label for="filter-nearest">Nearest neighbor</label>
 
-                        <input type="radio" id="filter-linear" name="image-filter" value="Linear">
+                        <input type="radio" id="filter-linear" name="image-filter" value="LinearInterpolation">
                         <label for="filter-linear">Linear interpolation</label>
+                    </fieldset>
+                    <fieldset>
+                        <legend>Image prescale factor</legend>
 
-                        <input type="radio" id="filter-linear-2x" name="image-filter" value="Linear2x">
-                        <label for="filter-linear-2x">Linear interpolation (2x scaled)</label>
+                        <input type="radio" id="prescale-1x" name="image-prescale" value="1" checked>
+                        <label for="prescale-1x">1x</label>
 
-                        <input type="radio" id="filter-linear-3x" name="image-filter" value="Linear3x">
-                        <label for="filter-linear-3x">Linear interpolation (3x scaled)</label>
+                        <input type="radio" id="prescale-2x" name="image-prescale" value="2">
+                        <label for="prescale-2x">2x</label>
+
+                        <input type="radio" id="prescale-3x" name="image-prescale" value="3">
+                        <label for="prescale-3x">3x</label>
                     </fieldset>
                     <fieldset>
                         <legend>Overscan</legend>
@@ -219,6 +225,12 @@
             document.querySelectorAll("input[name='image-filter']").forEach((element) => {
                 element.addEventListener("click", (event) => {
                     config.set_filter_mode(event.target.value);
+                });
+            });
+
+            document.querySelectorAll("input[name='image-prescale']").forEach((element) => {
+                element.addEventListener("click", (event) => {
+                    config.set_render_scale(parseInt(event.target.value));
                 });
             });
 

@@ -14,7 +14,7 @@ use jgnes_native_driver::{
     JgnesNativeConfig, JgnesSharedConfig, JoystickInput, KeyboardInput, NativeRenderer,
 };
 use jgnes_renderer::config::{
-    AspectRatio, GpuFilterMode, Overscan, RenderScale, VSyncMode, WgpuBackend,
+    AspectRatio, GpuFilterMode, Overscan, PrescalingMode, RenderScale, VSyncMode, WgpuBackend,
 };
 use rfd::FileDialog;
 use serde::{Deserialize, Serialize};
@@ -27,19 +27,16 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-enum GpuFilterType {
-    NearestNeighbor,
-    #[default]
-    Linear,
-}
-
 fn default_window_width() -> u32 {
     (f64::from(3 * 224) * 64.0 / 49.0).ceil() as u32
 }
 
 fn default_window_height() -> u32 {
     3 * 224
+}
+
+fn default_gpu_filter_mode() -> GpuFilterMode {
+    GpuFilterMode::LinearInterpolation
 }
 
 fn default_ff_multiplier() -> u8 {
@@ -64,10 +61,10 @@ struct AppConfig {
     renderer: NativeRenderer,
     #[serde(default)]
     wgpu_backend: WgpuBackend,
+    #[serde(default = "default_gpu_filter_mode")]
+    gpu_filter_mode: GpuFilterMode,
     #[serde(default)]
-    gpu_filter_type: GpuFilterType,
-    #[serde(default)]
-    gpu_render_scale: RenderScale,
+    render_scale: RenderScale,
     #[serde(default)]
     aspect_ratio: AspectRatio,
     #[serde(default)]
@@ -100,10 +97,8 @@ struct AppConfig {
 impl AppConfig {
     fn to_jgnes_dynamic_config(&self) -> JgnesDynamicConfig {
         JgnesDynamicConfig {
-            gpu_filter_mode: match self.gpu_filter_type {
-                GpuFilterType::NearestNeighbor => GpuFilterMode::NearestNeighbor,
-                GpuFilterType::Linear => GpuFilterMode::Linear(self.gpu_render_scale),
-            },
+            gpu_filter_mode: self.gpu_filter_mode,
+            prescaling_mode: PrescalingMode::Gpu(self.render_scale),
             aspect_ratio: self.aspect_ratio,
             overscan: self.overscan,
             forced_integer_height_scaling: self.forced_integer_height_scaling,
@@ -454,7 +449,7 @@ impl AppState {
             rewind_buffer_len_invalid: false,
         };
         Self {
-            render_scale_text: config.gpu_render_scale.get().to_string(),
+            render_scale_text: config.render_scale.get().to_string(),
             render_scale_invalid: false,
             window_width_text: config.window_width.to_string(),
             window_width_invalid: false,
@@ -909,33 +904,33 @@ impl App {
                 ui.group(|ui| {
                     ui.set_enabled(self.config.renderer == NativeRenderer::Wgpu);
 
-                    let disabled_hover_text = "Only nearest neighbor filtering is supported with SDL2 renderer";
+                    let disabled_hover_text = "Only nearest neighbor sampling is supported with SDL2 renderer";
                     ui.label("Image filtering")
                         .on_disabled_hover_text(disabled_hover_text);
                     ui.horizontal(|ui| {
-                        ui.radio_value(&mut self.config.gpu_filter_type, GpuFilterType::NearestNeighbor, "Nearest neighbor")
+                        ui.radio_value(&mut self.config.gpu_filter_mode, GpuFilterMode::NearestNeighbor, "Nearest neighbor")
                             .on_disabled_hover_text(disabled_hover_text);
-                        ui.radio_value(&mut self.config.gpu_filter_type, GpuFilterType::Linear, "Linear interpolation")
+                        ui.radio_value(&mut self.config.gpu_filter_mode, GpuFilterMode::LinearInterpolation, "Linear interpolation")
                             .on_disabled_hover_text(disabled_hover_text);
                     });
                 });
 
                 ui.horizontal(|ui| {
-                    ui.set_enabled(self.config.renderer == NativeRenderer::Wgpu && self.config.gpu_filter_type == GpuFilterType::Linear);
+                    ui.set_enabled(self.config.renderer == NativeRenderer::Wgpu);
 
                     if !TextEdit::singleline(&mut self.state.render_scale_text).desired_width(30.0).ui(ui).has_focus() {
                         match RenderScale::try_from(self.state.render_scale_text.parse::<u32>().unwrap_or(0)) {
                             Ok(render_scale) => {
                                 self.state.render_scale_invalid = false;
-                                self.config.gpu_render_scale = render_scale;
+                                self.config.render_scale = render_scale;
                             }
                             Err(_) => {
                                 self.state.render_scale_invalid = true;
                             }
                         }
                     }
-                    ui.label("Linear interpolation scaling factor")
-                        .on_hover_text("The image will be integer upscaled from 256x224 by this factor before linear interpolation");
+                    ui.label("Image prescale factor")
+                        .on_hover_text("The image will be integer upscaled from 256x224 by this factor before filtering");
                 });
                 if self.state.render_scale_invalid {
                     ui.colored_label(Color32::RED, "Scaling factor must be an integer between 1 and 16");

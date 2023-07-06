@@ -5,14 +5,10 @@ use jgnes_native_driver::{
     InputConfig, JgnesDynamicConfig, JgnesNativeConfig, JgnesSharedConfig, NativeRenderer,
 };
 use jgnes_proc_macros::{EnumDisplay, EnumFromStr};
-use jgnes_renderer::config::{AspectRatio, GpuFilterMode, Overscan, VSyncMode, WgpuBackend};
+use jgnes_renderer::config::{
+    AspectRatio, GpuFilterMode, Overscan, PrescalingMode, RenderScale, VSyncMode, WgpuBackend,
+};
 use std::time::Duration;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumDisplay, EnumFromStr)]
-enum GpuFilterType {
-    NearestNeighbor,
-    Linear,
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, EnumDisplay, EnumFromStr)]
 enum OptionalTimingMode {
@@ -30,6 +26,13 @@ impl OptionalTimingMode {
             Self::None => None,
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, EnumDisplay, EnumFromStr)]
+enum PrescalingType {
+    #[default]
+    Gpu,
+    Cpu,
 }
 
 #[derive(Parser)]
@@ -54,13 +57,17 @@ struct CliArgs {
     #[arg(long, default_value_t)]
     wgpu_backend: WgpuBackend,
 
-    /// GPU filter type (NearestNeighbor / Linear)
-    #[arg(long, default_value_t = GpuFilterType::Linear)]
-    gpu_filter_type: GpuFilterType,
+    /// GPU filter type (NearestNeighbor / LinearInterpolation)
+    #[arg(long, default_value_t = GpuFilterMode::LinearInterpolation)]
+    gpu_filter_mode: GpuFilterMode,
 
-    /// Internal resolution scale (1 to 16, only applicable to Wgpu renderer w/ linear filter mode)
+    /// Prescaling type (Gpu / Cpu)
+    #[arg(long, default_value_t)]
+    prescaling_type: PrescalingType,
+
+    /// Internal resolution prescale factor (1 to 16, only applicable to Wgpu renderer)
     #[arg(long, default_value_t = 3)]
-    gpu_render_scale: u32,
+    render_scale: u32,
 
     /// Aspect ratio (Ntsc / Pal / SquarePixels / FourThree / Stretched)
     #[arg(long, default_value_t)]
@@ -140,20 +147,17 @@ fn main() -> anyhow::Result<()> {
 
     let args = CliArgs::parse();
 
-    let gpu_filter_mode = match args.gpu_filter_type {
-        GpuFilterType::NearestNeighbor => GpuFilterMode::NearestNeighbor,
-        GpuFilterType::Linear => {
-            let render_scale = args
-                .gpu_render_scale
-                .try_into()
-                .expect("invalid GPU render scale");
-            GpuFilterMode::Linear(render_scale)
-        }
+    let render_scale =
+        RenderScale::try_from(args.render_scale).expect("render_scale arg is invalid");
+    let prescaling_mode = match args.prescaling_type {
+        PrescalingType::Gpu => PrescalingMode::Gpu(render_scale),
+        PrescalingType::Cpu => PrescalingMode::Cpu(render_scale),
     };
 
     let overscan = args.overscan();
     let (shared_config, _) = JgnesSharedConfig::new(JgnesDynamicConfig {
-        gpu_filter_mode,
+        gpu_filter_mode: args.gpu_filter_mode,
+        prescaling_mode,
         aspect_ratio: args.aspect_ratio,
         overscan,
         forced_integer_height_scaling: args.forced_integer_height_scaling,

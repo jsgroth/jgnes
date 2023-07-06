@@ -1,10 +1,14 @@
 use crate::{js, NesButton};
-use jgnes_renderer::config::{AspectRatio, GpuFilterMode, Overscan, RenderScale};
+use jgnes_renderer::config::{AspectRatio, GpuFilterMode, Overscan, PrescalingMode, RenderScale};
 use serde::{Deserialize, Serialize};
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 use winit::event::VirtualKeyCode;
+
+fn default_render_scale() -> RenderScale {
+    RenderScale::ONE
+}
 
 fn true_fn() -> bool {
     true
@@ -16,6 +20,8 @@ struct SerializableConfig {
     aspect_ratio: AspectRatio,
     #[serde(default)]
     gpu_filter_mode: GpuFilterMode,
+    #[serde(default = "default_render_scale")]
+    render_scale: RenderScale,
     #[serde(default)]
     overscan: Overscan,
     #[serde(default)]
@@ -136,6 +142,7 @@ pub struct JgnesWebConfig {
     pub(crate) inputs: Rc<RefCell<InputConfig>>,
     pub(crate) aspect_ratio: Rc<Cell<AspectRatio>>,
     pub(crate) gpu_filter_mode: Rc<Cell<GpuFilterMode>>,
+    pub(crate) render_scale: Rc<Cell<RenderScale>>,
     pub(crate) overscan: Rc<Cell<Overscan>>,
     pub(crate) remove_sprite_limit: Rc<Cell<bool>>,
     pub(crate) audio_enabled: Rc<Cell<bool>>,
@@ -154,9 +161,7 @@ const PAL: &str = "Pal";
 const SQUARE_PIXELS: &str = "SquarePixels";
 
 const NEAREST_NEIGHBOR: &str = "NearestNeighbor";
-const LINEAR_1X: &str = "Linear";
-const LINEAR_2X: &str = "Linear2x";
-const LINEAR_3X: &str = "Linear3x";
+const LINEAR_INTERPOLATION: &str = "LinearInterpolation";
 
 #[wasm_bindgen]
 impl JgnesWebConfig {
@@ -173,6 +178,7 @@ impl JgnesWebConfig {
                 inputs: Rc::new(RefCell::new(inputs)),
                 aspect_ratio: Rc::new(Cell::new(config.aspect_ratio)),
                 gpu_filter_mode: Rc::new(Cell::new(config.gpu_filter_mode)),
+                render_scale: Rc::new(Cell::new(config.render_scale)),
                 overscan: Rc::new(Cell::new(config.overscan)),
                 remove_sprite_limit: Rc::new(Cell::new(config.remove_sprite_limit)),
                 audio_enabled: Rc::new(Cell::new(config.audio_enabled)),
@@ -210,24 +216,15 @@ impl JgnesWebConfig {
     pub fn filter_mode(&self) -> String {
         let s = match self.gpu_filter_mode.get() {
             GpuFilterMode::NearestNeighbor => NEAREST_NEIGHBOR,
-            GpuFilterMode::Linear(RenderScale::ONE) => LINEAR_1X,
-            GpuFilterMode::Linear(RenderScale::TWO)
-            | GpuFilterMode::LinearCpuScaled(RenderScale::TWO) => LINEAR_2X,
-            GpuFilterMode::Linear(RenderScale::THREE)
-            | GpuFilterMode::LinearCpuScaled(RenderScale::THREE) => LINEAR_3X,
-            // Other filter modes not supported by the web frontend
-            _ => "",
+            GpuFilterMode::LinearInterpolation => LINEAR_INTERPOLATION,
         };
         s.into()
     }
 
-    #[cfg(feature = "webgl")]
     pub fn set_filter_mode(&self, gpu_filter_mode: &str) {
         let gpu_filter_mode = match gpu_filter_mode {
             NEAREST_NEIGHBOR => GpuFilterMode::NearestNeighbor,
-            LINEAR_1X => GpuFilterMode::Linear(RenderScale::ONE),
-            LINEAR_2X => GpuFilterMode::LinearCpuScaled(RenderScale::TWO),
-            LINEAR_3X => GpuFilterMode::LinearCpuScaled(RenderScale::THREE),
+            LINEAR_INTERPOLATION => GpuFilterMode::LinearInterpolation,
             _ => return,
         };
         self.gpu_filter_mode.set(gpu_filter_mode);
@@ -235,18 +232,13 @@ impl JgnesWebConfig {
         self.save_to_local_storage();
     }
 
-    #[cfg(not(feature = "webgl"))]
-    pub fn set_filter_mode(&self, gpu_filter_mode: &str) {
-        let gpu_filter_mode = match gpu_filter_mode {
-            NEAREST_NEIGHBOR => GpuFilterMode::NearestNeighbor,
-            LINEAR_1X => GpuFilterMode::Linear(RenderScale::ONE),
-            LINEAR_2X => GpuFilterMode::Linear(RenderScale::TWO),
-            LINEAR_3X => GpuFilterMode::Linear(RenderScale::THREE),
-            _ => return,
-        };
-        self.gpu_filter_mode.set(gpu_filter_mode);
+    pub fn render_scale(&self) -> u32 {
+        self.render_scale.get().get()
+    }
 
-        self.save_to_local_storage();
+    pub fn set_render_scale(&self, value: u32) {
+        let Ok(render_scale) = RenderScale::try_from(value) else { return };
+        self.render_scale.set(render_scale);
     }
 
     pub fn overscan_left(&self) -> bool {
@@ -348,6 +340,7 @@ impl JgnesWebConfig {
         *self.inputs.borrow_mut() = default.inputs.borrow().clone();
         self.aspect_ratio.set(default.aspect_ratio.get());
         self.gpu_filter_mode.set(default.gpu_filter_mode.get());
+        self.render_scale.set(default.render_scale.get());
         self.overscan.set(default.overscan.get());
         self.remove_sprite_limit
             .set(default.remove_sprite_limit.get());
@@ -392,10 +385,21 @@ impl JgnesWebConfig {
 }
 
 impl JgnesWebConfig {
+    #[cfg(feature = "webgl")]
+    pub(crate) fn get_prescaling_mode(&self) -> PrescalingMode {
+        PrescalingMode::Cpu(self.render_scale.get())
+    }
+
+    #[cfg(not(feature = "webgl"))]
+    pub(crate) fn get_prescaling_mode(&self) -> PrescalingMode {
+        PrescalingMode::Gpu(self.render_scale.get())
+    }
+
     fn to_serializable_config(&self) -> SerializableConfig {
         SerializableConfig {
             aspect_ratio: self.aspect_ratio.get(),
             gpu_filter_mode: self.gpu_filter_mode.get(),
+            render_scale: self.render_scale.get(),
             overscan: self.overscan.get(),
             remove_sprite_limit: self.remove_sprite_limit.get(),
             audio_enabled: self.audio_enabled.get(),
@@ -418,6 +422,7 @@ impl Default for JgnesWebConfig {
             inputs: Rc::default(),
             aspect_ratio: Rc::new(Cell::new(AspectRatio::Ntsc)),
             gpu_filter_mode: Rc::new(Cell::new(GpuFilterMode::NearestNeighbor)),
+            render_scale: Rc::new(Cell::new(default_render_scale())),
             overscan: Rc::default(),
             remove_sprite_limit: Rc::new(Cell::new(false)),
             audio_enabled: Rc::new(Cell::new(true)),

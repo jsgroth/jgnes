@@ -111,45 +111,59 @@ impl TryFrom<u32> for RenderScale {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, EnumDisplay, EnumFromStr,
+)]
 pub enum GpuFilterMode {
+    #[default]
     NearestNeighbor,
-    Linear(RenderScale),
-    LinearCpuScaled(RenderScale),
+    LinearInterpolation,
 }
 
 impl GpuFilterMode {
-    #[must_use]
-    pub fn cpu_render_scale(self) -> u32 {
+    pub(crate) fn to_wgpu_filter_mode(self) -> wgpu::FilterMode {
         match self {
-            Self::NearestNeighbor | Self::Linear(_) => 1,
-            Self::LinearCpuScaled(render_scale) => render_scale.get(),
+            Self::NearestNeighbor => wgpu::FilterMode::Nearest,
+            Self::LinearInterpolation => wgpu::FilterMode::Linear,
         }
     }
+}
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PrescalingMode {
+    Gpu(RenderScale),
+    Cpu(RenderScale),
+}
+
+impl PrescalingMode {
     #[must_use]
     pub fn gpu_render_scale(self) -> u32 {
         match self {
-            Self::NearestNeighbor | Self::LinearCpuScaled(_) => 1,
-            Self::Linear(render_scale) => render_scale.get(),
+            Self::Gpu(render_scale) => render_scale.get(),
+            Self::Cpu(_) => 1,
+        }
+    }
+
+    #[must_use]
+    pub fn cpu_render_scale(self) -> u32 {
+        match self {
+            Self::Gpu(_) => 1,
+            Self::Cpu(render_scale) => render_scale.get(),
         }
     }
 }
 
-impl Default for GpuFilterMode {
+impl Default for PrescalingMode {
     fn default() -> Self {
-        Self::NearestNeighbor
+        Self::Gpu(RenderScale::ONE)
     }
 }
 
-impl Display for GpuFilterMode {
+impl Display for PrescalingMode {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::NearestNeighbor => write!(f, "NearestNeighbor"),
-            Self::Linear(render_scale) => write!(f, "Linear {}x", render_scale.0),
-            Self::LinearCpuScaled(render_scale) => {
-                write!(f, "Linear {}x (CPU scaled)", render_scale.0)
-            }
+            Self::Gpu(render_scale) => write!(f, "GPU {}x", render_scale.get()),
+            Self::Cpu(render_scale) => write!(f, "CPU {}x", render_scale.get()),
         }
     }
 }
@@ -171,6 +185,7 @@ pub struct RendererConfig {
     pub vsync_mode: VSyncMode,
     pub wgpu_backend: WgpuBackend,
     pub gpu_filter_mode: GpuFilterMode,
+    pub prescaling_mode: PrescalingMode,
     pub aspect_ratio: AspectRatio,
     pub overscan: Overscan,
     pub frame_skip: FrameSkip,

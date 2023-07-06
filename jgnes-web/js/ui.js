@@ -37,6 +37,10 @@ export function setConfigDisplayValues(jgnesWebConfig) {
         element.checked = element.value === jgnesWebConfig.filter_mode();
     });
 
+    document.querySelectorAll("input[name='image-prescale']").forEach((element) => {
+        element.checked = parseInt(element.value) === jgnesWebConfig.render_scale();
+    });
+
     document.getElementById("overscan-left").checked = jgnesWebConfig.overscan_left();
     document.getElementById("overscan-right").checked = jgnesWebConfig.overscan_right();
     document.getElementById("overscan-top").checked = jgnesWebConfig.overscan_top();

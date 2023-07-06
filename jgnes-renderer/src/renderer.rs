@@ -1,10 +1,10 @@
 // The generated Copy impl for Vertex2d violates this rule for some reason
 #![allow(clippy::let_underscore_untyped)]
 
-use crate::colors;
 use crate::config::{
     AspectRatio, FrameSkip, GpuFilterMode, Overscan, PrescalingMode, RendererConfig, VSyncMode,
 };
+use crate::{colors, DisplayArea};
 use jgnes_core::{ColorEmphasis, FrameBuffer, Renderer, TimingMode};
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 use std::{iter, mem};
@@ -58,6 +58,38 @@ impl Vertex2d {
     }
 }
 
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Default, bytemuck::Pod, bytemuck::Zeroable)]
+struct FragmentGlobals {
+    viewport_x: [u32; 2],
+    viewport_y: [u32; 2],
+    nes_visible_height: u32,
+}
+
+impl FragmentGlobals {
+    const SIZE: usize = 20;
+
+    fn new(display_area: DisplayArea, timing_mode: TimingMode) -> Self {
+        Self {
+            viewport_x: [display_area.x, display_area.x + display_area.width],
+            viewport_y: [display_area.y, display_area.y + display_area.height],
+            nes_visible_height: timing_mode.visible_screen_height().into(),
+        }
+    }
+
+    fn to_bytes(self) -> [u8; Self::SIZE] {
+        bytemuck::cast(self)
+    }
+
+    const fn padded_size() -> usize {
+        if Self::SIZE % 8 != 0 {
+            Self::SIZE + (8 - (Self::SIZE & 0x07))
+        } else {
+            Self::SIZE
+        }
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum WgpuRendererError {
     #[error("Error creating wgpu surface: {source}")]
@@ -102,9 +134,13 @@ pub struct WgpuRenderer<W> {
     compute_resources: Option<(wgpu::BindGroup, wgpu::ComputePipeline)>,
     render_bind_group: wgpu::BindGroup,
     render_bind_group_layout: wgpu::BindGroupLayout,
+    shader: wgpu::ShaderModule,
     render_pipeline: wgpu::RenderPipeline,
+    render_pipeline_layout: wgpu::PipelineLayout,
     vertices: Vec<Vertex2d>,
     vertex_buffer: wgpu::Buffer,
+    fs_globals: FragmentGlobals,
+    fs_globals_buffer: wgpu::Buffer,
     // SAFETY: The window must be declared after the surface so that it is not dropped before the
     // surface is dropped
     window: W,
@@ -228,14 +264,28 @@ where
 
         let sampler = create_sampler(&device, render_config.gpu_filter_mode);
 
-        let vertices = compute_vertices(window_width, window_height, &render_config, timing_mode);
+        let display_area = crate::determine_display_area(
+            window_width,
+            window_height,
+            render_config.aspect_ratio,
+            render_config.forced_integer_height_scaling,
+            timing_mode,
+        );
+
+        let vertices = compute_vertices(window_width, window_height, display_area);
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("vertex_buffer"),
             contents: bytemuck::cast_slice(&vertices),
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         });
 
-        let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
+        let fs_globals = FragmentGlobals::new(display_area, timing_mode);
+        let fs_globals_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("fs_globals_buffer"),
+            size: FragmentGlobals::padded_size() as u64,
+            mapped_at_creation: false,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
 
         // Compute pipeline is for texture scaling and is only needed if render scale is higher than 1
         let compute_resources = create_compute_resources(
@@ -266,6 +316,16 @@ where
                         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                         count: None,
                     },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
                 ],
             });
         // Ignore the scaled texture if render scale is 1
@@ -279,6 +339,7 @@ where
             &render_bind_group_layout,
             render_bind_texture,
             &sampler,
+            &fs_globals_buffer,
         );
 
         let render_pipeline_layout =
@@ -288,40 +349,13 @@ where
                 push_constant_ranges: &[],
             });
 
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("render_pipeline"),
-            layout: Some(&render_pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: "vs_main",
-                buffers: &[Vertex2d::descriptor()],
-            },
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: None,
-                unclipped_depth: false,
-                polygon_mode: wgpu::PolygonMode::Fill,
-                conservative: false,
-            },
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState {
-                count: 1,
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: "fs_main",
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: surface_config.format,
-                    blend: Some(wgpu::BlendState::REPLACE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            multiview: None,
-        });
+        let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
+        let render_pipeline = create_render_pipeline(
+            &device,
+            &shader,
+            &render_pipeline_layout,
+            surface_config.format,
+        );
 
         Ok(Self {
             render_config,
@@ -338,9 +372,13 @@ where
             compute_resources,
             render_bind_group,
             render_bind_group_layout,
+            shader,
             render_pipeline,
+            render_pipeline_layout,
             vertices,
             vertex_buffer,
+            fs_globals,
+            fs_globals_buffer,
             window,
             window_size_fn,
             total_frames: 0,
@@ -362,12 +400,16 @@ where
 
         self.surface.configure(&self.device, &self.surface_config);
 
-        self.vertices = compute_vertices(
+        let display_area = crate::determine_display_area(
             window_width,
             window_height,
-            &self.render_config,
+            self.render_config.aspect_ratio,
+            self.render_config.forced_integer_height_scaling,
             self.timing_mode,
         );
+
+        self.vertices = compute_vertices(window_width, window_height, display_area);
+        self.fs_globals = FragmentGlobals::new(display_area, self.timing_mode);
     }
 
     pub fn update_aspect_ratio(&mut self, aspect_ratio: AspectRatio) {
@@ -426,6 +468,7 @@ where
                     &self.render_bind_group_layout,
                     &texture_view,
                     &sampler,
+                    &self.fs_globals_buffer,
                 );
             }
             PrescalingMode::Gpu(render_scale) => {
@@ -473,6 +516,7 @@ where
                     &self.render_bind_group_layout,
                     render_texture_view,
                     &sampler,
+                    &self.fs_globals_buffer,
                 );
             }
         }
@@ -658,6 +702,7 @@ fn create_render_bind_group(
     render_bind_group_layout: &wgpu::BindGroupLayout,
     texture_view: &wgpu::TextureView,
     sampler: &wgpu::Sampler,
+    fs_globals_buffer: &wgpu::Buffer,
 ) -> wgpu::BindGroup {
     device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("render_bind_group"),
@@ -670,6 +715,14 @@ fn create_render_bind_group(
             wgpu::BindGroupEntry {
                 binding: 1,
                 resource: wgpu::BindingResource::Sampler(sampler),
+            },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                    buffer: fs_globals_buffer,
+                    offset: 0,
+                    size: None,
+                }),
             },
         ],
     })
@@ -686,6 +739,48 @@ fn create_sampler(device: &wgpu::Device, filter_mode: GpuFilterMode) -> wgpu::Sa
         min_filter: sampler_filter_mode,
         mipmap_filter: sampler_filter_mode,
         ..wgpu::SamplerDescriptor::default()
+    })
+}
+
+fn create_render_pipeline(
+    device: &wgpu::Device,
+    shader: &wgpu::ShaderModule,
+    layout: &wgpu::PipelineLayout,
+    surface_format: wgpu::TextureFormat,
+) -> wgpu::RenderPipeline {
+    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some("render_pipeline"),
+        layout: Some(layout),
+        vertex: wgpu::VertexState {
+            module: shader,
+            entry_point: "vs_main",
+            buffers: &[Vertex2d::descriptor()],
+        },
+        primitive: wgpu::PrimitiveState {
+            topology: wgpu::PrimitiveTopology::TriangleList,
+            strip_index_format: None,
+            front_face: wgpu::FrontFace::Ccw,
+            cull_mode: None,
+            unclipped_depth: false,
+            polygon_mode: wgpu::PolygonMode::Fill,
+            conservative: false,
+        },
+        depth_stencil: None,
+        multisample: wgpu::MultisampleState {
+            count: 1,
+            mask: !0,
+            alpha_to_coverage_enabled: false,
+        },
+        fragment: Some(wgpu::FragmentState {
+            module: shader,
+            entry_point: "crt_scanlines_fs",
+            targets: &[Some(wgpu::ColorTargetState {
+                format: surface_format,
+                blend: Some(wgpu::BlendState::REPLACE),
+                write_mask: wgpu::ColorWrites::ALL,
+            })],
+        }),
+        multiview: None,
     })
 }
 
@@ -709,16 +804,8 @@ fn compute_vertex(
 fn compute_vertices(
     window_width: u32,
     window_height: u32,
-    render_config: &RendererConfig,
-    timing_mode: TimingMode,
+    display_area: DisplayArea,
 ) -> Vec<Vertex2d> {
-    let display_area = crate::determine_display_area(
-        window_width,
-        window_height,
-        render_config.aspect_ratio,
-        render_config.forced_integer_height_scaling,
-        timing_mode,
-    );
     VERTICES
         .into_iter()
         .map(|vertex| Vertex2d {
@@ -783,6 +870,9 @@ impl<W: HasRawDisplayHandle + HasRawWindowHandle> Renderer for WgpuRenderer<W> {
 
         self.queue
             .write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&self.vertices));
+
+        self.queue
+            .write_buffer(&self.fs_globals_buffer, 0, &self.fs_globals.to_bytes());
 
         colors::to_rgba(
             frame_buffer,
@@ -885,5 +975,15 @@ impl<W: HasRawDisplayHandle + HasRawWindowHandle> Renderer for WgpuRenderer<W> {
         self.reconfigure_surface();
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validate_fragment_globals_size() {
+        let _: [u8; FragmentGlobals::SIZE] = FragmentGlobals::default().to_bytes();
     }
 }

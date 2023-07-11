@@ -2,8 +2,7 @@
 #![allow(clippy::let_underscore_untyped)]
 
 use crate::config::{
-    AspectRatio, FrameSkip, GpuFilterMode, Overscan, PrescalingMode, RendererConfig, Shader,
-    VSyncMode,
+    FrameSkip, GpuFilterMode, PrescalingMode, RendererConfig, Shader, VSyncMode, WgpuBackend,
 };
 use crate::{colors, DisplayArea};
 use jgnes_core::{ColorEmphasis, FrameBuffer, Renderer, TimingMode};
@@ -141,11 +140,12 @@ pub struct WgpuRenderer<W> {
     vertex_buffer: wgpu::Buffer,
     fs_globals: FragmentGlobals,
     fs_globals_buffer: wgpu::Buffer,
+    frame_skip: FrameSkip,
+    total_frames: u64,
     // SAFETY: The window must be declared after the surface so that it is not dropped before the
     // surface is dropped
     window: W,
     window_size_fn: WindowSizeFn<W>,
-    total_frames: u64,
 }
 
 impl<W> WgpuRenderer<W>
@@ -380,9 +380,10 @@ where
             vertex_buffer,
             fs_globals,
             fs_globals_buffer,
+            frame_skip: FrameSkip::ZERO,
+            total_frames: 0,
             window,
             window_size_fn,
-            total_frames: 0,
         })
     }
 
@@ -392,6 +393,10 @@ where
 
     pub fn window_mut(&mut self) -> &mut W {
         &mut self.window
+    }
+
+    pub fn wgpu_backend(&self) -> WgpuBackend {
+        self.render_config.wgpu_backend
     }
 
     pub fn reconfigure_surface(&mut self) {
@@ -413,28 +418,41 @@ where
         self.fs_globals = FragmentGlobals::new(display_area, self.timing_mode);
     }
 
-    pub fn update_aspect_ratio(&mut self, aspect_ratio: AspectRatio) {
-        if aspect_ratio != self.render_config.aspect_ratio {
-            self.render_config.aspect_ratio = aspect_ratio;
+    /// Update the rendering config. The `wgpu_backend` and `use_webgl2_limits` fields in the input
+    /// config will be ignored, but all other fields will be updated and immediately applied.
+    ///
+    /// # Errors
+    ///
+    /// This method will return an error if VSync mode is updated and the driver/configuration does
+    /// not support the new VSync mode.
+    pub fn update_render_config(
+        &mut self,
+        render_config: RendererConfig,
+    ) -> Result<(), WgpuRendererError> {
+        let new_config = RendererConfig {
+            wgpu_backend: self.render_config.wgpu_backend,
+            use_webgl2_limits: self.render_config.use_webgl2_limits,
+            ..render_config
+        };
+
+        if new_config != self.render_config {
+            self.update_vsync_mode(new_config.vsync_mode)?;
+            self.update_shader(new_config.shader);
+
+            self.render_config = new_config;
+
+            self.reinit_textures();
             self.reconfigure_surface();
         }
+
+        Ok(())
     }
 
-    pub fn update_filter_mode(&mut self, filter_mode: GpuFilterMode) {
-        if filter_mode != self.render_config.gpu_filter_mode {
-            self.render_config.gpu_filter_mode = filter_mode;
-            self.reinit_textures();
-        }
+    pub fn update_frame_skip(&mut self, frame_skip: FrameSkip) {
+        self.frame_skip = frame_skip;
     }
 
-    pub fn update_prescaling_mode(&mut self, prescaling_mode: PrescalingMode) {
-        if prescaling_mode != self.render_config.prescaling_mode {
-            self.render_config.prescaling_mode = prescaling_mode;
-            self.reinit_textures();
-        }
-    }
-
-    pub fn update_shader(&mut self, shader: Shader) {
+    fn update_shader(&mut self, shader: Shader) {
         if shader != self.render_config.shader {
             self.render_config.shader = shader;
 
@@ -537,27 +555,7 @@ where
         }
     }
 
-    pub fn update_overscan(&mut self, overscan: Overscan) {
-        self.render_config.overscan = overscan;
-        // No need to reconfigure surface, overscan is read on every frame rendered as it is only
-        // used to determine which pixels to copy from the NES PPU frame buffer
-    }
-
-    pub fn update_frame_skip(&mut self, frame_skip: FrameSkip) {
-        self.render_config.frame_skip = frame_skip;
-    }
-
-    pub fn update_forced_integer_height_scaling(&mut self, forced_integer_height_scaling: bool) {
-        if forced_integer_height_scaling != self.render_config.forced_integer_height_scaling {
-            self.render_config.forced_integer_height_scaling = forced_integer_height_scaling;
-            self.reconfigure_surface();
-        }
-    }
-
-    /// # Errors
-    ///
-    /// This method will return an error if the GPU driver does not support the specified vsync mode.
-    pub fn update_vsync_mode(&mut self, vsync_mode: VSyncMode) -> Result<(), WgpuRendererError> {
+    fn update_vsync_mode(&mut self, vsync_mode: VSyncMode) -> Result<(), WgpuRendererError> {
         if vsync_mode == self.render_config.vsync_mode {
             return Ok(());
         }
@@ -576,7 +574,6 @@ where
 
         self.render_config.vsync_mode = vsync_mode;
         self.surface_config.present_mode = present_mode;
-        self.reconfigure_surface();
 
         Ok(())
     }
@@ -885,7 +882,7 @@ impl<W: HasRawDisplayHandle + HasRawWindowHandle> Renderer for WgpuRenderer<W> {
     ) -> Result<(), Self::Err> {
         self.total_frames += 1;
 
-        if self.render_config.frame_skip.should_skip(self.total_frames) {
+        if self.frame_skip.should_skip(self.total_frames) {
             return Ok(());
         }
 

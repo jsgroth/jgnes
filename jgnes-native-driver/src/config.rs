@@ -1,7 +1,8 @@
 use jgnes_core::{EmulatorConfig, TimingMode};
 use jgnes_proc_macros::{EnumDisplay, EnumFromStr};
 use jgnes_renderer::config::{
-    AspectRatio, GpuFilterMode, Overscan, PrescalingMode, Shader, VSyncMode, WgpuBackend,
+    AspectRatio, GpuFilterMode, Overscan, PrescalingMode, RendererConfig, Shader, VSyncMode,
+    WgpuBackend,
 };
 use sdl2::joystick::HatState;
 use sdl2::keyboard::Keycode;
@@ -399,6 +400,20 @@ pub struct JgnesDynamicConfig {
 }
 
 impl JgnesDynamicConfig {
+    pub(crate) fn to_renderer_config(&self, wgpu_backend: WgpuBackend) -> RendererConfig {
+        RendererConfig {
+            vsync_mode: self.vsync_mode,
+            wgpu_backend,
+            gpu_filter_mode: self.gpu_filter_mode,
+            prescaling_mode: self.prescaling_mode,
+            shader: self.shader,
+            aspect_ratio: self.aspect_ratio,
+            overscan: self.overscan,
+            forced_integer_height_scaling: self.forced_integer_height_scaling,
+            use_webgl2_limits: false,
+        }
+    }
+
     pub(crate) fn update_emulator_config(&self, emulator_config: &mut EmulatorConfig) {
         emulator_config.remove_sprite_limit = self.remove_sprite_limit;
         emulator_config.pal_black_border = self.pal_black_border;

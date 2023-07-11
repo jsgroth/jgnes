@@ -53,9 +53,12 @@ fn scanlines_fs(input: VertexOutput) -> @location(0) vec4<f32> {
     let vp_line = u32(round(input.position.y - 0.5)) - fs_globals.viewport_y;
     let crt_line = 2u * fs_globals.nes_visible_height * vp_line / fs_globals.viewport_height;
 
-    let is_even_line = crt_line % 2u == 1u;
+    let is_odd_line = crt_line % 2u == 0u;
 
     let color = textureSample(t_diffuse, s_diffuse, input.texture_coords);
+    let filtered_color = select(color, BLACK, is_odd_line);
 
-    return select(color, BLACK, is_even_line);
+    // Ignore result of scanline filtering if viewport height is less than 2x native frame height
+    let vp_too_small = fs_globals.viewport_height < 2u * fs_globals.nes_visible_height;
+    return select(filtered_color, color, vp_too_small);
 }

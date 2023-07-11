@@ -5,7 +5,7 @@ mod config;
 mod js;
 
 use crate::audio::{AudioQueue, EnqueueResult};
-use crate::config::InputConfig;
+use crate::config::{ConfigFields, InputConfig};
 use base64::engine::GeneralPurpose;
 use base64::Engine;
 use config::JgnesWebConfig;
@@ -15,10 +15,7 @@ use jgnes_core::{
     JoypadState, Renderer, SaveWriter, TickEffect, TimingMode,
 };
 use jgnes_proc_macros::EnumDisplay;
-use jgnes_renderer::config::{
-    AspectRatio, FrameSkip, GpuFilterMode, Overscan, RenderScale, RendererConfig, Shader,
-    VSyncMode, WgpuBackend,
-};
+use jgnes_renderer::config::{RendererConfig, VSyncMode, WgpuBackend};
 use jgnes_renderer::WgpuRenderer;
 use js_sys::Promise;
 use rfd::AsyncFileDialog;
@@ -204,11 +201,11 @@ struct WebAudioPlayer {
     audio_queue: AudioQueue,
     low_pass_filter: LowPassFilter,
     downsample_counter: DownsampleCounter,
-    audio_enabled: Rc<Cell<bool>>,
+    audio_enabled: bool,
 }
 
 impl WebAudioPlayer {
-    fn new(audio_queue: AudioQueue, audio_enabled: Rc<Cell<bool>>) -> Self {
+    fn new(audio_queue: AudioQueue, audio_enabled: bool) -> Self {
         Self {
             audio_queue,
             low_pass_filter: LowPassFilter::new(),
@@ -229,7 +226,7 @@ impl AudioPlayer for WebAudioPlayer {
     type Err = JsValue;
 
     fn push_sample(&mut self, sample: f64) -> Result<(), Self::Err> {
-        if !self.audio_enabled.get() {
+        if !self.audio_enabled {
             return Ok(());
         }
 
@@ -261,12 +258,7 @@ struct State {
     audio_player: Rc<RefCell<WebAudioPlayer>>,
     audio_ctx: AudioContext,
     input_handler: InputHandler,
-    aspect_ratio: AspectRatio,
-    filter_mode: GpuFilterMode,
-    render_scale: RenderScale,
-    shader: Shader,
-    overscan: Overscan,
-    force_integer_scaling: bool,
+    current_config: ConfigFields,
     user_interacted: bool,
 }
 
@@ -341,13 +333,28 @@ enum JgnesUserEvent {
 }
 
 #[cfg(feature = "webgl")]
-fn get_wgpu_backend() -> WgpuBackend {
+const fn get_wgpu_backend() -> WgpuBackend {
     WgpuBackend::OpenGl
 }
 
 #[cfg(not(feature = "webgl"))]
-fn get_wgpu_backend() -> WgpuBackend {
+const fn get_wgpu_backend() -> WgpuBackend {
     WgpuBackend::WebGpu
+}
+
+fn new_renderer_config(fields: &ConfigFields) -> RendererConfig {
+    let wgpu_backend = get_wgpu_backend();
+    RendererConfig {
+        vsync_mode: VSyncMode::Enabled,
+        wgpu_backend,
+        gpu_filter_mode: fields.gpu_filter_mode,
+        prescaling_mode: fields.get_prescaling_mode(),
+        shader: fields.shader,
+        aspect_ratio: fields.aspect_ratio,
+        overscan: fields.overscan,
+        forced_integer_height_scaling: fields.force_integer_scaling,
+        use_webgl2_limits: wgpu_backend == WgpuBackend::OpenGl,
+    }
 }
 
 #[allow(clippy::missing_panics_doc)]
@@ -370,27 +377,11 @@ pub async fn run_emulator(config: JgnesWebConfig) {
         })
         .expect("Couldn't append canvas to document body");
 
-    let wgpu_backend = get_wgpu_backend();
-
-    let renderer = WgpuRenderer::from_window(
-        window,
-        window_size,
-        RendererConfig {
-            vsync_mode: VSyncMode::Enabled,
-            wgpu_backend,
-            gpu_filter_mode: config.gpu_filter_mode.get(),
-            shader: config.shader.get(),
-            prescaling_mode: config.get_prescaling_mode(),
-            aspect_ratio: config.aspect_ratio.get(),
-            overscan: config.overscan.get(),
-            frame_skip: FrameSkip::ZERO,
-            forced_integer_height_scaling: config.force_integer_scaling.get(),
-            use_webgl2_limits: wgpu_backend == WgpuBackend::OpenGl,
-        },
-    )
-    .await
-    .map_err(|err| alert_and_panic(&err.to_string()))
-    .unwrap();
+    let renderer_config = new_renderer_config(&config.fields.borrow());
+    let renderer = WgpuRenderer::from_window(window, window_size, renderer_config)
+        .await
+        .map_err(|err| alert_and_panic(&err.to_string()))
+        .unwrap();
     let renderer = Rc::new(RefCell::new(renderer));
 
     let audio_ctx = AudioContext::new_with_context_options(
@@ -402,7 +393,7 @@ pub async fn run_emulator(config: JgnesWebConfig) {
         .await
         .unwrap();
 
-    let audio_player = WebAudioPlayer::new(audio_queue, Rc::clone(&config.audio_enabled));
+    let audio_player = WebAudioPlayer::new(audio_queue, config.fields.borrow().audio_enabled);
     let audio_player = Rc::new(RefCell::new(audio_player));
 
     let input_handler = InputHandler::new(&config.inputs.borrow());
@@ -413,12 +404,7 @@ pub async fn run_emulator(config: JgnesWebConfig) {
         audio_player,
         audio_ctx,
         input_handler,
-        aspect_ratio: config.aspect_ratio.get(),
-        filter_mode: config.gpu_filter_mode.get(),
-        render_scale: config.render_scale.get(),
-        shader: config.shader.get(),
-        overscan: config.overscan.get(),
-        force_integer_scaling: config.force_integer_scaling.get(),
+        current_config: config.fields.borrow().clone(),
         user_interacted: false,
     };
 
@@ -534,52 +520,16 @@ fn run_event_loop(
                 }
             }
             Event::MainEventsCleared => {
-                let config_aspect_ratio = config.aspect_ratio.get();
-                if config_aspect_ratio != state.aspect_ratio {
+                if state.current_config != *config.fields.borrow() {
+                    state.current_config = config.fields.borrow().clone();
+
                     state
                         .renderer
                         .borrow_mut()
-                        .update_aspect_ratio(config_aspect_ratio);
-                    state.aspect_ratio = config_aspect_ratio;
-                }
-
-                let config_filter_mode = config.gpu_filter_mode.get();
-                if config_filter_mode != state.filter_mode {
-                    state
-                        .renderer
-                        .borrow_mut()
-                        .update_filter_mode(config_filter_mode);
-                    state.filter_mode = config_filter_mode;
-                }
-
-                let config_render_scale = config.render_scale.get();
-                if config_render_scale != state.render_scale {
-                    state
-                        .renderer
-                        .borrow_mut()
-                        .update_prescaling_mode(config.get_prescaling_mode());
-                    state.render_scale = config_render_scale;
-                }
-
-                let config_shader = config.shader.get();
-                if config_shader != state.shader {
-                    state.renderer.borrow_mut().update_shader(config_shader);
-                    state.shader = config_shader;
-                }
-
-                let config_overscan = config.overscan.get();
-                if config_overscan != state.overscan {
-                    state.renderer.borrow_mut().update_overscan(config_overscan);
-                    state.overscan = config_overscan;
-                }
-
-                let config_force_integer_scaling = config.force_integer_scaling.get();
-                if config_force_integer_scaling != state.force_integer_scaling {
-                    state
-                        .renderer
-                        .borrow_mut()
-                        .update_forced_integer_height_scaling(config_force_integer_scaling);
-                    state.force_integer_scaling = config_force_integer_scaling;
+                        .update_render_config(new_renderer_config(&state.current_config))
+                        .expect("Failed to update wgpu renderer config");
+                    state.audio_player.borrow_mut().audio_enabled =
+                        state.current_config.audio_enabled;
                 }
 
                 if config.open_file_requested.replace(false) {
@@ -621,18 +571,19 @@ fn run_event_loop(
                     InputHandlerState::WaitingForInput(_)
                 ) {
                     // If audio sync is enabled, only run the emulator if the audio queue isn't filling up
+                    let audio_sync_enabled = state.current_config.audio_sync_enabled;
                     let audio_queue_len = state.audio_player.borrow().audio_queue.len().unwrap();
                     let should_wait_for_audio =
-                        config.audio_sync_enabled.get() && audio_queue_len > AUDIO_QUEUE_THRESHOLD;
+                        audio_sync_enabled && audio_queue_len > AUDIO_QUEUE_THRESHOLD;
                     if !should_wait_for_audio {
                         match &mut state.emulator {
                             Some(emulator) => {
                                 let emulator_config = EmulatorConfig {
-                                    remove_sprite_limit: config.remove_sprite_limit.get(),
+                                    remove_sprite_limit: state.current_config.remove_sprite_limit,
                                     pal_black_border: false,
-                                    silence_ultrasonic_triangle_output: config
-                                        .silence_ultrasonic_triangle_output
-                                        .get(),
+                                    silence_ultrasonic_triangle_output: state
+                                        .current_config
+                                        .silence_ultrasonic_triangle_output,
                                 };
 
                                 // Tick the emulator until it renders the next frame

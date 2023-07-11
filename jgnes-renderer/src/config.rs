@@ -189,7 +189,7 @@ impl FrameSkip {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RendererConfig {
     pub vsync_mode: VSyncMode,
     pub wgpu_backend: WgpuBackend,
@@ -198,7 +198,6 @@ pub struct RendererConfig {
     pub shader: Shader,
     pub aspect_ratio: AspectRatio,
     pub overscan: Overscan,
-    pub frame_skip: FrameSkip,
     pub forced_integer_height_scaling: bool,
     pub use_webgl2_limits: bool,
 }

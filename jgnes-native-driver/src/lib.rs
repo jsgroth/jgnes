@@ -301,6 +301,7 @@ impl SdlWindowRenderer for WgpuRenderer<Window> {
     fn reload_config(&mut self, config: &JgnesDynamicConfig) -> Result<(), anyhow::Error> {
         self.update_filter_mode(config.gpu_filter_mode);
         self.update_prescaling_mode(config.prescaling_mode);
+        self.update_shader(config.shader);
         self.update_aspect_ratio(config.aspect_ratio);
         self.update_overscan(config.overscan);
         self.update_forced_integer_height_scaling(config.forced_integer_height_scaling);
@@ -368,6 +369,7 @@ pub fn run(config: &JgnesNativeConfig) -> anyhow::Result<()> {
             wgpu_backend: config.wgpu_backend,
             gpu_filter_mode: dynamic_config.gpu_filter_mode,
             prescaling_mode: dynamic_config.prescaling_mode,
+            shader: dynamic_config.shader,
             aspect_ratio: dynamic_config.aspect_ratio,
             overscan: dynamic_config.overscan,
             frame_skip: FrameSkip::ZERO,

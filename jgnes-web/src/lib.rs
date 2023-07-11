@@ -16,8 +16,8 @@ use jgnes_core::{
 };
 use jgnes_proc_macros::EnumDisplay;
 use jgnes_renderer::config::{
-    AspectRatio, FrameSkip, GpuFilterMode, Overscan, RenderScale, RendererConfig, VSyncMode,
-    WgpuBackend,
+    AspectRatio, FrameSkip, GpuFilterMode, Overscan, RenderScale, RendererConfig, Shader,
+    VSyncMode, WgpuBackend,
 };
 use jgnes_renderer::WgpuRenderer;
 use js_sys::Promise;
@@ -264,7 +264,9 @@ struct State {
     aspect_ratio: AspectRatio,
     filter_mode: GpuFilterMode,
     render_scale: RenderScale,
+    shader: Shader,
     overscan: Overscan,
+    force_integer_scaling: bool,
     user_interacted: bool,
 }
 
@@ -370,21 +372,19 @@ pub async fn run_emulator(config: JgnesWebConfig) {
 
     let wgpu_backend = get_wgpu_backend();
 
-    let gpu_filter_mode = config.gpu_filter_mode.get();
-    let aspect_ratio = config.aspect_ratio.get();
-    let overscan = config.overscan.get();
     let renderer = WgpuRenderer::from_window(
         window,
         window_size,
         RendererConfig {
             vsync_mode: VSyncMode::Enabled,
             wgpu_backend,
-            gpu_filter_mode,
+            gpu_filter_mode: config.gpu_filter_mode.get(),
+            shader: config.shader.get(),
             prescaling_mode: config.get_prescaling_mode(),
-            aspect_ratio,
-            overscan,
+            aspect_ratio: config.aspect_ratio.get(),
+            overscan: config.overscan.get(),
             frame_skip: FrameSkip::ZERO,
-            forced_integer_height_scaling: false,
+            forced_integer_height_scaling: config.force_integer_scaling.get(),
             use_webgl2_limits: wgpu_backend == WgpuBackend::OpenGl,
         },
     )
@@ -416,7 +416,9 @@ pub async fn run_emulator(config: JgnesWebConfig) {
         aspect_ratio: config.aspect_ratio.get(),
         filter_mode: config.gpu_filter_mode.get(),
         render_scale: config.render_scale.get(),
+        shader: config.shader.get(),
         overscan: config.overscan.get(),
+        force_integer_scaling: config.force_integer_scaling.get(),
         user_interacted: false,
     };
 
@@ -559,10 +561,25 @@ fn run_event_loop(
                     state.render_scale = config_render_scale;
                 }
 
+                let config_shader = config.shader.get();
+                if config_shader != state.shader {
+                    state.renderer.borrow_mut().update_shader(config_shader);
+                    state.shader = config_shader;
+                }
+
                 let config_overscan = config.overscan.get();
                 if config_overscan != state.overscan {
                     state.renderer.borrow_mut().update_overscan(config_overscan);
                     state.overscan = config_overscan;
+                }
+
+                let config_force_integer_scaling = config.force_integer_scaling.get();
+                if config_force_integer_scaling != state.force_integer_scaling {
+                    state
+                        .renderer
+                        .borrow_mut()
+                        .update_forced_integer_height_scaling(config_force_integer_scaling);
+                    state.force_integer_scaling = config_force_integer_scaling;
                 }
 
                 if config.open_file_requested.replace(false) {

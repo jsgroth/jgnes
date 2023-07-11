@@ -14,7 +14,8 @@ use jgnes_native_driver::{
     JgnesNativeConfig, JgnesSharedConfig, JoystickInput, KeyboardInput, NativeRenderer,
 };
 use jgnes_renderer::config::{
-    AspectRatio, GpuFilterMode, Overscan, PrescalingMode, RenderScale, VSyncMode, WgpuBackend,
+    AspectRatio, GpuFilterMode, Overscan, PrescalingMode, RenderScale, Shader, VSyncMode,
+    WgpuBackend,
 };
 use rfd::FileDialog;
 use serde::{Deserialize, Serialize};
@@ -66,6 +67,8 @@ struct AppConfig {
     #[serde(default)]
     render_scale: RenderScale,
     #[serde(default)]
+    shader: Shader,
+    #[serde(default)]
     aspect_ratio: AspectRatio,
     #[serde(default)]
     overscan: Overscan,
@@ -99,6 +102,7 @@ impl AppConfig {
         JgnesDynamicConfig {
             gpu_filter_mode: self.gpu_filter_mode,
             prescaling_mode: PrescalingMode::Gpu(self.render_scale),
+            shader: self.shader,
             aspect_ratio: self.aspect_ratio,
             overscan: self.overscan,
             forced_integer_height_scaling: self.forced_integer_height_scaling,
@@ -935,6 +939,20 @@ impl App {
                 if self.state.render_scale_invalid {
                     ui.colored_label(Color32::RED, "Scaling factor must be an integer between 1 and 16");
                 }
+
+                ui.group(|ui| {
+                    ui.set_enabled(self.config.renderer == NativeRenderer::Wgpu);
+
+                    let disabled_hover_text = "Shaders are not supported with SDL2 renderer";
+                    ui.label("Shader").on_disabled_hover_text(disabled_hover_text);
+                    ui.horizontal(|ui| {
+                        ui.radio_value(&mut self.config.shader, Shader::None, "None")
+                            .on_disabled_hover_text(disabled_hover_text);
+                        ui.radio_value(&mut self.config.shader, Shader::Scanlines, "Scanlines")
+                            .on_hover_text("Works best with integer height scaling")
+                            .on_disabled_hover_text(disabled_hover_text);
+                    });
+                });
 
                 ui.group(|ui| {
                     ui.label("Aspect ratio");

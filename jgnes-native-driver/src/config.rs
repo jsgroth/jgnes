@@ -1,7 +1,7 @@
 use jgnes_core::{EmulatorConfig, TimingMode};
 use jgnes_proc_macros::{EnumDisplay, EnumFromStr};
 use jgnes_renderer::config::{
-    AspectRatio, GpuFilterMode, Overscan, PrescalingMode, VSyncMode, WgpuBackend,
+    AspectRatio, GpuFilterMode, Overscan, PrescalingMode, Shader, VSyncMode, WgpuBackend,
 };
 use sdl2::joystick::HatState;
 use sdl2::keyboard::Keycode;
@@ -384,6 +384,7 @@ impl Display for JgnesNativeConfig {
 pub struct JgnesDynamicConfig {
     pub gpu_filter_mode: GpuFilterMode,
     pub prescaling_mode: PrescalingMode,
+    pub shader: Shader,
     pub aspect_ratio: AspectRatio,
     pub overscan: Overscan,
     pub forced_integer_height_scaling: bool,
@@ -411,6 +412,7 @@ impl Display for JgnesDynamicConfig {
         writeln!(f, "remove_sprite_limit: {}", self.remove_sprite_limit)?;
         writeln!(f, "gpu_filter_mode: {}", self.gpu_filter_mode)?;
         writeln!(f, "prescaling_mode: {}", self.prescaling_mode)?;
+        writeln!(f, "shader: {}", self.shader)?;
         writeln!(f, "aspect_ratio: {}", self.aspect_ratio)?;
         writeln!(f, "overscan: {}", self.overscan)?;
         writeln!(

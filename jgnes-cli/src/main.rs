@@ -6,7 +6,8 @@ use jgnes_native_driver::{
 };
 use jgnes_proc_macros::{EnumDisplay, EnumFromStr};
 use jgnes_renderer::config::{
-    AspectRatio, GpuFilterMode, Overscan, PrescalingMode, RenderScale, VSyncMode, WgpuBackend,
+    AspectRatio, GpuFilterMode, Overscan, PrescalingMode, RenderScale, Shader, VSyncMode,
+    WgpuBackend,
 };
 use std::time::Duration;
 
@@ -64,6 +65,10 @@ struct CliArgs {
     /// Prescaling type (Gpu / Cpu)
     #[arg(long, default_value_t)]
     prescaling_type: PrescalingType,
+
+    /// Shader (None / Scanlines)
+    #[arg(long, default_value_t)]
+    shader: Shader,
 
     /// Internal resolution prescale factor (1 to 16, only applicable to Wgpu renderer)
     #[arg(long, default_value_t = 3)]
@@ -159,6 +164,7 @@ fn main() -> anyhow::Result<()> {
     let (shared_config, _) = JgnesSharedConfig::new(JgnesDynamicConfig {
         gpu_filter_mode: args.gpu_filter_mode,
         prescaling_mode,
+        shader: args.shader,
         aspect_ratio: args.aspect_ratio,
         overscan,
         forced_integer_height_scaling: args.forced_integer_height_scaling,

@@ -168,6 +168,15 @@ impl Display for PrescalingMode {
     }
 }
 
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, EnumDisplay, EnumFromStr,
+)]
+pub enum Shader {
+    #[default]
+    None,
+    Scanlines,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FrameSkip(pub u8);
 
@@ -186,6 +195,7 @@ pub struct RendererConfig {
     pub wgpu_backend: WgpuBackend,
     pub gpu_filter_mode: GpuFilterMode,
     pub prescaling_mode: PrescalingMode,
+    pub shader: Shader,
     pub aspect_ratio: AspectRatio,
     pub overscan: Overscan,
     pub frame_skip: FrameSkip,

@@ -1,5 +1,7 @@
 use crate::{js, NesButton};
-use jgnes_renderer::config::{AspectRatio, GpuFilterMode, Overscan, PrescalingMode, RenderScale};
+use jgnes_renderer::config::{
+    AspectRatio, GpuFilterMode, Overscan, PrescalingMode, RenderScale, Shader,
+};
 use serde::{Deserialize, Serialize};
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -23,7 +25,11 @@ struct SerializableConfig {
     #[serde(default = "default_render_scale")]
     render_scale: RenderScale,
     #[serde(default)]
+    shader: Shader,
+    #[serde(default)]
     overscan: Overscan,
+    #[serde(default)]
+    force_integer_scaling: bool,
     #[serde(default)]
     remove_sprite_limit: bool,
     #[serde(default = "true_fn")]
@@ -143,7 +149,9 @@ pub struct JgnesWebConfig {
     pub(crate) aspect_ratio: Rc<Cell<AspectRatio>>,
     pub(crate) gpu_filter_mode: Rc<Cell<GpuFilterMode>>,
     pub(crate) render_scale: Rc<Cell<RenderScale>>,
+    pub(crate) shader: Rc<Cell<Shader>>,
     pub(crate) overscan: Rc<Cell<Overscan>>,
+    pub(crate) force_integer_scaling: Rc<Cell<bool>>,
     pub(crate) remove_sprite_limit: Rc<Cell<bool>>,
     pub(crate) audio_enabled: Rc<Cell<bool>>,
     pub(crate) audio_sync_enabled: Rc<Cell<bool>>,
@@ -178,8 +186,10 @@ impl JgnesWebConfig {
                 inputs: Rc::new(RefCell::new(inputs)),
                 aspect_ratio: Rc::new(Cell::new(config.aspect_ratio)),
                 gpu_filter_mode: Rc::new(Cell::new(config.gpu_filter_mode)),
+                shader: Rc::new(Cell::new(config.shader)),
                 render_scale: Rc::new(Cell::new(config.render_scale)),
                 overscan: Rc::new(Cell::new(config.overscan)),
+                force_integer_scaling: Rc::new(Cell::new(config.force_integer_scaling)),
                 remove_sprite_limit: Rc::new(Cell::new(config.remove_sprite_limit)),
                 audio_enabled: Rc::new(Cell::new(config.audio_enabled)),
                 audio_sync_enabled: Rc::new(Cell::new(config.audio_sync_enabled)),
@@ -208,9 +218,7 @@ impl JgnesWebConfig {
             SQUARE_PIXELS => AspectRatio::SquarePixels,
             _ => return,
         };
-        self.aspect_ratio.set(aspect_ratio);
-
-        self.save_to_local_storage();
+        self.set_cell(&self.aspect_ratio, aspect_ratio);
     }
 
     pub fn filter_mode(&self) -> String {
@@ -227,9 +235,7 @@ impl JgnesWebConfig {
             LINEAR_INTERPOLATION => GpuFilterMode::LinearInterpolation,
             _ => return,
         };
-        self.gpu_filter_mode.set(gpu_filter_mode);
-
-        self.save_to_local_storage();
+        self.set_cell(&self.gpu_filter_mode, gpu_filter_mode);
     }
 
     pub fn render_scale(&self) -> u32 {
@@ -238,7 +244,16 @@ impl JgnesWebConfig {
 
     pub fn set_render_scale(&self, value: u32) {
         let Ok(render_scale) = RenderScale::try_from(value) else { return };
-        self.render_scale.set(render_scale);
+        self.set_cell(&self.render_scale, render_scale);
+    }
+
+    pub fn shader(&self) -> String {
+        format!("{}", self.shader.get())
+    }
+
+    pub fn set_shader(&self, shader: &str) {
+        let Ok(shader) = shader.parse() else { return };
+        self.set_cell(&self.shader, shader);
     }
 
     pub fn overscan_left(&self) -> bool {
@@ -250,8 +265,7 @@ impl JgnesWebConfig {
             left: overscan_value(value),
             ..self.overscan.get()
         };
-        self.overscan.set(overscan);
-        self.save_to_local_storage();
+        self.set_cell(&self.overscan, overscan);
     }
 
     pub fn overscan_right(&self) -> bool {
@@ -276,8 +290,7 @@ impl JgnesWebConfig {
             top: overscan_value(value),
             ..self.overscan.get()
         };
-        self.overscan.set(overscan);
-        self.save_to_local_storage();
+        self.set_cell(&self.overscan, overscan);
     }
 
     pub fn overscan_bottom(&self) -> bool {
@@ -289,8 +302,15 @@ impl JgnesWebConfig {
             bottom: overscan_value(value),
             ..self.overscan.get()
         };
-        self.overscan.set(overscan);
-        self.save_to_local_storage();
+        self.set_cell(&self.overscan, overscan);
+    }
+
+    pub fn get_force_integer_scaling(&self) -> bool {
+        self.force_integer_scaling.get()
+    }
+
+    pub fn set_force_integer_scaling(&self, value: bool) {
+        self.set_cell(&self.force_integer_scaling, value);
     }
 
     pub fn get_remove_sprite_limit(&self) -> bool {
@@ -298,7 +318,7 @@ impl JgnesWebConfig {
     }
 
     pub fn set_remove_sprite_limit(&self, value: bool) {
-        self.remove_sprite_limit.set(value);
+        self.set_cell(&self.remove_sprite_limit, value);
     }
 
     pub fn audio_enabled(&self) -> bool {
@@ -306,8 +326,7 @@ impl JgnesWebConfig {
     }
 
     pub fn set_audio_enabled(&self, value: bool) {
-        self.audio_enabled.set(value);
-        self.save_to_local_storage();
+        self.set_cell(&self.audio_enabled, value);
     }
 
     pub fn audio_sync_enabled(&self) -> bool {
@@ -315,8 +334,7 @@ impl JgnesWebConfig {
     }
 
     pub fn set_audio_sync_enabled(&self, value: bool) {
-        self.audio_sync_enabled.set(value);
-        self.save_to_local_storage();
+        self.set_cell(&self.audio_sync_enabled, value);
     }
 
     pub fn silence_ultrasonic_triangle_output(&self) -> bool {
@@ -324,8 +342,7 @@ impl JgnesWebConfig {
     }
 
     pub fn set_silence_ultrasonic_triangle_output(&self, value: bool) {
-        self.silence_ultrasonic_triangle_output.set(value);
-        self.save_to_local_storage();
+        self.set_cell(&self.silence_ultrasonic_triangle_output, value);
     }
 
     pub fn inputs(&self) -> InputConfig {
@@ -341,7 +358,10 @@ impl JgnesWebConfig {
         self.aspect_ratio.set(default.aspect_ratio.get());
         self.gpu_filter_mode.set(default.gpu_filter_mode.get());
         self.render_scale.set(default.render_scale.get());
+        self.shader.set(default.shader.get());
         self.overscan.set(default.overscan.get());
+        self.force_integer_scaling
+            .set(default.force_integer_scaling.get());
         self.remove_sprite_limit
             .set(default.remove_sprite_limit.get());
         self.audio_enabled.set(default.audio_enabled.get());
@@ -385,6 +405,11 @@ impl JgnesWebConfig {
 }
 
 impl JgnesWebConfig {
+    fn set_cell<T: Copy>(&self, cell: &Rc<Cell<T>>, value: T) {
+        cell.set(value);
+        self.save_to_local_storage();
+    }
+
     #[cfg(feature = "webgl")]
     pub(crate) fn get_prescaling_mode(&self) -> PrescalingMode {
         PrescalingMode::Cpu(self.render_scale.get())
@@ -400,7 +425,9 @@ impl JgnesWebConfig {
             aspect_ratio: self.aspect_ratio.get(),
             gpu_filter_mode: self.gpu_filter_mode.get(),
             render_scale: self.render_scale.get(),
+            shader: self.shader.get(),
             overscan: self.overscan.get(),
+            force_integer_scaling: self.force_integer_scaling.get(),
             remove_sprite_limit: self.remove_sprite_limit.get(),
             audio_enabled: self.audio_enabled.get(),
             audio_sync_enabled: self.audio_sync_enabled.get(),
@@ -423,7 +450,9 @@ impl Default for JgnesWebConfig {
             aspect_ratio: Rc::new(Cell::new(AspectRatio::Ntsc)),
             gpu_filter_mode: Rc::new(Cell::new(GpuFilterMode::NearestNeighbor)),
             render_scale: Rc::new(Cell::new(default_render_scale())),
+            shader: Rc::default(),
             overscan: Rc::default(),
+            force_integer_scaling: Rc::new(Cell::new(false)),
             remove_sprite_limit: Rc::new(Cell::new(false)),
             audio_enabled: Rc::new(Cell::new(true)),
             audio_sync_enabled: Rc::new(Cell::new(true)),

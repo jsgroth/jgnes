@@ -2,7 +2,8 @@
 #![allow(clippy::let_underscore_untyped)]
 
 use crate::config::{
-    AspectRatio, FrameSkip, GpuFilterMode, Overscan, PrescalingMode, RendererConfig, VSyncMode,
+    AspectRatio, FrameSkip, GpuFilterMode, Overscan, PrescalingMode, RendererConfig, Shader,
+    VSyncMode,
 };
 use crate::{colors, DisplayArea};
 use jgnes_core::{ColorEmphasis, FrameBuffer, Renderer, TimingMode};
@@ -61,32 +62,31 @@ impl Vertex2d {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Default, bytemuck::Pod, bytemuck::Zeroable)]
 struct FragmentGlobals {
-    viewport_x: [u32; 2],
-    viewport_y: [u32; 2],
+    viewport_x: u32,
+    viewport_y: u32,
+    viewport_width: u32,
+    viewport_height: u32,
     nes_visible_height: u32,
+    // WebGL requires types to be a multiple of 16 bytes
+    padding: [u8; 12],
 }
 
 impl FragmentGlobals {
-    const SIZE: usize = 20;
+    const SIZE: usize = 32;
 
     fn new(display_area: DisplayArea, timing_mode: TimingMode) -> Self {
         Self {
-            viewport_x: [display_area.x, display_area.x + display_area.width],
-            viewport_y: [display_area.y, display_area.y + display_area.height],
+            viewport_x: display_area.x,
+            viewport_y: display_area.y,
+            viewport_width: display_area.width,
+            viewport_height: display_area.height,
             nes_visible_height: timing_mode.visible_screen_height().into(),
+            padding: [0; 12],
         }
     }
 
     fn to_bytes(self) -> [u8; Self::SIZE] {
         bytemuck::cast(self)
-    }
-
-    const fn padded_size() -> usize {
-        if Self::SIZE % 8 != 0 {
-            Self::SIZE + (8 - (Self::SIZE & 0x07))
-        } else {
-            Self::SIZE
-        }
     }
 }
 
@@ -134,7 +134,7 @@ pub struct WgpuRenderer<W> {
     compute_resources: Option<(wgpu::BindGroup, wgpu::ComputePipeline)>,
     render_bind_group: wgpu::BindGroup,
     render_bind_group_layout: wgpu::BindGroupLayout,
-    shader: wgpu::ShaderModule,
+    shader_module: wgpu::ShaderModule,
     render_pipeline: wgpu::RenderPipeline,
     render_pipeline_layout: wgpu::PipelineLayout,
     vertices: Vec<Vertex2d>,
@@ -282,7 +282,7 @@ where
         let fs_globals = FragmentGlobals::new(display_area, timing_mode);
         let fs_globals_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("fs_globals_buffer"),
-            size: FragmentGlobals::padded_size() as u64,
+            size: FragmentGlobals::SIZE as u64,
             mapped_at_creation: false,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
@@ -349,10 +349,11 @@ where
                 push_constant_ranges: &[],
             });
 
-        let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
+        let shader_module = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
         let render_pipeline = create_render_pipeline(
             &device,
-            &shader,
+            &shader_module,
+            render_config.shader,
             &render_pipeline_layout,
             surface_config.format,
         );
@@ -372,7 +373,7 @@ where
             compute_resources,
             render_bind_group,
             render_bind_group_layout,
-            shader,
+            shader_module,
             render_pipeline,
             render_pipeline_layout,
             vertices,
@@ -430,6 +431,20 @@ where
         if prescaling_mode != self.render_config.prescaling_mode {
             self.render_config.prescaling_mode = prescaling_mode;
             self.reinit_textures();
+        }
+    }
+
+    pub fn update_shader(&mut self, shader: Shader) {
+        if shader != self.render_config.shader {
+            self.render_config.shader = shader;
+
+            self.render_pipeline = create_render_pipeline(
+                &self.device,
+                &self.shader_module,
+                shader,
+                &self.render_pipeline_layout,
+                self.surface_config.format,
+            );
         }
     }
 
@@ -744,15 +759,21 @@ fn create_sampler(device: &wgpu::Device, filter_mode: GpuFilterMode) -> wgpu::Sa
 
 fn create_render_pipeline(
     device: &wgpu::Device,
-    shader: &wgpu::ShaderModule,
+    shader_module: &wgpu::ShaderModule,
+    shader: Shader,
     layout: &wgpu::PipelineLayout,
     surface_format: wgpu::TextureFormat,
 ) -> wgpu::RenderPipeline {
+    let fs_main = match shader {
+        Shader::None => "basic_fs",
+        Shader::Scanlines => "scanlines_fs",
+    };
+
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: Some("render_pipeline"),
         layout: Some(layout),
         vertex: wgpu::VertexState {
-            module: shader,
+            module: shader_module,
             entry_point: "vs_main",
             buffers: &[Vertex2d::descriptor()],
         },
@@ -772,8 +793,8 @@ fn create_render_pipeline(
             alpha_to_coverage_enabled: false,
         },
         fragment: Some(wgpu::FragmentState {
-            module: shader,
-            entry_point: "crt_scanlines_fs",
+            module: shader_module,
+            entry_point: fs_main,
             targets: &[Some(wgpu::ColorTargetState {
                 format: surface_format,
                 blend: Some(wgpu::BlendState::REPLACE),
@@ -985,5 +1006,7 @@ mod tests {
     #[test]
     fn validate_fragment_globals_size() {
         let _: [u8; FragmentGlobals::SIZE] = FragmentGlobals::default().to_bytes();
+
+        assert_eq!(FragmentGlobals::SIZE % 16, 0);
     }
 }

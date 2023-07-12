@@ -1,20 +1,20 @@
 // Vertex shaders
 
 struct VertexInput {
-    @location(0) position: vec2<f32>,
-    @location(1) texture_coords: vec2<f32>,
+    @location(0) position: vec2f,
+    @location(1) texture_coords: vec2f,
 }
 
 struct VertexOutput {
-    @builtin(position) position: vec4<f32>,
-    @location(0) texture_coords: vec2<f32>,
+    @builtin(position) position: vec4f,
+    @location(0) texture_coords: vec2f,
 }
 
 @vertex
 fn vs_main(input: VertexInput) -> VertexOutput {
     var out: VertexOutput;
 
-    out.position = vec4<f32>(input.position, 0.0, 1.0);
+    out.position = vec4f(input.position, 0.0, 1.0);
     out.texture_coords = input.texture_coords;
 
     return out;
@@ -42,14 +42,14 @@ var s_diffuse: sampler;
 var<uniform> fs_globals: FragmentGlobals;
 
 @fragment
-fn basic_fs(input: VertexOutput) -> @location(0) vec4<f32> {
+fn basic_fs(input: VertexOutput) -> @location(0) vec4f {
     return textureSample(t_diffuse, s_diffuse, input.texture_coords);
 }
 
-const BLACK = vec4<f32>(0.0, 0.0, 0.0, 1.0);
+const BLACK = vec4f(0.0, 0.0, 0.0, 1.0);
 
 @fragment
-fn scanlines_fs(input: VertexOutput) -> @location(0) vec4<f32> {
+fn scanlines_fs(input: VertexOutput) -> @location(0) vec4f {
     let vp_line = u32(round(input.position.y - 0.5)) - fs_globals.viewport_y;
     let crt_line = 2u * fs_globals.nes_visible_height * vp_line / fs_globals.viewport_height;
 

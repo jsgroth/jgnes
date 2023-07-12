@@ -2,17 +2,39 @@ use crate::config::{PrescalingMode, Shader};
 use crate::renderer::Vertex2d;
 use jgnes_core::TimingMode;
 
-pub enum ComputePipelineState {
-    None,
-    Prescale {
-        scaled_texture: wgpu::Texture,
-        scaled_texture_view: wgpu::TextureView,
-        bind_group: wgpu::BindGroup,
-        pipeline: wgpu::ComputePipeline,
-    },
+struct ComputePipeline {
+    label: String,
+    bind_group: wgpu::BindGroup,
+    pipeline: wgpu::ComputePipeline,
+    workgroups: (u32, u32, u32),
+}
+
+impl ComputePipeline {
+    fn dispatch(&self, encoder: &mut wgpu::CommandEncoder) {
+        let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+            label: Some(&self.label),
+        });
+
+        compute_pass.set_pipeline(&self.pipeline);
+        compute_pass.set_bind_group(0, &self.bind_group, &[]);
+
+        compute_pass.dispatch_workgroups(self.workgroups.0, self.workgroups.1, self.workgroups.2);
+    }
+}
+
+pub struct ComputePipelineState {
+    render_texture_view: Option<wgpu::TextureView>,
+    compute_pipelines: Vec<ComputePipeline>,
 }
 
 impl ComputePipelineState {
+    fn none() -> Self {
+        Self {
+            render_texture_view: None,
+            compute_pipelines: vec![],
+        }
+    }
+
     pub fn create(
         prescaling_mode: PrescalingMode,
         timing_mode: TimingMode,
@@ -29,7 +51,7 @@ impl ComputePipelineState {
                     input_texture_view,
                 )
             }
-            _ => Self::None,
+            _ => Self::none(),
         }
     }
 
@@ -37,12 +59,14 @@ impl ComputePipelineState {
         &'a self,
         input_texture_view: &'a wgpu::TextureView,
     ) -> &'a wgpu::TextureView {
-        match self {
-            Self::None => input_texture_view,
-            Self::Prescale {
-                scaled_texture_view,
-                ..
-            } => scaled_texture_view,
+        self.render_texture_view
+            .as_ref()
+            .unwrap_or(input_texture_view)
+    }
+
+    pub fn dispatch(&self, encoder: &mut wgpu::CommandEncoder) {
+        for compute_pipeline in &self.compute_pipelines {
+            compute_pipeline.dispatch(encoder);
         }
     }
 }
@@ -112,11 +136,20 @@ fn create_prescale_compute_pipeline(
         entry_point: &entry_point,
     });
 
-    ComputePipelineState::Prescale {
-        scaled_texture,
-        scaled_texture_view,
-        bind_group,
-        pipeline,
+    let workgroups = (
+        jgnes_core::SCREEN_WIDTH.into(),
+        timing_mode.visible_screen_height().into(),
+        1,
+    );
+
+    ComputePipelineState {
+        render_texture_view: Some(scaled_texture_view),
+        compute_pipelines: vec![ComputePipeline {
+            label: "scale_pipeline".into(),
+            bind_group,
+            pipeline,
+            workgroups,
+        }],
     }
 }
 

@@ -692,25 +692,7 @@ impl<W: HasRawDisplayHandle + HasRawWindowHandle> Renderer for WgpuRenderer<W> {
                 label: Some("command_encoder"),
             });
 
-        if let ComputePipelineState::Prescale {
-            bind_group,
-            pipeline,
-            ..
-        } = &self.compute_pipeline_state
-        {
-            let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-                label: Some("compute_pass"),
-            });
-
-            compute_pass.set_pipeline(pipeline);
-            compute_pass.set_bind_group(0, bind_group, &[]);
-
-            compute_pass.dispatch_workgroups(
-                jgnes_core::SCREEN_WIDTH.into(),
-                self.timing_mode.visible_screen_height().into(),
-                1,
-            );
-        }
+        self.compute_pipeline_state.dispatch(&mut encoder);
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {

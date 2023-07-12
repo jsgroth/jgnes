@@ -689,6 +689,23 @@ fn create_sampler(device: &wgpu::Device, filter_mode: GpuFilterMode) -> wgpu::Sa
     })
 }
 
+#[allow(clippy::float_cmp)]
+fn compute_vertex(
+    position: f32,
+    window_length: u32,
+    display_area_pos: u32,
+    display_area_length: u32,
+) -> f32 {
+    assert!(position == 1.0_f32 || position == -1.0_f32);
+
+    let new_position = if position.is_sign_positive() {
+        f64::from(display_area_pos + display_area_length) / f64::from(window_length) * 2.0 - 1.0
+    } else {
+        f64::from(display_area_pos) / f64::from(window_length) * 2.0 - 1.0
+    };
+    new_position as f32
+}
+
 fn compute_vertices(
     window_width: u32,
     window_height: u32,
@@ -706,10 +723,18 @@ fn compute_vertices(
         .into_iter()
         .map(|vertex| Vertex2d {
             position: [
-                (f64::from(vertex.position[0]) * f64::from(display_area.width)
-                    / f64::from(window_width)) as f32,
-                (f64::from(vertex.position[1]) * f64::from(display_area.height)
-                    / f64::from(window_height)) as f32,
+                compute_vertex(
+                    vertex.position[0],
+                    window_width,
+                    display_area.x,
+                    display_area.width,
+                ),
+                compute_vertex(
+                    vertex.position[1],
+                    window_height,
+                    display_area.y,
+                    display_area.height,
+                ),
             ],
             texture_coords: vertex.texture_coords,
         })

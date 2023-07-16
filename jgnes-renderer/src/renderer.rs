@@ -61,6 +61,8 @@ impl Vertex2d {
     }
 }
 
+const FS_GLOBALS_PADDING: usize = 8;
+
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Default, bytemuck::Pod, bytemuck::Zeroable)]
 struct FragmentGlobals {
@@ -69,21 +71,27 @@ struct FragmentGlobals {
     viewport_width: u32,
     viewport_height: u32,
     nes_visible_height: u32,
+    is_srgb: u32,
     // WebGL requires types to be a multiple of 16 bytes
-    padding: [u8; 12],
+    padding: [u8; FS_GLOBALS_PADDING],
 }
 
 impl FragmentGlobals {
     const SIZE: usize = 32;
 
-    fn new(display_area: DisplayArea, timing_mode: TimingMode) -> Self {
+    fn new(
+        display_area: DisplayArea,
+        timing_mode: TimingMode,
+        surface_format: wgpu::TextureFormat,
+    ) -> Self {
         Self {
             viewport_x: display_area.x,
             viewport_y: display_area.y,
             viewport_width: display_area.width,
             viewport_height: display_area.height,
             nes_visible_height: timing_mode.visible_screen_height().into(),
-            padding: [0; 12],
+            is_srgb: surface_format.is_srgb().into(),
+            padding: [0; FS_GLOBALS_PADDING],
         }
     }
 
@@ -273,7 +281,7 @@ where
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         });
 
-        let fs_globals = FragmentGlobals::new(display_area, timing_mode);
+        let fs_globals = FragmentGlobals::new(display_area, timing_mode, surface_format);
         let fs_globals_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("fs_globals_buffer"),
             size: FragmentGlobals::SIZE as u64,
@@ -351,7 +359,8 @@ where
         );
 
         self.vertices = compute_vertices(window_width, window_height, display_area);
-        self.fs_globals = FragmentGlobals::new(display_area, self.timing_mode);
+        self.fs_globals =
+            FragmentGlobals::new(display_area, self.timing_mode, self.surface_config.format);
     }
 
     /// Update the rendering config. The `wgpu_backend` and `use_webgl2_limits` fields in the input

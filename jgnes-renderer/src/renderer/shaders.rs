@@ -252,7 +252,8 @@ fn create_render_pipeline(
 
     let fs_main = match shader {
         Shader::None => "basic_fs",
-        Shader::Scanlines => "scanlines_fs",
+        Shader::BlackScanlines => "black_scanlines_fs",
+        Shader::DimScanlines => "dim_scanlines_fs",
     };
 
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {

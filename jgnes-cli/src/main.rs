@@ -66,7 +66,7 @@ struct CliArgs {
     #[arg(long, default_value_t)]
     prescaling_type: PrescalingType,
 
-    /// Shader (None / Scanlines)
+    /// Shader (None / BlackScanlines / DimScanlines)
     #[arg(long, default_value_t)]
     shader: Shader,
 

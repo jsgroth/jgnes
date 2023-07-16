@@ -943,13 +943,18 @@ impl App {
                 ui.group(|ui| {
                     ui.set_enabled(self.config.renderer == NativeRenderer::Wgpu);
 
+                    let scanlines_hover_text = "Works best with integer height scaling";
                     let disabled_hover_text = "Shaders are not supported with SDL2 renderer";
+
                     ui.label("Shader").on_disabled_hover_text(disabled_hover_text);
                     ui.horizontal(|ui| {
                         ui.radio_value(&mut self.config.shader, Shader::None, "None")
                             .on_disabled_hover_text(disabled_hover_text);
-                        ui.radio_value(&mut self.config.shader, Shader::Scanlines, "Scanlines")
-                            .on_hover_text("Works best with integer height scaling")
+                        ui.radio_value(&mut self.config.shader, Shader::BlackScanlines, "Black scanlines")
+                            .on_hover_text(scanlines_hover_text)
+                            .on_disabled_hover_text(disabled_hover_text);
+                        ui.radio_value(&mut self.config.shader, Shader::DimScanlines, "Dim scanlines")
+                            .on_hover_text(scanlines_hover_text)
                             .on_disabled_hover_text(disabled_hover_text);
                     });
                 });

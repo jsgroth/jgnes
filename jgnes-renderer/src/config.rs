@@ -174,7 +174,8 @@ impl Display for PrescalingMode {
 pub enum Shader {
     #[default]
     None,
-    Scanlines,
+    BlackScanlines,
+    DimScanlines,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

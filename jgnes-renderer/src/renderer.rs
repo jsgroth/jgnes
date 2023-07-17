@@ -4,7 +4,8 @@
 mod shaders;
 
 use crate::config::{
-    FrameSkip, GpuFilterMode, PrescalingMode, RendererConfig, Shader, VSyncMode, WgpuBackend,
+    FrameSkip, GpuFilterMode, PrescalingMode, RendererConfig, Scanlines, Shader, VSyncMode,
+    WgpuBackend,
 };
 use crate::renderer::shaders::{ComputePipelineState, RenderPipelineState};
 use crate::{colors, DisplayArea};
@@ -139,7 +140,6 @@ pub struct WgpuRenderer<W> {
     surface: wgpu::Surface,
     surface_capabilities: wgpu::SurfaceCapabilities,
     surface_config: wgpu::SurfaceConfiguration,
-    texture_format: wgpu::TextureFormat,
     texture: wgpu::Texture,
     compute_pipeline_state: ComputePipelineState,
     render_pipeline_state: RenderPipelineState,
@@ -174,7 +174,7 @@ where
 
         let output_buffer = vec![0; output_buffer_len(timing_mode)];
 
-        let cpu_render_scale = render_config.prescaling_mode.cpu_render_scale() as usize;
+        let cpu_render_scale = render_config.shader.cpu_render_scale() as usize;
         let cpu_scale_output_buffer =
             vec![0; output_buffer.len() * cpu_render_scale * cpu_render_scale];
 
@@ -260,7 +260,7 @@ where
             wgpu::TextureFormat::Rgba8Unorm
         };
 
-        let cpu_render_scale = render_config.prescaling_mode.cpu_render_scale();
+        let cpu_render_scale = render_config.shader.cpu_render_scale();
         let texture = create_texture(&device, texture_format, cpu_render_scale, timing_mode);
         let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
@@ -289,16 +289,12 @@ where
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
-        let compute_pipeline_state = ComputePipelineState::create(
-            render_config.prescaling_mode,
-            timing_mode,
-            &device,
-            &texture_view,
-        );
+        let compute_pipeline_state =
+            ComputePipelineState::create(render_config.shader, timing_mode, &device, &texture_view);
 
         let render_bind_texture = compute_pipeline_state.get_render_texture(&texture_view);
         let render_pipeline_state = RenderPipelineState::create(
-            render_config.shader,
+            render_config.scanlines,
             &device,
             render_bind_texture,
             &sampler,
@@ -316,7 +312,6 @@ where
             surface,
             surface_capabilities,
             surface_config,
-            texture_format,
             texture,
             compute_pipeline_state,
             render_pipeline_state,
@@ -382,7 +377,7 @@ where
 
         if new_config != self.render_config {
             self.update_vsync_mode(new_config.vsync_mode)?;
-            self.update_shader(new_config.shader);
+            self.update_scanlines(new_config.scanlines);
 
             self.render_config = new_config;
 
@@ -397,9 +392,9 @@ where
         self.frame_skip = frame_skip;
     }
 
-    fn update_shader(&mut self, shader: Shader) {
-        if shader != self.render_config.shader {
-            self.render_config.shader = shader;
+    fn update_scanlines(&mut self, shader: Scanlines) {
+        if shader != self.render_config.scanlines {
+            self.render_config.scanlines = shader;
 
             self.render_pipeline_state.recreate_pipeline(
                 shader,
@@ -412,9 +407,9 @@ where
     fn reinit_textures(&mut self) {
         let sampler = create_sampler(&self.device, self.render_config.gpu_filter_mode);
 
-        let prescaling_mode = self.render_config.prescaling_mode;
-        match prescaling_mode {
-            PrescalingMode::Cpu(render_scale) => {
+        let shader = self.render_config.shader;
+        match shader {
+            Shader::Prescale(PrescalingMode::Cpu, render_scale) => {
                 let render_scale = render_scale.get() as usize;
                 self.cpu_scale_output_buffer =
                     vec![0; self.output_buffer.len() * render_scale * render_scale];
@@ -430,7 +425,7 @@ where
                     mip_level_count: 1,
                     sample_count: 1,
                     dimension: wgpu::TextureDimension::D2,
-                    format: self.texture_format,
+                    format: self.surface_config.format,
                     usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
                     view_formats: &[],
                 });
@@ -446,7 +441,7 @@ where
                     &self.fs_globals_buffer,
                 );
             }
-            PrescalingMode::Gpu(_) => {
+            Shader::None | Shader::Prescale(PrescalingMode::Gpu, _) => {
                 self.texture = self.device.create_texture(&wgpu::TextureDescriptor {
                     label: Some("texture"),
                     size: wgpu::Extent3d {
@@ -457,7 +452,7 @@ where
                     mip_level_count: 1,
                     sample_count: 1,
                     dimension: wgpu::TextureDimension::D2,
-                    format: self.texture_format,
+                    format: self.surface_config.format,
                     usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
                     view_formats: &[],
                 });
@@ -467,7 +462,7 @@ where
                     .create_view(&wgpu::TextureViewDescriptor::default());
 
                 self.compute_pipeline_state = ComputePipelineState::create(
-                    prescaling_mode,
+                    shader,
                     self.timing_mode,
                     &self.device,
                     &texture_view,
@@ -659,7 +654,7 @@ impl<W: HasRawDisplayHandle + HasRawWindowHandle> Renderer for WgpuRenderer<W> {
             &mut self.output_buffer,
         );
 
-        let cpu_render_scale = self.render_config.prescaling_mode.cpu_render_scale();
+        let cpu_render_scale = self.render_config.shader.cpu_render_scale();
         let render_buffer = if cpu_render_scale > 1 {
             cpu_scale_texture(
                 &self.output_buffer,

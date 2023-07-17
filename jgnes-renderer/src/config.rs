@@ -100,6 +100,12 @@ impl Default for RenderScale {
     }
 }
 
+impl Display for RenderScale {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}x", self.0)
+    }
+}
+
 impl TryFrom<u32> for RenderScale {
     type Error = String;
 
@@ -129,41 +135,43 @@ impl GpuFilterMode {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, EnumDisplay, EnumFromStr,
+)]
 pub enum PrescalingMode {
-    Gpu(RenderScale),
-    Cpu(RenderScale),
+    #[default]
+    Gpu,
+    Cpu,
 }
 
-impl PrescalingMode {
-    #[must_use]
-    pub fn gpu_render_scale(self) -> u32 {
-        match self {
-            Self::Gpu(render_scale) => render_scale.get(),
-            Self::Cpu(_) => 1,
-        }
-    }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Shader {
+    None,
+    Prescale(PrescalingMode, RenderScale),
+}
 
-    #[must_use]
-    pub fn cpu_render_scale(self) -> u32 {
+impl Shader {
+    pub(crate) fn cpu_render_scale(self) -> u32 {
         match self {
-            Self::Gpu(_) => 1,
-            Self::Cpu(render_scale) => render_scale.get(),
+            Self::Prescale(PrescalingMode::Cpu, render_scale) => render_scale.get(),
+            _ => 1,
         }
     }
 }
 
-impl Default for PrescalingMode {
+impl Default for Shader {
     fn default() -> Self {
-        Self::Gpu(RenderScale::ONE)
+        Self::None
     }
 }
 
-impl Display for PrescalingMode {
+impl Display for Shader {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Gpu(render_scale) => write!(f, "GPU {}x", render_scale.get()),
-            Self::Cpu(render_scale) => write!(f, "CPU {}x", render_scale.get()),
+            Self::None => write!(f, "None"),
+            Self::Prescale(prescaling_mode, render_scale) => {
+                write!(f, "Prescale {prescaling_mode} {render_scale}")
+            }
         }
     }
 }
@@ -171,11 +179,11 @@ impl Display for PrescalingMode {
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, EnumDisplay, EnumFromStr,
 )]
-pub enum Shader {
+pub enum Scanlines {
     #[default]
     None,
-    BlackScanlines,
-    DimScanlines,
+    Black,
+    Dim,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -195,8 +203,8 @@ pub struct RendererConfig {
     pub vsync_mode: VSyncMode,
     pub wgpu_backend: WgpuBackend,
     pub gpu_filter_mode: GpuFilterMode,
-    pub prescaling_mode: PrescalingMode,
     pub shader: Shader,
+    pub scanlines: Scanlines,
     pub aspect_ratio: AspectRatio,
     pub overscan: Overscan,
     pub forced_integer_height_scaling: bool,

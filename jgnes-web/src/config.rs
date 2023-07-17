@@ -1,6 +1,6 @@
 use crate::{js, NesButton};
 use jgnes_renderer::config::{
-    AspectRatio, GpuFilterMode, Overscan, PrescalingMode, RenderScale, Shader,
+    AspectRatio, GpuFilterMode, Overscan, PrescalingMode, RenderScale, Scanlines, Shader,
 };
 use serde::{Deserialize, Serialize};
 use std::cell::{Cell, RefCell};
@@ -25,7 +25,7 @@ pub(crate) struct ConfigFields {
     #[serde(default = "default_render_scale")]
     pub(crate) render_scale: RenderScale,
     #[serde(default)]
-    pub(crate) shader: Shader,
+    pub(crate) scanlines: Scanlines,
     #[serde(default)]
     pub(crate) overscan: Overscan,
     #[serde(default)]
@@ -44,13 +44,13 @@ impl ConfigFields {
     const LOCAL_STORAGE_KEY: &'static str = "__config";
 
     #[cfg(feature = "webgl")]
-    pub(crate) fn get_prescaling_mode(&self) -> PrescalingMode {
-        PrescalingMode::Cpu(self.render_scale)
+    pub(crate) fn get_shader(&self) -> Shader {
+        Shader::Prescale(PrescalingMode::Cpu, self.render_scale)
     }
 
     #[cfg(not(feature = "webgl"))]
-    pub(crate) fn get_prescaling_mode(&self) -> PrescalingMode {
-        PrescalingMode::Gpu(self.render_scale)
+    pub(crate) fn get_shader(&self) -> Shader {
+        Shader::Prescale(PrescalingMode::Cpu, self.render_scale)
     }
 
     fn save(&self) {
@@ -255,14 +255,14 @@ impl JgnesWebConfig {
         fields.save();
     }
 
-    pub fn shader(&self) -> String {
-        format!("{}", self.fields.borrow().shader)
+    pub fn scanlines(&self) -> String {
+        format!("{}", self.fields.borrow().scanlines)
     }
 
-    pub fn set_shader(&self, shader: &str) {
-        let Ok(shader) = shader.parse() else { return };
+    pub fn set_scanlines(&self, scanlines: &str) {
+        let Ok(scanlines) = scanlines.parse() else { return };
         let mut fields = self.fields.borrow_mut();
-        fields.shader = shader;
+        fields.scanlines = scanlines;
         fields.save();
     }
 

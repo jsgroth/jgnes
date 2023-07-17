@@ -14,8 +14,8 @@ use jgnes_native_driver::{
     JgnesNativeConfig, JgnesSharedConfig, JoystickInput, KeyboardInput, NativeRenderer,
 };
 use jgnes_renderer::config::{
-    AspectRatio, GpuFilterMode, Overscan, PrescalingMode, RenderScale, Shader, VSyncMode,
-    WgpuBackend,
+    AspectRatio, GpuFilterMode, Overscan, PrescalingMode, RenderScale, Scanlines, Shader,
+    VSyncMode, WgpuBackend,
 };
 use rfd::FileDialog;
 use serde::{Deserialize, Serialize};
@@ -67,7 +67,7 @@ struct AppConfig {
     #[serde(default)]
     render_scale: RenderScale,
     #[serde(default)]
-    shader: Shader,
+    scanlines: Scanlines,
     #[serde(default)]
     aspect_ratio: AspectRatio,
     #[serde(default)]
@@ -101,8 +101,8 @@ impl AppConfig {
     fn to_jgnes_dynamic_config(&self) -> JgnesDynamicConfig {
         JgnesDynamicConfig {
             gpu_filter_mode: self.gpu_filter_mode,
-            prescaling_mode: PrescalingMode::Gpu(self.render_scale),
-            shader: self.shader,
+            shader: Shader::Prescale(PrescalingMode::Gpu, self.render_scale),
+            scanlines: self.scanlines,
             aspect_ratio: self.aspect_ratio,
             overscan: self.overscan,
             forced_integer_height_scaling: self.forced_integer_height_scaling,
@@ -944,16 +944,16 @@ impl App {
                     ui.set_enabled(self.config.renderer == NativeRenderer::Wgpu);
 
                     let scanlines_hover_text = "Works best with integer height scaling";
-                    let disabled_hover_text = "Shaders are not supported with SDL2 renderer";
+                    let disabled_hover_text = "Scanlines are not supported with SDL2 renderer";
 
-                    ui.label("Shader").on_disabled_hover_text(disabled_hover_text);
+                    ui.label("Scanlines").on_disabled_hover_text(disabled_hover_text);
                     ui.horizontal(|ui| {
-                        ui.radio_value(&mut self.config.shader, Shader::None, "None")
+                        ui.radio_value(&mut self.config.scanlines, Scanlines::None, "None")
                             .on_disabled_hover_text(disabled_hover_text);
-                        ui.radio_value(&mut self.config.shader, Shader::BlackScanlines, "Black scanlines")
+                        ui.radio_value(&mut self.config.scanlines, Scanlines::Dim, "Dim")
                             .on_hover_text(scanlines_hover_text)
                             .on_disabled_hover_text(disabled_hover_text);
-                        ui.radio_value(&mut self.config.shader, Shader::DimScanlines, "Dim scanlines")
+                        ui.radio_value(&mut self.config.scanlines, Scanlines::Black, "Black")
                             .on_hover_text(scanlines_hover_text)
                             .on_disabled_hover_text(disabled_hover_text);
                     });

@@ -1,4 +1,4 @@
-use crate::config::{PrescalingMode, Shader};
+use crate::config::{PrescalingMode, Scanlines, Shader};
 use crate::renderer::Vertex2d;
 use jgnes_core::TimingMode;
 
@@ -36,13 +36,13 @@ impl ComputePipelineState {
     }
 
     pub fn create(
-        prescaling_mode: PrescalingMode,
+        shader: Shader,
         timing_mode: TimingMode,
         device: &wgpu::Device,
         input_texture_view: &wgpu::TextureView,
     ) -> Self {
-        match prescaling_mode {
-            PrescalingMode::Gpu(render_scale) if render_scale.get() > 1 => {
+        match shader {
+            Shader::Prescale(PrescalingMode::Gpu, render_scale) if render_scale.get() > 1 => {
                 let gpu_render_scale = render_scale.get();
                 create_prescale_compute_pipeline(
                     gpu_render_scale,
@@ -184,7 +184,7 @@ pub struct RenderPipelineState {
 
 impl RenderPipelineState {
     pub fn create(
-        shader: Shader,
+        shader: Scanlines,
         device: &wgpu::Device,
         input_texture_view: &wgpu::TextureView,
         sampler: &wgpu::Sampler,
@@ -233,7 +233,7 @@ impl RenderPipelineState {
 
     pub fn recreate_pipeline(
         &mut self,
-        shader: Shader,
+        shader: Scanlines,
         device: &wgpu::Device,
         surface_format: wgpu::TextureFormat,
     ) {
@@ -243,7 +243,7 @@ impl RenderPipelineState {
 }
 
 fn create_render_pipeline(
-    shader: Shader,
+    shader: Scanlines,
     device: &wgpu::Device,
     render_pipeline_layout: &wgpu::PipelineLayout,
     surface_format: wgpu::TextureFormat,
@@ -251,9 +251,9 @@ fn create_render_pipeline(
     let shader_module = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
 
     let fs_main = match shader {
-        Shader::None => "basic_fs",
-        Shader::BlackScanlines => "black_scanlines_fs",
-        Shader::DimScanlines => "dim_scanlines_fs",
+        Scanlines::None => "basic_fs",
+        Scanlines::Black => "black_scanlines_fs",
+        Scanlines::Dim => "dim_scanlines_fs",
     };
 
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {

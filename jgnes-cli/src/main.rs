@@ -6,8 +6,8 @@ use jgnes_native_driver::{
 };
 use jgnes_proc_macros::{EnumDisplay, EnumFromStr};
 use jgnes_renderer::config::{
-    AspectRatio, GpuFilterMode, Overscan, PrescalingMode, RenderScale, Shader, VSyncMode,
-    WgpuBackend,
+    AspectRatio, GpuFilterMode, Overscan, PrescalingMode, RenderScale, Scanlines, Shader,
+    VSyncMode, WgpuBackend,
 };
 use std::time::Duration;
 
@@ -27,13 +27,6 @@ impl OptionalTimingMode {
             Self::None => None,
         }
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, EnumDisplay, EnumFromStr)]
-enum PrescalingType {
-    #[default]
-    Gpu,
-    Cpu,
 }
 
 #[derive(Parser)]
@@ -62,13 +55,13 @@ struct CliArgs {
     #[arg(long, default_value_t = GpuFilterMode::LinearInterpolation)]
     gpu_filter_mode: GpuFilterMode,
 
-    /// Prescaling type (Gpu / Cpu)
+    /// Prescaling mode (Gpu / Cpu)
     #[arg(long, default_value_t)]
-    prescaling_type: PrescalingType,
+    prescaling_mode: PrescalingMode,
 
-    /// Shader (None / BlackScanlines / DimScanlines)
+    /// Scanlines setting (None / Black / Dim)
     #[arg(long, default_value_t)]
-    shader: Shader,
+    scanlines: Scanlines,
 
     /// Internal resolution prescale factor (1 to 16, only applicable to Wgpu renderer)
     #[arg(long, default_value_t = 3)]
@@ -155,16 +148,12 @@ fn main() -> anyhow::Result<()> {
 
     let render_scale =
         RenderScale::try_from(args.render_scale).expect("render_scale arg is invalid");
-    let prescaling_mode = match args.prescaling_type {
-        PrescalingType::Gpu => PrescalingMode::Gpu(render_scale),
-        PrescalingType::Cpu => PrescalingMode::Cpu(render_scale),
-    };
 
     let overscan = args.overscan();
     let (shared_config, _) = JgnesSharedConfig::new(JgnesDynamicConfig {
         gpu_filter_mode: args.gpu_filter_mode,
-        prescaling_mode,
-        shader: args.shader,
+        shader: Shader::Prescale(args.prescaling_mode, render_scale),
+        scanlines: args.scanlines,
         aspect_ratio: args.aspect_ratio,
         overscan,
         forced_integer_height_scaling: args.forced_integer_height_scaling,

@@ -41,8 +41,8 @@ export function setConfigDisplayValues(jgnesWebConfig) {
         element.checked = parseInt(element.value) === jgnesWebConfig.render_scale();
     });
 
-    document.querySelectorAll("input[name='shader']").forEach((element) => {
-        element.checked = element.value === jgnesWebConfig.shader();
+    document.querySelectorAll("input[name='scanlines']").forEach((element) => {
+        element.checked = element.value === jgnesWebConfig.scanlines();
     });
 
     document.getElementById("overscan-left").checked = jgnesWebConfig.overscan_left();

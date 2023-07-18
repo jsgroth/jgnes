@@ -112,7 +112,7 @@ impl TryFrom<u32> for RenderScale {
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         match value {
             1..=16 => Ok(Self(value)),
-            _ => Err(format!("Invalid render scale value: {value}")),
+            _ => Err(format!("Invalid render scale value, must be 1-16: {value}")),
         }
     }
 }
@@ -144,10 +144,15 @@ pub enum PrescalingMode {
     Cpu,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum Shader {
     None,
     Prescale(PrescalingMode, RenderScale),
+    GaussianBlur {
+        prescale_factor: RenderScale,
+        stdev: f64,
+        radius: u32,
+    },
 }
 
 impl Shader {
@@ -172,6 +177,14 @@ impl Display for Shader {
             Self::Prescale(prescaling_mode, render_scale) => {
                 write!(f, "Prescale {prescaling_mode} {render_scale}")
             }
+            Self::GaussianBlur {
+                prescale_factor,
+                stdev,
+                radius,
+            } => write!(
+                f,
+                "GaussianBlur[prescale={prescale_factor}, stdev={stdev}, radius={radius}]"
+            ),
         }
     }
 }
@@ -198,7 +211,7 @@ impl FrameSkip {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct RendererConfig {
     pub vsync_mode: VSyncMode,
     pub wgpu_backend: WgpuBackend,

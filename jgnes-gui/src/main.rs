@@ -58,7 +58,7 @@ fn main() -> eframe::Result<()> {
     let config_path = PathBuf::from_str("jgnes-config.toml").unwrap();
 
     let options = NativeOptions {
-        initial_window_size: Some(Vec2::new(800.0, 600.0)),
+        initial_window_size: Some(Vec2::new(800.0, 720.0)),
         ..NativeOptions::default()
     };
 

@@ -62,7 +62,7 @@ impl Vertex2d {
     }
 }
 
-const FS_GLOBALS_PADDING: usize = 8;
+const FS_GLOBALS_PADDING: usize = 12;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Default, bytemuck::Pod, bytemuck::Zeroable)]
@@ -72,7 +72,6 @@ struct FragmentGlobals {
     viewport_width: u32,
     viewport_height: u32,
     nes_visible_height: u32,
-    is_srgb: u32,
     // WebGL requires types to be a multiple of 16 bytes
     padding: [u8; FS_GLOBALS_PADDING],
 }
@@ -80,18 +79,13 @@ struct FragmentGlobals {
 impl FragmentGlobals {
     const SIZE: usize = 32;
 
-    fn new(
-        display_area: DisplayArea,
-        timing_mode: TimingMode,
-        surface_format: wgpu::TextureFormat,
-    ) -> Self {
+    fn new(display_area: DisplayArea, timing_mode: TimingMode) -> Self {
         Self {
             viewport_x: display_area.x,
             viewport_y: display_area.y,
             viewport_width: display_area.width,
             viewport_height: display_area.height,
             nes_visible_height: timing_mode.visible_screen_height().into(),
-            is_srgb: surface_format.is_srgb().into(),
             padding: [0; FS_GLOBALS_PADDING],
         }
     }
@@ -141,6 +135,7 @@ pub struct WgpuRenderer<W> {
     surface_capabilities: wgpu::SurfaceCapabilities,
     surface_config: wgpu::SurfaceConfiguration,
     texture: wgpu::Texture,
+    texture_format: wgpu::TextureFormat,
     compute_pipeline_state: ComputePipelineState,
     render_pipeline_state: RenderPipelineState,
     vertices: Vec<Vertex2d>,
@@ -281,7 +276,7 @@ where
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         });
 
-        let fs_globals = FragmentGlobals::new(display_area, timing_mode, surface_format);
+        let fs_globals = FragmentGlobals::new(display_area, timing_mode);
         let fs_globals_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("fs_globals_buffer"),
             size: FragmentGlobals::SIZE as u64,
@@ -313,6 +308,7 @@ where
             surface_capabilities,
             surface_config,
             texture,
+            texture_format,
             compute_pipeline_state,
             render_pipeline_state,
             vertices,
@@ -354,8 +350,7 @@ where
         );
 
         self.vertices = compute_vertices(window_width, window_height, display_area);
-        self.fs_globals =
-            FragmentGlobals::new(display_area, self.timing_mode, self.surface_config.format);
+        self.fs_globals = FragmentGlobals::new(display_area, self.timing_mode);
     }
 
     /// Update the rendering config. The `wgpu_backend` and `use_webgl2_limits` fields in the input
@@ -425,7 +420,7 @@ where
                     mip_level_count: 1,
                     sample_count: 1,
                     dimension: wgpu::TextureDimension::D2,
-                    format: self.surface_config.format,
+                    format: self.texture_format,
                     usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
                     view_formats: &[],
                 });
@@ -441,7 +436,9 @@ where
                     &self.fs_globals_buffer,
                 );
             }
-            Shader::None | Shader::Prescale(PrescalingMode::Gpu, _) => {
+            Shader::None
+            | Shader::Prescale(PrescalingMode::Gpu, _)
+            | Shader::GaussianBlur { .. } => {
                 self.texture = self.device.create_texture(&wgpu::TextureDescriptor {
                     label: Some("texture"),
                     size: wgpu::Extent3d {
@@ -452,7 +449,7 @@ where
                     mip_level_count: 1,
                     sample_count: 1,
                     dimension: wgpu::TextureDimension::D2,
-                    format: self.surface_config.format,
+                    format: self.texture_format,
                     usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
                     view_formats: &[],
                 });
@@ -557,7 +554,7 @@ fn create_sampler(device: &wgpu::Device, filter_mode: GpuFilterMode) -> wgpu::Sa
 }
 
 #[allow(clippy::float_cmp)]
-fn compute_vertex(
+fn compute_vertex_position(
     position: f32,
     window_length: u32,
     display_area_pos: u32,
@@ -582,13 +579,13 @@ fn compute_vertices(
         .into_iter()
         .map(|vertex| Vertex2d {
             position: [
-                compute_vertex(
+                compute_vertex_position(
                     vertex.position[0],
                     window_width,
                     display_area.x,
                     display_area.width,
                 ),
-                compute_vertex(
+                compute_vertex_position(
                     vertex.position[1],
                     window_height,
                     display_area.y,

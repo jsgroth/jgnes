@@ -29,6 +29,14 @@ impl OptionalTimingMode {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, EnumDisplay, EnumFromStr)]
+enum ShaderType {
+    None,
+    #[default]
+    Prescale,
+    GaussianBlur,
+}
+
 #[derive(Parser)]
 struct CliArgs {
     /// Path to iNES / NES 2.0 ROM file
@@ -54,6 +62,18 @@ struct CliArgs {
     /// GPU filter type (NearestNeighbor / LinearInterpolation)
     #[arg(long, default_value_t = GpuFilterMode::LinearInterpolation)]
     gpu_filter_mode: GpuFilterMode,
+
+    /// Shader type (None / Prescale / GaussianBlur)
+    #[arg(long, default_value_t)]
+    shader_type: ShaderType,
+
+    /// Gaussian blur stdev for Gaussian blur shader
+    #[arg(long, default_value_t = 2.0)]
+    blur_stdev: f64,
+
+    /// Gaussian blur radius for Gaussian blur shader
+    #[arg(long, default_value_t = 16)]
+    blur_radius: u32,
 
     /// Prescaling mode (Gpu / Cpu)
     #[arg(long, default_value_t)]
@@ -130,6 +150,30 @@ struct CliArgs {
 }
 
 impl CliArgs {
+    fn render_scale(&self) -> RenderScale {
+        RenderScale::try_from(self.render_scale).expect("render_scale arg is invalid")
+    }
+
+    fn blur_stdev(&self) -> f64 {
+        assert!(
+            !self.blur_stdev.is_nan() && !self.blur_stdev.is_sign_negative(),
+            "Gaussian blur stdev cannot be negative or NaN"
+        );
+        self.blur_stdev
+    }
+
+    fn shader(&self) -> Shader {
+        match self.shader_type {
+            ShaderType::None => Shader::None,
+            ShaderType::Prescale => Shader::Prescale(self.prescaling_mode, self.render_scale()),
+            ShaderType::GaussianBlur => Shader::GaussianBlur {
+                prescale_factor: self.render_scale(),
+                stdev: self.blur_stdev(),
+                radius: self.blur_radius,
+            },
+        }
+    }
+
     fn overscan(&self) -> Overscan {
         Overscan {
             top: self.overscan_top,
@@ -146,16 +190,12 @@ fn main() -> anyhow::Result<()> {
 
     let args = CliArgs::parse();
 
-    let render_scale =
-        RenderScale::try_from(args.render_scale).expect("render_scale arg is invalid");
-
-    let overscan = args.overscan();
     let (shared_config, _) = JgnesSharedConfig::new(JgnesDynamicConfig {
         gpu_filter_mode: args.gpu_filter_mode,
-        shader: Shader::Prescale(args.prescaling_mode, render_scale),
+        shader: args.shader(),
         scanlines: args.scanlines,
         aspect_ratio: args.aspect_ratio,
-        overscan,
+        overscan: args.overscan(),
         forced_integer_height_scaling: args.forced_integer_height_scaling,
         vsync_mode: args.vsync_mode,
         remove_sprite_limit: args.remove_sprite_limit,

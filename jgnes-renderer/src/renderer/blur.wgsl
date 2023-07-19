@@ -34,8 +34,8 @@ fn blur_fs(
     var color = weights[center] * textureLoad(texture_in, position, 0).rgb;
 
     for (var i = 1; i <= center; i += 1) {
-        color += weights[center - i] * blur_tap(position, i);
-        color += weights[center + i] * blur_tap(position, -i);
+        color += weights[center - i] * blur_tap(position, -i);
+        color += weights[center + i] * blur_tap(position, i);
     }
 
     textureStore(texture_out, position, vec4f(color, 1.0));

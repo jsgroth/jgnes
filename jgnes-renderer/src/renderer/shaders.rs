@@ -319,7 +319,7 @@ fn compute_blur_weights(stdev: f64, radius: u32) -> Vec<f32> {
         })
         .collect();
 
-    // Normalize weights to they sum to 1
+    // Normalize weights so they sum to 1
     let weight_sum = weights.iter().copied().sum::<f64>();
     for value in &mut weights {
         *value /= weight_sum;

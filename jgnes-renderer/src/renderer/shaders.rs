@@ -310,15 +310,22 @@ fn compute_blur_weights(stdev: f64, radius: u32) -> Vec<f32> {
     let len = (2 * radius + 1) as i32;
     let center = len / 2;
 
-    (0..len)
+    let mut weights: Vec<_> = (0..len)
         .map(|i| {
             // Gaussian blur formula
             let x = f64::from(i - center);
-            let weight = 1.0 / (2.0 * std::f64::consts::PI * stdev.powi(2)).sqrt()
-                * (-1.0 * x.powi(2) / (2.0 * stdev.powi(2))).exp();
-            weight as f32
+            1.0 / (2.0 * std::f64::consts::PI * stdev.powi(2)).sqrt()
+                * (-1.0 * x.powi(2) / (2.0 * stdev.powi(2))).exp()
         })
-        .collect()
+        .collect();
+
+    // Normalize weights to they sum to 1
+    let weight_sum = weights.iter().copied().sum::<f64>();
+    for value in &mut weights {
+        *value /= weight_sum;
+    }
+
+    weights.into_iter().map(|weight| weight as f32).collect()
 }
 
 fn create_blur_compute_pipeline(

@@ -494,7 +494,7 @@ pub struct RenderPipelineState {
 
 impl RenderPipelineState {
     pub fn create(
-        shader: Scanlines,
+        scanlines: Scanlines,
         device: &wgpu::Device,
         input_texture_view: &wgpu::TextureView,
         sampler: &wgpu::Sampler,
@@ -515,7 +515,7 @@ impl RenderPipelineState {
             bind_group_layouts: &[&bind_group_layout],
             push_constant_ranges: &[],
         });
-        let pipeline = create_render_pipeline(shader, device, &pipeline_layout, surface_format);
+        let pipeline = create_render_pipeline(scanlines, device, &pipeline_layout, surface_format);
 
         Self {
             bind_group_layout,
@@ -553,14 +553,14 @@ impl RenderPipelineState {
 }
 
 fn create_render_pipeline(
-    shader: Scanlines,
+    scanlines: Scanlines,
     device: &wgpu::Device,
     render_pipeline_layout: &wgpu::PipelineLayout,
     surface_format: wgpu::TextureFormat,
 ) -> wgpu::RenderPipeline {
     let shader_module = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
 
-    let fs_main = match shader {
+    let fs_main = match scanlines {
         Scanlines::None => "basic_fs",
         Scanlines::Black => "black_scanlines_fs",
         Scanlines::Dim => "dim_scanlines_fs",

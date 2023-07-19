@@ -48,7 +48,8 @@ fn steam_deck_dpi_hack() {
 }
 
 fn main() -> eframe::Result<()> {
-    env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("info,wgpu_core::device=warn"))
+        .init();
 
     #[cfg(target_os = "linux")]
     steam_deck_dpi_hack();

@@ -67,7 +67,7 @@ struct CliArgs {
     shader_type: ShaderType,
 
     /// Gaussian blur stdev for Gaussian blur shader
-    #[arg(long, default_value_t = 2.0)]
+    #[arg(long, default_value_t = 1.5)]
     blur_stdev: f64,
 
     /// Gaussian blur radius for Gaussian blur shader

@@ -12,20 +12,6 @@ var<uniform> globals: BlurGlobals;
 @group(0) @binding(2)
 var<storage, read> weights: array<f32>;
 
-var<private> VERTICES: array<vec4f, 6> = array<vec4f, 6>(
-    vec4f(-1.0, 1.0, 0.0, 1.0),
-    vec4f(-1.0, -1.0, 0.0, 1.0),
-    vec4f(1.0, -1.0, 0.0, 1.0),
-    vec4f(1.0, -1.0, 0.0, 1.0),
-    vec4f(1.0, 1.0, 0.0, 1.0),
-    vec4f(-1.0, 1.0, 0.0, 1.0),
-);
-
-@vertex
-fn vs_main(@builtin(vertex_index) vertex_index: u32) -> @builtin(position) vec4f {
-    return VERTICES[vertex_index];
-}
-
 fn blur_tap(position: vec2u, shift: i32) -> vec3f {
     let horizontal = globals.blur_direction == 0u;
     let shift_vec = select(vec2i(0, shift), vec2i(shift, 0), horizontal);

@@ -175,12 +175,13 @@ impl TextureScalePipeline {
             push_constant_ranges: &[],
         });
 
-        let shader_module = device.create_shader_module(wgpu::include_wgsl!("prescale.wgsl"));
+        let vertex_shader = device.create_shader_module(wgpu::include_wgsl!("vertex.wgsl"));
+        let prescale_shader = device.create_shader_module(wgpu::include_wgsl!("prescale.wgsl"));
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("texture_scale_pipeline"),
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
-                module: &shader_module,
+                module: &vertex_shader,
                 entry_point: "vs_main",
                 buffers: &[],
             },
@@ -200,7 +201,7 @@ impl TextureScalePipeline {
                 alpha_to_coverage_enabled: false,
             },
             fragment: Some(wgpu::FragmentState {
-                module: &shader_module,
+                module: &prescale_shader,
                 entry_point: "fs_main",
                 targets: &[Some(wgpu::ColorTargetState {
                     format: scaled_texture.format(),
@@ -347,7 +348,8 @@ impl BlurPipeline {
             &weights_buffer,
         );
 
-        let shader_module = device.create_shader_module(wgpu::include_wgsl!("blur.wgsl"));
+        let vertex_shader = device.create_shader_module(wgpu::include_wgsl!("vertex.wgsl"));
+        let blur_shader = device.create_shader_module(wgpu::include_wgsl!("blur.wgsl"));
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("blur_pipeline_layout"),
@@ -358,7 +360,7 @@ impl BlurPipeline {
             label: Some("blur_pipeline"),
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
-                module: &shader_module,
+                module: &vertex_shader,
                 entry_point: "vs_main",
                 buffers: &[],
             },
@@ -378,7 +380,7 @@ impl BlurPipeline {
                 alpha_to_coverage_enabled: false,
             },
             fragment: Some(wgpu::FragmentState {
-                module: &shader_module,
+                module: &blur_shader,
                 entry_point: "fs_main",
                 targets: &[Some(wgpu::ColorTargetState {
                     format: input.format(),

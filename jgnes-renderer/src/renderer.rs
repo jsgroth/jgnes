@@ -683,7 +683,7 @@ impl<W: HasRawDisplayHandle + HasRawWindowHandle> Renderer for WgpuRenderer<W> {
         );
 
         let output = self.surface.get_current_texture()?;
-        let view = output
+        let surface_view = output
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
@@ -695,26 +695,12 @@ impl<W: HasRawDisplayHandle + HasRawWindowHandle> Renderer for WgpuRenderer<W> {
 
         self.compute_pipeline_state.dispatch(&mut encoder);
 
-        {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("render_pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                        store: true,
-                    },
-                })],
-                depth_stencil_attachment: None,
-            });
-
-            render_pass.set_pipeline(&self.render_pipeline_state.pipeline);
-            render_pass.set_bind_group(0, &self.render_pipeline_state.bind_group, &[]);
-            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-
-            render_pass.draw(0..VERTICES.len() as u32, 0..1);
-        }
+        self.render_pipeline_state.draw(
+            &mut encoder,
+            &self.vertex_buffer,
+            VERTICES.len() as u32,
+            &surface_view,
+        );
 
         self.queue.submit(iter::once(encoder.finish()));
         output.present();

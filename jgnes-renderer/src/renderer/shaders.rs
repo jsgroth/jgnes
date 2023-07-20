@@ -486,10 +486,10 @@ fn create_blur_compute_pipeline(
 }
 
 pub struct RenderPipelineState {
-    pub bind_group_layout: wgpu::BindGroupLayout,
-    pub bind_group: wgpu::BindGroup,
-    pub pipeline_layout: wgpu::PipelineLayout,
-    pub pipeline: wgpu::RenderPipeline,
+    bind_group_layout: wgpu::BindGroupLayout,
+    bind_group: wgpu::BindGroup,
+    pipeline_layout: wgpu::PipelineLayout,
+    pipeline: wgpu::RenderPipeline,
 }
 
 impl RenderPipelineState {
@@ -549,6 +549,33 @@ impl RenderPipelineState {
     ) {
         self.pipeline =
             create_render_pipeline(shader, device, &self.pipeline_layout, surface_format);
+    }
+
+    pub fn draw(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        vertex_buffer: &wgpu::Buffer,
+        num_vertices: u32,
+        output_view: &wgpu::TextureView,
+    ) {
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("render_pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: output_view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                    store: true,
+                },
+            })],
+            depth_stencil_attachment: None,
+        });
+
+        render_pass.set_pipeline(&self.pipeline);
+        render_pass.set_bind_group(0, &self.bind_group, &[]);
+        render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
+
+        render_pass.draw(0..num_vertices, 0..1);
     }
 }
 

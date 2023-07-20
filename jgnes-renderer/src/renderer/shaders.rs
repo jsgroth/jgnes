@@ -653,7 +653,7 @@ fn create_render_pipeline(
     render_pipeline_layout: &wgpu::PipelineLayout,
     surface_format: wgpu::TextureFormat,
 ) -> wgpu::RenderPipeline {
-    let shader_module = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
+    let shader_module = device.create_shader_module(wgpu::include_wgsl!("render.wgsl"));
 
     let fs_main = match scanlines {
         Scanlines::None => "basic_fs",

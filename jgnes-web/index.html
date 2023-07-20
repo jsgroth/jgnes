@@ -156,7 +156,7 @@
                         <input type="radio" id="scanlines-none" name="scanlines" value="None" checked>
                         <label for="scanlines-none">None</label>
 
-                        <input type="radio" id="scanlines-dim" name="shader" value="Dim">
+                        <input type="radio" id="scanlines-dim" name="scanlines" value="Dim">
                         <label for="scanlines-dim">Dim</label>
 
                         <input type="radio" id="scanlines-black" name="scanlines" value="Black">
@@ -249,9 +249,9 @@
                 });
             });
 
-            document.querySelectorAll("input[name='shader']").forEach((element) => {
+            document.querySelectorAll("input[name='scanlines']").forEach((element) => {
                 element.addEventListener("click", (event) => {
-                    config.set_shader(event.target.value);
+                    config.set_scanlines(event.target.value);
                 });
             });
 

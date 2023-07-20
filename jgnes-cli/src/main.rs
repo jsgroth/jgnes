@@ -6,8 +6,7 @@ use jgnes_native_driver::{
 };
 use jgnes_proc_macros::{EnumDisplay, EnumFromStr};
 use jgnes_renderer::config::{
-    AspectRatio, GpuFilterMode, Overscan, PrescalingMode, RenderScale, Scanlines, Shader,
-    VSyncMode, WgpuBackend,
+    AspectRatio, GpuFilterMode, Overscan, RenderScale, Scanlines, Shader, VSyncMode, WgpuBackend,
 };
 use std::time::Duration;
 
@@ -74,10 +73,6 @@ struct CliArgs {
     /// Gaussian blur radius for Gaussian blur shader
     #[arg(long, default_value_t = 16)]
     blur_radius: u32,
-
-    /// Prescaling mode (Gpu / Cpu)
-    #[arg(long, default_value_t)]
-    prescaling_mode: PrescalingMode,
 
     /// Scanlines setting (None / Black / Dim)
     #[arg(long, default_value_t)]
@@ -165,7 +160,7 @@ impl CliArgs {
     fn shader(&self) -> Shader {
         match self.shader_type {
             ShaderType::None => Shader::None,
-            ShaderType::Prescale => Shader::Prescale(self.prescaling_mode, self.render_scale()),
+            ShaderType::Prescale => Shader::Prescale(self.render_scale()),
             ShaderType::GaussianBlur => Shader::GaussianBlur {
                 prescale_factor: self.render_scale(),
                 stdev: self.blur_stdev(),

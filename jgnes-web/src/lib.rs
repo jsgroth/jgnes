@@ -15,7 +15,7 @@ use jgnes_core::{
     JoypadState, Renderer, SaveWriter, TickEffect, TimingMode,
 };
 use jgnes_proc_macros::EnumDisplay;
-use jgnes_renderer::config::{RendererConfig, VSyncMode, WgpuBackend};
+use jgnes_renderer::config::{RendererConfig, Shader, VSyncMode, WgpuBackend};
 use jgnes_renderer::WgpuRenderer;
 use js_sys::Promise;
 use rfd::AsyncFileDialog;
@@ -348,7 +348,7 @@ fn new_renderer_config(fields: &ConfigFields) -> RendererConfig {
         vsync_mode: VSyncMode::Enabled,
         wgpu_backend,
         gpu_filter_mode: fields.gpu_filter_mode,
-        shader: fields.get_shader(),
+        shader: Shader::Prescale(fields.render_scale),
         scanlines: fields.scanlines,
         aspect_ratio: fields.aspect_ratio,
         overscan: fields.overscan,

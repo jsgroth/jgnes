@@ -135,33 +135,15 @@ impl GpuFilterMode {
     }
 }
 
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, EnumDisplay, EnumFromStr,
-)]
-pub enum PrescalingMode {
-    #[default]
-    Gpu,
-    Cpu,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum Shader {
     None,
-    Prescale(PrescalingMode, RenderScale),
+    Prescale(RenderScale),
     GaussianBlur {
         prescale_factor: RenderScale,
         stdev: f64,
         radius: u32,
     },
-}
-
-impl Shader {
-    pub(crate) fn cpu_render_scale(self) -> u32 {
-        match self {
-            Self::Prescale(PrescalingMode::Cpu, render_scale) => render_scale.get(),
-            _ => 1,
-        }
-    }
 }
 
 impl Default for Shader {
@@ -174,8 +156,8 @@ impl Display for Shader {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::None => write!(f, "None"),
-            Self::Prescale(prescaling_mode, render_scale) => {
-                write!(f, "Prescale {prescaling_mode} {render_scale}")
+            Self::Prescale(render_scale) => {
+                write!(f, "Prescale {render_scale}")
             }
             Self::GaussianBlur {
                 prescale_factor,

@@ -1,7 +1,5 @@
 use crate::{js, NesButton};
-use jgnes_renderer::config::{
-    AspectRatio, GpuFilterMode, Overscan, PrescalingMode, RenderScale, Scanlines, Shader,
-};
+use jgnes_renderer::config::{AspectRatio, GpuFilterMode, Overscan, RenderScale, Scanlines};
 use serde::{Deserialize, Serialize};
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -42,16 +40,6 @@ pub(crate) struct ConfigFields {
 
 impl ConfigFields {
     const LOCAL_STORAGE_KEY: &'static str = "__config";
-
-    #[cfg(feature = "webgl")]
-    pub(crate) fn get_shader(&self) -> Shader {
-        Shader::Prescale(PrescalingMode::Cpu, self.render_scale)
-    }
-
-    #[cfg(not(feature = "webgl"))]
-    pub(crate) fn get_shader(&self) -> Shader {
-        Shader::Prescale(PrescalingMode::Cpu, self.render_scale)
-    }
 
     fn save(&self) {
         save_to_local_storage(Self::LOCAL_STORAGE_KEY, self);

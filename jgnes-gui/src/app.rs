@@ -14,8 +14,7 @@ use jgnes_native_driver::{
     JgnesNativeConfig, JgnesSharedConfig, JoystickInput, KeyboardInput, NativeRenderer,
 };
 use jgnes_renderer::config::{
-    AspectRatio, GpuFilterMode, Overscan, PrescalingMode, RenderScale, Scanlines, Shader,
-    VSyncMode, WgpuBackend,
+    AspectRatio, GpuFilterMode, Overscan, RenderScale, Scanlines, Shader, VSyncMode, WgpuBackend,
 };
 use rfd::FileDialog;
 use serde::{Deserialize, Serialize};
@@ -124,7 +123,7 @@ impl AppConfig {
     fn to_jgnes_dynamic_config(&self) -> JgnesDynamicConfig {
         let shader = match self.shader_type {
             ShaderType::None => Shader::None,
-            ShaderType::Prescale => Shader::Prescale(PrescalingMode::Gpu, self.render_scale),
+            ShaderType::Prescale => Shader::Prescale(self.render_scale),
             ShaderType::GaussianBlur => Shader::GaussianBlur {
                 prescale_factor: self.render_scale,
                 stdev: self.blur_stdev,

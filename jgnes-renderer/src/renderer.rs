@@ -4,7 +4,7 @@
 mod shaders;
 
 use crate::config::{FrameSkip, GpuFilterMode, RendererConfig, Scanlines, VSyncMode, WgpuBackend};
-use crate::renderer::shaders::{ComputePipelineState, RenderPipelineState};
+use crate::renderer::shaders::{FragmentGlobals, RenderPipelineState};
 use crate::{colors, DisplayArea};
 use jgnes_core::{ColorEmphasis, FrameBuffer, Renderer, TimingMode};
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
@@ -59,39 +59,6 @@ impl Vertex2d {
     }
 }
 
-const FS_GLOBALS_PADDING: usize = 12;
-
-#[repr(C)]
-#[derive(Debug, Clone, Copy, Default, bytemuck::Pod, bytemuck::Zeroable)]
-struct FragmentGlobals {
-    viewport_x: u32,
-    viewport_y: u32,
-    viewport_width: u32,
-    viewport_height: u32,
-    nes_visible_height: u32,
-    // WebGL requires types to be a multiple of 16 bytes
-    padding: [u8; FS_GLOBALS_PADDING],
-}
-
-impl FragmentGlobals {
-    const SIZE: usize = 32;
-
-    fn new(display_area: DisplayArea, timing_mode: TimingMode) -> Self {
-        Self {
-            viewport_x: display_area.x,
-            viewport_y: display_area.y,
-            viewport_width: display_area.width,
-            viewport_height: display_area.height,
-            nes_visible_height: timing_mode.visible_screen_height().into(),
-            padding: [0; FS_GLOBALS_PADDING],
-        }
-    }
-
-    fn to_bytes(self) -> [u8; Self::SIZE] {
-        bytemuck::cast(self)
-    }
-}
-
 #[derive(Debug, Error)]
 pub enum WgpuRendererError {
     #[error("Error creating wgpu surface: {source}")]
@@ -132,7 +99,6 @@ pub struct WgpuRenderer<W> {
     surface_config: wgpu::SurfaceConfiguration,
     texture: wgpu::Texture,
     texture_format: wgpu::TextureFormat,
-    compute_pipeline_state: ComputePipelineState,
     render_pipeline_state: RenderPipelineState,
     vertices: Vec<Vertex2d>,
     vertex_buffer: wgpu::Buffer,
@@ -248,8 +214,6 @@ where
         };
 
         let texture = create_texture(&device, texture_format, timing_mode);
-        let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-
         let sampler = create_sampler(&device, render_config.gpu_filter_mode);
 
         let display_area = crate::determine_display_area(
@@ -275,13 +239,9 @@ where
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
-        let compute_pipeline_state =
-            ComputePipelineState::create(render_config.shader, timing_mode, &device, &texture_view);
-
-        let render_bind_texture = compute_pipeline_state.get_render_texture(&texture);
         let render_pipeline_state = RenderPipelineState::create(
             &device,
-            render_bind_texture,
+            &texture,
             &sampler,
             &fs_globals_buffer,
             surface_format,
@@ -300,7 +260,6 @@ where
             surface_config,
             texture,
             texture_format,
-            compute_pipeline_state,
             render_pipeline_state,
             vertices,
             vertex_buffer,
@@ -393,7 +352,6 @@ where
     fn reinit_textures(&mut self) {
         let sampler = create_sampler(&self.device, self.render_config.gpu_filter_mode);
 
-        let shader = self.render_config.shader;
         self.texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("texture"),
             size: wgpu::Extent3d {
@@ -409,19 +367,9 @@ where
             view_formats: &[],
         });
 
-        let texture_view = self
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
-
-        self.compute_pipeline_state =
-            ComputePipelineState::create(shader, self.timing_mode, &self.device, &texture_view);
-
-        let render_texture_view = self
-            .compute_pipeline_state
-            .get_render_texture(&self.texture);
         self.render_pipeline_state = RenderPipelineState::create(
             &self.device,
-            render_texture_view,
+            &self.texture,
             &sampler,
             &self.fs_globals_buffer,
             self.surface_config.format,
@@ -603,8 +551,6 @@ impl<W: HasRawDisplayHandle + HasRawWindowHandle> Renderer for WgpuRenderer<W> {
                 label: Some("command_encoder"),
             });
 
-        self.compute_pipeline_state.dispatch(&mut encoder);
-
         self.render_pipeline_state.draw(
             &mut encoder,
             &self.vertex_buffer,
@@ -627,17 +573,5 @@ impl<W: HasRawDisplayHandle + HasRawWindowHandle> Renderer for WgpuRenderer<W> {
         self.reconfigure_surface();
 
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn validate_fragment_globals_size() {
-        let _: [u8; FragmentGlobals::SIZE] = FragmentGlobals::default().to_bytes();
-
-        assert_eq!(FragmentGlobals::SIZE % 16, 0);
     }
 }

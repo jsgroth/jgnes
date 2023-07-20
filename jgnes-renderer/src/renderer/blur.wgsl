@@ -8,12 +8,23 @@ struct BlurGlobals {
 @group(0) @binding(0)
 var texture_in: texture_2d<f32>;
 @group(0) @binding(1)
-var texture_out: texture_storage_2d<rgba8unorm, write>;
-
-@group(1) @binding(0)
 var<uniform> globals: BlurGlobals;
-@group(1) @binding(1)
+@group(0) @binding(2)
 var<storage, read> weights: array<f32>;
+
+var<private> VERTICES: array<vec4f, 6> = array<vec4f, 6>(
+    vec4f(-1.0, 1.0, 0.0, 1.0),
+    vec4f(-1.0, -1.0, 0.0, 1.0),
+    vec4f(1.0, -1.0, 0.0, 1.0),
+    vec4f(1.0, -1.0, 0.0, 1.0),
+    vec4f(1.0, 1.0, 0.0, 1.0),
+    vec4f(-1.0, 1.0, 0.0, 1.0),
+);
+
+@vertex
+fn vs_main(@builtin(vertex_index) vertex_index: u32) -> @builtin(position) vec4f {
+    return VERTICES[vertex_index];
+}
 
 fn blur_tap(position: vec2u, shift: i32) -> vec3f {
     let horizontal = globals.blur_direction == 0u;
@@ -24,11 +35,9 @@ fn blur_tap(position: vec2u, shift: i32) -> vec3f {
     return textureLoad(texture_in, vec2u(clamped), 0).rgb;
 }
 
-@compute @workgroup_size(16, 16, 1)
-fn blur_fs(
-    @builtin(global_invocation_id) global_invocation_id: vec3u,
-) {
-    let position = global_invocation_id.xy;
+@fragment
+fn fs_main(@builtin(position) position: vec4f) -> @location(0) vec4f {
+    let position = vec2u(u32(round(position.x - 0.5)), u32(round(position.y - 0.5)));
     let center = i32(arrayLength(&weights)) / 2;
 
     var color = weights[center] * textureLoad(texture_in, position, 0).rgb;
@@ -38,5 +47,5 @@ fn blur_fs(
         color += weights[center + i] * blur_tap(position, i);
     }
 
-    textureStore(texture_out, position, vec4f(color, 1.0));
+    return vec4f(color, 1.0);
 }

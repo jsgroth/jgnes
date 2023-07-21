@@ -22,6 +22,7 @@ use jgnes_renderer::config::{
 use jgnes_renderer::WgpuRenderer;
 use js_sys::Promise;
 use rfd::AsyncFileDialog;
+use std::array;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -651,8 +652,6 @@ fn run_event_loop(
 }
 
 fn render_white_noise<R: Renderer>(renderer: &mut R) -> Result<(), R::Err> {
-    let frame_buffer = [[(); jgnes_core::SCREEN_WIDTH as usize];
-        jgnes_core::SCREEN_HEIGHT as usize]
-        .map(|arr| arr.map(|_| rand::random::<u8>() % 64));
+    let frame_buffer = array::from_fn(|_| array::from_fn(|_| rand::random::<u8>() % 64));
     renderer.render_frame(&frame_buffer, ColorEmphasis::default())
 }

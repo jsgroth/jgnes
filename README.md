@@ -36,7 +36,7 @@ Implemented:
 * Support for both NTSC and PAL releases
 
 Not Implemented:
-* A handful of unofficial CPU opcodes that are buggy/unstable and do not do anything useful (specifically $93, $9B, $9F, and $BB)
+* A handful of unofficial CPU opcodes that are buggy/unstable and do not do anything useful (specifically $93, $9B, and $9F)
 * Cycle-accurate rendering effects of enabling rendering mid-scanline
 * DMC DMA cycle stealing and dummy reads, an obscure hardware quirk that affects very very few if any games
 * Color palette customization; the NES hardware directly outputs an NTSC video signal rather than RGB pixel grids, so any mapping from NES colors to RGB colors is an approximation at best

@@ -120,7 +120,7 @@ cargo run --release --bin jgnes-gui
 | cpu_timing_test6/cpu_timing_test.nes | ✅ | |
 | instr_test-v5/all_instrs.nes | ✅ | |
 | instr_test-v5/official_only.nes | ✅ | |
-| instr_timing/instr_timing.nes | ❌ | Panic due to unimplemented buggy unofficial opcodes ($93/$9C/$9F/$BB) |
+| instr_timing/instr_timing.nes | ✅ | |
 
 ### APU Test ROMs
 

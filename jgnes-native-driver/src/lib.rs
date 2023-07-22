@@ -611,9 +611,6 @@ where
                     return match err {
                         EmulationError::Render(err) => Err(err.into()),
                         EmulationError::Audio(err) | EmulationError::Save(err) => Err(err),
-                        EmulationError::CpuInvalidOpcode(..) => {
-                            Err(anyhow::Error::msg(err.to_string()))
-                        }
                     };
                 }
             }

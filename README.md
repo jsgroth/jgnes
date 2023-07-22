@@ -36,7 +36,7 @@ Implemented:
 * Support for both NTSC and PAL releases
 
 Not Implemented:
-* Unofficial CPU opcodes
+* A handful of unofficial CPU opcodes that are buggy/unstable and do not do anything useful (specifically $93, $9B, $9F, and $BB)
 * Cycle-accurate rendering effects of enabling rendering mid-scanline
 * DMC DMA cycle stealing and dummy reads, an obscure hardware quirk that affects very very few if any games
 * Color palette customization; the NES hardware directly outputs an NTSC video signal rather than RGB pixel grids, so any mapping from NES colors to RGB colors is an approximation at best
@@ -106,21 +106,21 @@ cargo run --release --bin jgnes-gui
 
 | Test | Result | Failure Reason |
 | --- | --- | --- |
-| blargg_nes_cpu_test5/cpu.nes | ❌ | Panic due to unofficial opcodes |
+| blargg_nes_cpu_test5/cpu.nes | ✅ | |
 | blargg_nes_cpu_test5/official.nes | ✅ | |
 | branch_timing_tests/1.Branch_Basics.nes | ✅ | |
 | branch_timing_tests/2.Backward_Branch.nes | ✅ | |
 | branch_timing_tests/3.Forward_Branch.nes | ✅ | |
 | cpu_dummy_reads/cpu_dummy_reads.nes | ✅ | |
-| cpu_dummy_writes/cpu_dummy_writes_oam.nes | ❌ | Panic due to unofficial opcodes |
-| cpu_dummy_writes/cpu_dummy_writes_ppumem.nes | ❌ | Panic due to unofficial opcodes |
+| cpu_dummy_writes/cpu_dummy_writes_oam.nes | ✅ | |
+| cpu_dummy_writes/cpu_dummy_writes_ppumem.nes | ✅ | |
 | cpu_exec_space/test_cpu_exec_space_apu.nes | ✅ | |
 | cpu_exec_space/test_cpu_exec_space_ppuio.nes | ✅ | |
 | cpu_interrupts_v2/cpu_interrupts.nes | ✅ | |
 | cpu_timing_test6/cpu_timing_test.nes | ✅ | |
-| instr_test-v5/all_instrs.nes | ❌ | Panic due to unofficial opcodes |
+| instr_test-v5/all_instrs.nes | ✅ | |
 | instr_test-v5/official_only.nes | ✅ | |
-| instr_timing/instr_timing.nes | ❌ | Panic due to unofficial opcodes |
+| instr_timing/instr_timing.nes | ❌ | Panic due to unimplemented buggy unofficial opcodes ($93/$9C/$9F/$BB) |
 
 ### APU Test ROMs
 

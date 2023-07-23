@@ -14,7 +14,7 @@ use jgnes_native_driver::{
     JgnesNativeConfig, JgnesSharedConfig, JoystickInput, KeyboardInput, NativeRenderer,
 };
 use jgnes_renderer::config::{
-    AspectRatio, GpuFilterMode, Overscan, PrescalingMode, RenderScale, VSyncMode, WgpuBackend,
+    AspectRatio, GpuFilterMode, Overscan, RenderScale, Scanlines, Shader, VSyncMode, WgpuBackend,
 };
 use rfd::FileDialog;
 use serde::{Deserialize, Serialize};
@@ -39,6 +39,14 @@ fn default_gpu_filter_mode() -> GpuFilterMode {
     GpuFilterMode::LinearInterpolation
 }
 
+fn default_blur_stdev() -> f64 {
+    1.5
+}
+
+fn default_blur_radius() -> u32 {
+    16
+}
+
 fn default_ff_multiplier() -> u8 {
     2
 }
@@ -51,7 +59,15 @@ fn true_fn() -> bool {
     true
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+enum ShaderType {
+    None,
+    #[default]
+    Prescale,
+    GaussianBlur,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct AppConfig {
     #[serde(default = "default_window_width")]
     window_width: u32,
@@ -64,7 +80,15 @@ struct AppConfig {
     #[serde(default = "default_gpu_filter_mode")]
     gpu_filter_mode: GpuFilterMode,
     #[serde(default)]
+    shader_type: ShaderType,
+    #[serde(default)]
     render_scale: RenderScale,
+    #[serde(default = "default_blur_stdev")]
+    blur_stdev: f64,
+    #[serde(default = "default_blur_radius")]
+    blur_radius: u32,
+    #[serde(default)]
+    scanlines: Scanlines,
     #[serde(default)]
     aspect_ratio: AspectRatio,
     #[serde(default)]
@@ -89,6 +113,7 @@ struct AppConfig {
     fast_forward_multiplier: u8,
     #[serde(default = "default_rewind_buffer_len_secs")]
     rewind_buffer_len_secs: u64,
+    #[serde(default)]
     rom_search_dir: Option<String>,
     #[serde(default)]
     input: InputConfig,
@@ -96,9 +121,20 @@ struct AppConfig {
 
 impl AppConfig {
     fn to_jgnes_dynamic_config(&self) -> JgnesDynamicConfig {
+        let shader = match self.shader_type {
+            ShaderType::None => Shader::None,
+            ShaderType::Prescale => Shader::Prescale(self.render_scale),
+            ShaderType::GaussianBlur => Shader::GaussianBlur {
+                prescale_factor: self.render_scale,
+                stdev: self.blur_stdev,
+                radius: self.blur_radius,
+            },
+        };
+
         JgnesDynamicConfig {
             gpu_filter_mode: self.gpu_filter_mode,
-            prescaling_mode: PrescalingMode::Gpu(self.render_scale),
+            shader,
+            scanlines: self.scanlines,
             aspect_ratio: self.aspect_ratio,
             overscan: self.overscan,
             forced_integer_height_scaling: self.forced_integer_height_scaling,
@@ -403,13 +439,21 @@ enum InputReceiveResult {
     NotReceived,
 }
 
-struct AppState {
+struct ShaderState {
     render_scale_text: String,
     render_scale_invalid: bool,
+    blur_stdev_text: String,
+    blur_stdev_invalid: bool,
+    blur_radius_text: String,
+    blur_radius_invalid: bool,
+}
+
+struct AppState {
     window_width_text: String,
     window_width_invalid: bool,
     window_height_text: String,
     window_height_invalid: bool,
+    shader: ShaderState,
     overscan: OverscanState,
     input: InputState,
     rom_list: Vec<RomMetadata>,
@@ -430,6 +474,14 @@ impl AppState {
         let emulation_error = Arc::new(Mutex::new(None));
         let (thread_task_sender, thread_input_receiver) =
             emuthread::start(Arc::clone(&is_running), Arc::clone(&emulation_error));
+        let shader_state = ShaderState {
+            render_scale_text: config.render_scale.get().to_string(),
+            render_scale_invalid: false,
+            blur_stdev_text: config.blur_stdev.to_string(),
+            blur_stdev_invalid: false,
+            blur_radius_text: config.blur_radius.to_string(),
+            blur_radius_invalid: false,
+        };
         let overscan_state = OverscanState {
             top_text: config.overscan.top.to_string(),
             top_invalid: false,
@@ -449,12 +501,11 @@ impl AppState {
             rewind_buffer_len_invalid: false,
         };
         Self {
-            render_scale_text: config.render_scale.get().to_string(),
-            render_scale_invalid: false,
             window_width_text: config.window_width.to_string(),
             window_width_invalid: false,
             window_height_text: config.window_height.to_string(),
             window_height_invalid: false,
+            shader: shader_state,
             overscan: overscan_state,
             input: input_state,
             rom_list: Vec::new(),
@@ -915,26 +966,89 @@ impl App {
                     });
                 });
 
-                ui.horizontal(|ui| {
+                ui.group(|ui| {
                     ui.set_enabled(self.config.renderer == NativeRenderer::Wgpu);
 
-                    if !TextEdit::singleline(&mut self.state.render_scale_text).desired_width(30.0).ui(ui).has_focus() {
-                        match RenderScale::try_from(self.state.render_scale_text.parse::<u32>().unwrap_or(0)) {
+                    let disabled_hover_text = "Shaders are not supported with SDL2 renderer";
+                    ui.label("Shader").on_disabled_hover_text(disabled_hover_text);
+                    ui.horizontal(|ui| {
+                        ui.radio_value(&mut self.config.shader_type, ShaderType::None, "None").on_disabled_hover_text(disabled_hover_text);
+                        ui.radio_value(&mut self.config.shader_type, ShaderType::Prescale, "Prescale").on_disabled_hover_text(disabled_hover_text);
+                        ui.radio_value(&mut self.config.shader_type, ShaderType::GaussianBlur, "Gaussian blur").on_disabled_hover_text(disabled_hover_text);
+                    });
+                });
+
+                ui.horizontal(|ui| {
+                    ui.set_enabled(self.config.renderer == NativeRenderer::Wgpu && [ShaderType::Prescale, ShaderType::GaussianBlur].contains(&self.config.shader_type));
+
+                    if !TextEdit::singleline(&mut self.state.shader.render_scale_text).desired_width(30.0).ui(ui).has_focus() {
+                        match RenderScale::try_from(self.state.shader.render_scale_text.parse::<u32>().unwrap_or(0)) {
                             Ok(render_scale) => {
-                                self.state.render_scale_invalid = false;
+                                self.state.shader.render_scale_invalid = false;
                                 self.config.render_scale = render_scale;
                             }
                             Err(_) => {
-                                self.state.render_scale_invalid = true;
+                                self.state.shader.render_scale_invalid = true;
                             }
                         }
                     }
-                    ui.label("Image prescale factor")
-                        .on_hover_text("The image will be integer upscaled from 256x224 by this factor before filtering");
+                    ui.label("Prescale factor")
+                        .on_hover_text("The image will be integer upscaled by this factor before filtering");
+
+                    ui.set_enabled(self.config.shader_type == ShaderType::GaussianBlur);
+
+                    if !TextEdit::singleline(&mut self.state.shader.blur_stdev_text).desired_width(30.0).ui(ui).has_focus() {
+                        match self.state.shader.blur_stdev_text.parse::<f64>() {
+                            Ok(blur_stdev) if !blur_stdev.is_nan() && !blur_stdev.is_sign_negative() => {
+                                self.state.shader.blur_stdev_invalid = false;
+                                self.config.blur_stdev = blur_stdev;
+                            }
+                            _ => {
+                                self.state.shader.blur_stdev_invalid = true;
+                            }
+                        }
+                    }
+                    ui.label("Blur stdev");
+
+                    NumericTextInput::new(
+                        &mut self.state.shader.blur_radius_text,
+                        &mut self.config.blur_radius,
+                        &mut self.state.shader.blur_radius_invalid,
+                        1..=u32::MAX,
+                    )
+                        .desired_width(30.0)
+                        .ui(ui);
+                    ui.label("Blur radius");
                 });
-                if self.state.render_scale_invalid {
+
+                if self.state.shader.render_scale_invalid {
                     ui.colored_label(Color32::RED, "Scaling factor must be an integer between 1 and 16");
                 }
+                if self.state.shader.blur_stdev_invalid {
+                    ui.colored_label(Color32::RED, "Blur stdev must be a floating point number that is not negative or NaN");
+                }
+                if self.state.shader.blur_radius_invalid {
+                    ui.colored_label(Color32::RED, "Blur radius must be a non-negative integer");
+                }
+
+                ui.group(|ui| {
+                    ui.set_enabled(self.config.renderer == NativeRenderer::Wgpu);
+
+                    let scanlines_hover_text = "Works best with integer height scaling";
+                    let disabled_hover_text = "Scanlines are not supported with SDL2 renderer";
+
+                    ui.label("Scanlines").on_disabled_hover_text(disabled_hover_text);
+                    ui.horizontal(|ui| {
+                        ui.radio_value(&mut self.config.scanlines, Scanlines::None, "None")
+                            .on_disabled_hover_text(disabled_hover_text);
+                        ui.radio_value(&mut self.config.scanlines, Scanlines::Dim, "Dim")
+                            .on_hover_text(scanlines_hover_text)
+                            .on_disabled_hover_text(disabled_hover_text);
+                        ui.radio_value(&mut self.config.scanlines, Scanlines::Black, "Black")
+                            .on_hover_text(scanlines_hover_text)
+                            .on_disabled_hover_text(disabled_hover_text);
+                    });
+                });
 
                 ui.group(|ui| {
                     ui.label("Aspect ratio");

@@ -151,6 +151,18 @@
                         <label for="prescale-3x">3x</label>
                     </fieldset>
                     <fieldset>
+                        <legend>Scanlines</legend>
+
+                        <input type="radio" id="scanlines-none" name="scanlines" value="None" checked>
+                        <label for="scanlines-none">None</label>
+
+                        <input type="radio" id="scanlines-dim" name="scanlines" value="Dim">
+                        <label for="scanlines-dim">Dim</label>
+
+                        <input type="radio" id="scanlines-black" name="scanlines" value="Black">
+                        <label for="scanlines-black">Black</label>
+                    </fieldset>
+                    <fieldset>
                         <legend>Overscan</legend>
 
                         <input type="checkbox" id="overscan-left" name="overscan-left">
@@ -178,7 +190,10 @@
                         <label for="silence-triangle-ultrasonic">Silence ultrasonic triangle channel output (reduce pops)</label>
                     </fieldset>
                     <fieldset>
-                        <legend>Enhancements</legend>
+                        <legend>Other</legend>
+
+                        <input type="checkbox" id="force-integer-scaling" name="force-integer-scaling">
+                        <label for="force-integer-scaling">Force integer height scaling (for fullscreen)</label>
 
                         <input type="checkbox" id="sprite-limit-disabled" name="sprite-limit-disabled">
                         <label for="sprite-limit-disabled">Eliminate sprite flickering (can cause bugs)</label>
@@ -234,6 +249,12 @@
                 });
             });
 
+            document.querySelectorAll("input[name='scanlines']").forEach((element) => {
+                element.addEventListener("click", (event) => {
+                    config.set_scanlines(event.target.value);
+                });
+            });
+
             function initCheckboxElement(id, setter) {
                 let element = document.getElementById(id);
                 element.addEventListener("click", (event) => {
@@ -253,6 +274,7 @@
                 (value) => config.set_silence_ultrasonic_triangle_output(value),
             );
 
+            initCheckboxElement("force-integer-scaling", (value) => config.set_force_integer_scaling(value));
             initCheckboxElement("sprite-limit-disabled", (value) => config.set_remove_sprite_limit(value));
 
             document.querySelectorAll("input.input-config").forEach((element) => {

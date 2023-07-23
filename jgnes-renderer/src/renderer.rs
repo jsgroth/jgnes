@@ -1,10 +1,11 @@
 // The generated Copy impl for Vertex2d violates this rule for some reason
 #![allow(clippy::let_underscore_untyped)]
 
-use crate::colors;
-use crate::config::{
-    AspectRatio, FrameSkip, GpuFilterMode, Overscan, PrescalingMode, RendererConfig, VSyncMode,
-};
+mod shaders;
+
+use crate::config::{FrameSkip, GpuFilterMode, RendererConfig, Scanlines, VSyncMode, WgpuBackend};
+use crate::renderer::shaders::{FragmentGlobals, RenderPipelineState};
+use crate::{colors, DisplayArea};
 use jgnes_core::{ColorEmphasis, FrameBuffer, Renderer, TimingMode};
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 use std::{iter, mem};
@@ -91,25 +92,24 @@ pub struct WgpuRenderer<W> {
     render_config: RendererConfig,
     timing_mode: TimingMode,
     output_buffer: Vec<u8>,
-    cpu_scale_output_buffer: Vec<u8>,
     device: wgpu::Device,
     queue: wgpu::Queue,
     surface: wgpu::Surface,
     surface_capabilities: wgpu::SurfaceCapabilities,
     surface_config: wgpu::SurfaceConfiguration,
-    texture_format: wgpu::TextureFormat,
     texture: wgpu::Texture,
-    compute_resources: Option<(wgpu::BindGroup, wgpu::ComputePipeline)>,
-    render_bind_group: wgpu::BindGroup,
-    render_bind_group_layout: wgpu::BindGroupLayout,
-    render_pipeline: wgpu::RenderPipeline,
+    texture_format: wgpu::TextureFormat,
+    render_pipeline_state: RenderPipelineState,
     vertices: Vec<Vertex2d>,
     vertex_buffer: wgpu::Buffer,
+    fs_globals: FragmentGlobals,
+    fs_globals_buffer: wgpu::Buffer,
+    frame_skip: FrameSkip,
+    total_frames: u64,
     // SAFETY: The window must be declared after the surface so that it is not dropped before the
     // surface is dropped
     window: W,
     window_size_fn: WindowSizeFn<W>,
-    total_frames: u64,
 }
 
 impl<W> WgpuRenderer<W>
@@ -130,10 +130,6 @@ where
         let timing_mode = TimingMode::Ntsc;
 
         let output_buffer = vec![0; output_buffer_len(timing_mode)];
-
-        let cpu_render_scale = render_config.prescaling_mode.cpu_render_scale() as usize;
-        let cpu_scale_output_buffer =
-            vec![0; output_buffer.len() * cpu_render_scale * cpu_render_scale];
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: render_config.wgpu_backend.to_wgpu_backends(),
@@ -217,133 +213,62 @@ where
             wgpu::TextureFormat::Rgba8Unorm
         };
 
-        let cpu_render_scale = render_config.prescaling_mode.cpu_render_scale();
-        let texture = create_texture(&device, texture_format, cpu_render_scale, timing_mode);
-        let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-
-        let gpu_render_scale = render_config.prescaling_mode.gpu_render_scale();
-        let scaled_texture = create_scaled_texture(&device, gpu_render_scale, timing_mode);
-        let scaled_texture_view =
-            scaled_texture.create_view(&wgpu::TextureViewDescriptor::default());
-
+        let texture = create_texture(&device, texture_format, timing_mode);
         let sampler = create_sampler(&device, render_config.gpu_filter_mode);
 
-        let vertices = compute_vertices(window_width, window_height, &render_config, timing_mode);
+        let display_area = crate::determine_display_area(
+            window_width,
+            window_height,
+            render_config.aspect_ratio,
+            render_config.forced_integer_height_scaling,
+            timing_mode,
+        );
+
+        let vertices = compute_vertices(window_width, window_height, display_area);
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("vertex_buffer"),
             contents: bytemuck::cast_slice(&vertices),
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         });
 
-        let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
-
-        // Compute pipeline is for texture scaling and is only needed if render scale is higher than 1
-        let compute_resources = create_compute_resources(
-            &device,
-            &scaled_texture,
-            &texture_view,
-            &scaled_texture_view,
-            gpu_render_scale,
-        );
-
-        let render_bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some("render_bind_group_layout"),
-                entries: &[
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Texture {
-                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                            view_dimension: wgpu::TextureViewDimension::D2,
-                            multisampled: false,
-                        },
-                        count: None,
-                    },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                        count: None,
-                    },
-                ],
-            });
-        // Ignore the scaled texture if render scale is 1
-        let render_bind_texture = if gpu_render_scale > 1 {
-            &scaled_texture_view
-        } else {
-            &texture_view
-        };
-        let render_bind_group = create_render_bind_group(
-            &device,
-            &render_bind_group_layout,
-            render_bind_texture,
-            &sampler,
-        );
-
-        let render_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("render_pipeline_layout"),
-                bind_group_layouts: &[&render_bind_group_layout],
-                push_constant_ranges: &[],
-            });
-
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("render_pipeline"),
-            layout: Some(&render_pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: "vs_main",
-                buffers: &[Vertex2d::descriptor()],
-            },
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: None,
-                unclipped_depth: false,
-                polygon_mode: wgpu::PolygonMode::Fill,
-                conservative: false,
-            },
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState {
-                count: 1,
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: "fs_main",
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: surface_config.format,
-                    blend: Some(wgpu::BlendState::REPLACE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            multiview: None,
+        let fs_globals = FragmentGlobals::new(display_area, timing_mode);
+        let fs_globals_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("fs_globals_buffer"),
+            size: FragmentGlobals::SIZE as u64,
+            mapped_at_creation: false,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
+
+        let render_pipeline_state = RenderPipelineState::create(
+            &device,
+            &texture,
+            &sampler,
+            &fs_globals_buffer,
+            surface_format,
+            render_config.shader,
+            render_config.scanlines,
+        );
 
         Ok(Self {
             render_config,
             timing_mode,
             output_buffer,
-            cpu_scale_output_buffer,
             device,
             queue,
             surface,
             surface_capabilities,
             surface_config,
-            texture_format,
             texture,
-            compute_resources,
-            render_bind_group,
-            render_bind_group_layout,
-            render_pipeline,
+            texture_format,
+            render_pipeline_state,
             vertices,
             vertex_buffer,
+            fs_globals,
+            fs_globals_buffer,
+            frame_skip: FrameSkip::ZERO,
+            total_frames: 0,
             window,
             window_size_fn,
-            total_frames: 0,
         })
     }
 
@@ -355,6 +280,10 @@ where
         &mut self.window
     }
 
+    pub fn wgpu_backend(&self) -> WgpuBackend {
+        self.render_config.wgpu_backend
+    }
+
     pub fn reconfigure_surface(&mut self) {
         let (window_width, window_height) = (self.window_size_fn)(&self.window);
         self.surface_config.width = window_width;
@@ -362,143 +291,94 @@ where
 
         self.surface.configure(&self.device, &self.surface_config);
 
-        self.vertices = compute_vertices(
+        let display_area = crate::determine_display_area(
             window_width,
             window_height,
-            &self.render_config,
+            self.render_config.aspect_ratio,
+            self.render_config.forced_integer_height_scaling,
             self.timing_mode,
         );
+
+        self.vertices = compute_vertices(window_width, window_height, display_area);
+        self.fs_globals = FragmentGlobals::new(display_area, self.timing_mode);
     }
 
-    pub fn update_aspect_ratio(&mut self, aspect_ratio: AspectRatio) {
-        if aspect_ratio != self.render_config.aspect_ratio {
-            self.render_config.aspect_ratio = aspect_ratio;
+    /// Update the rendering config. The `wgpu_backend` and `use_webgl2_limits` fields in the input
+    /// config will be ignored, but all other fields will be updated and immediately applied.
+    ///
+    /// # Errors
+    ///
+    /// This method will return an error if VSync mode is updated and the driver/configuration does
+    /// not support the new VSync mode.
+    pub fn update_render_config(
+        &mut self,
+        render_config: RendererConfig,
+    ) -> Result<(), WgpuRendererError> {
+        let new_config = RendererConfig {
+            wgpu_backend: self.render_config.wgpu_backend,
+            use_webgl2_limits: self.render_config.use_webgl2_limits,
+            ..render_config
+        };
+
+        if new_config != self.render_config {
+            self.update_vsync_mode(new_config.vsync_mode)?;
+            self.update_scanlines(new_config.scanlines);
+
+            self.render_config = new_config;
+
+            self.reinit_textures();
             self.reconfigure_surface();
         }
+
+        Ok(())
     }
 
-    pub fn update_filter_mode(&mut self, filter_mode: GpuFilterMode) {
-        if filter_mode != self.render_config.gpu_filter_mode {
-            self.render_config.gpu_filter_mode = filter_mode;
-            self.reinit_textures();
-        }
+    pub fn update_frame_skip(&mut self, frame_skip: FrameSkip) {
+        self.frame_skip = frame_skip;
     }
 
-    pub fn update_prescaling_mode(&mut self, prescaling_mode: PrescalingMode) {
-        if prescaling_mode != self.render_config.prescaling_mode {
-            self.render_config.prescaling_mode = prescaling_mode;
-            self.reinit_textures();
+    fn update_scanlines(&mut self, scanlines: Scanlines) {
+        if scanlines != self.render_config.scanlines {
+            self.render_config.scanlines = scanlines;
+
+            self.render_pipeline_state.recreate_render_pipeline(
+                &self.device,
+                scanlines,
+                self.surface_config.format,
+            );
         }
     }
 
     fn reinit_textures(&mut self) {
         let sampler = create_sampler(&self.device, self.render_config.gpu_filter_mode);
 
-        let prescaling_mode = self.render_config.prescaling_mode;
-        match prescaling_mode {
-            PrescalingMode::Cpu(render_scale) => {
-                let render_scale = render_scale.get() as usize;
-                self.cpu_scale_output_buffer =
-                    vec![0; self.output_buffer.len() * render_scale * render_scale];
+        self.texture = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("texture"),
+            size: wgpu::Extent3d {
+                width: u32::from(jgnes_core::SCREEN_WIDTH),
+                height: u32::from(self.timing_mode.visible_screen_height()),
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: self.texture_format,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
 
-                self.texture = self.device.create_texture(&wgpu::TextureDescriptor {
-                    label: Some("texture"),
-                    size: wgpu::Extent3d {
-                        width: render_scale as u32 * u32::from(jgnes_core::SCREEN_WIDTH),
-                        height: render_scale as u32
-                            * u32::from(self.timing_mode.visible_screen_height()),
-                        depth_or_array_layers: 1,
-                    },
-                    mip_level_count: 1,
-                    sample_count: 1,
-                    dimension: wgpu::TextureDimension::D2,
-                    format: self.texture_format,
-                    usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-                    view_formats: &[],
-                });
-
-                let texture_view = self
-                    .texture
-                    .create_view(&wgpu::TextureViewDescriptor::default());
-
-                self.render_bind_group = create_render_bind_group(
-                    &self.device,
-                    &self.render_bind_group_layout,
-                    &texture_view,
-                    &sampler,
-                );
-            }
-            PrescalingMode::Gpu(render_scale) => {
-                self.texture = self.device.create_texture(&wgpu::TextureDescriptor {
-                    label: Some("texture"),
-                    size: wgpu::Extent3d {
-                        width: u32::from(jgnes_core::SCREEN_WIDTH),
-                        height: u32::from(self.timing_mode.visible_screen_height()),
-                        depth_or_array_layers: 1,
-                    },
-                    mip_level_count: 1,
-                    sample_count: 1,
-                    dimension: wgpu::TextureDimension::D2,
-                    format: self.texture_format,
-                    usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-                    view_formats: &[],
-                });
-
-                let texture_view = self
-                    .texture
-                    .create_view(&wgpu::TextureViewDescriptor::default());
-
-                let render_scale = render_scale.get();
-
-                let scaled_texture =
-                    create_scaled_texture(&self.device, render_scale, self.timing_mode);
-                let scaled_texture_view =
-                    scaled_texture.create_view(&wgpu::TextureViewDescriptor::default());
-
-                self.compute_resources = create_compute_resources(
-                    &self.device,
-                    &scaled_texture,
-                    &texture_view,
-                    &scaled_texture_view,
-                    render_scale,
-                );
-
-                let render_texture_view = if render_scale > 1 {
-                    &scaled_texture_view
-                } else {
-                    &texture_view
-                };
-                self.render_bind_group = create_render_bind_group(
-                    &self.device,
-                    &self.render_bind_group_layout,
-                    render_texture_view,
-                    &sampler,
-                );
-            }
-        }
+        self.render_pipeline_state = RenderPipelineState::create(
+            &self.device,
+            &self.texture,
+            &sampler,
+            &self.fs_globals_buffer,
+            self.surface_config.format,
+            self.render_config.shader,
+            self.render_config.scanlines,
+        );
     }
 
-    pub fn update_overscan(&mut self, overscan: Overscan) {
-        self.render_config.overscan = overscan;
-        // No need to reconfigure surface, overscan is read on every frame rendered as it is only
-        // used to determine which pixels to copy from the NES PPU frame buffer
-    }
-
-    pub fn update_frame_skip(&mut self, frame_skip: FrameSkip) {
-        self.render_config.frame_skip = frame_skip;
-    }
-
-    pub fn update_forced_integer_height_scaling(&mut self, forced_integer_height_scaling: bool) {
-        if forced_integer_height_scaling != self.render_config.forced_integer_height_scaling {
-            self.render_config.forced_integer_height_scaling = forced_integer_height_scaling;
-            self.reconfigure_surface();
-        }
-    }
-
-    /// # Errors
-    ///
-    /// This method will return an error if the GPU driver does not support the specified vsync mode.
-    pub fn update_vsync_mode(&mut self, vsync_mode: VSyncMode) -> Result<(), WgpuRendererError> {
+    fn update_vsync_mode(&mut self, vsync_mode: VSyncMode) -> Result<(), WgpuRendererError> {
         if vsync_mode == self.render_config.vsync_mode {
             return Ok(());
         }
@@ -517,7 +397,6 @@ where
 
         self.render_config.vsync_mode = vsync_mode;
         self.surface_config.present_mode = present_mode;
-        self.reconfigure_surface();
 
         Ok(())
     }
@@ -537,86 +416,14 @@ fn unsupported_vsync_mode_error(
     )
 }
 
-fn create_compute_resources(
-    device: &wgpu::Device,
-    scaled_texture: &wgpu::Texture,
-    texture_view: &wgpu::TextureView,
-    scaled_texture_view: &wgpu::TextureView,
-    gpu_render_scale: u32,
-) -> Option<(wgpu::BindGroup, wgpu::ComputePipeline)> {
-    (gpu_render_scale > 1).then(|| {
-        let compute_bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some("compute_bind_group_layout"),
-                entries: &[
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: wgpu::ShaderStages::COMPUTE,
-                        ty: wgpu::BindingType::Texture {
-                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                            view_dimension: wgpu::TextureViewDimension::D2,
-                            multisampled: false,
-                        },
-                        count: None,
-                    },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: wgpu::ShaderStages::COMPUTE,
-                        ty: wgpu::BindingType::StorageTexture {
-                            access: wgpu::StorageTextureAccess::WriteOnly,
-                            format: scaled_texture.format(),
-                            view_dimension: wgpu::TextureViewDimension::D2,
-                        },
-                        count: None,
-                    },
-                ],
-            });
-        let compute_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("compute_bind_group"),
-            layout: &compute_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(texture_view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::TextureView(scaled_texture_view),
-                },
-            ],
-        });
-
-        let compute_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("compute_pipeline_layout"),
-                bind_group_layouts: &[&compute_bind_group_layout],
-                push_constant_ranges: &[],
-            });
-
-        let texture_scale_shader =
-            device.create_shader_module(wgpu::include_wgsl!("texture_scale.wgsl"));
-
-        let compute_entry_point = format!("texture_scale_{gpu_render_scale}x");
-        let compute_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: Some("compute_pipeline"),
-            layout: Some(&compute_pipeline_layout),
-            module: &texture_scale_shader,
-            entry_point: &compute_entry_point,
-        });
-
-        (compute_bind_group, compute_pipeline)
-    })
-}
-
 fn create_texture(
     device: &wgpu::Device,
     texture_format: wgpu::TextureFormat,
-    cpu_render_scale: u32,
     timing_mode: TimingMode,
 ) -> wgpu::Texture {
     let texture_size = wgpu::Extent3d {
-        width: cpu_render_scale * u32::from(jgnes_core::SCREEN_WIDTH),
-        height: cpu_render_scale * u32::from(timing_mode.visible_screen_height()),
+        width: jgnes_core::SCREEN_WIDTH.into(),
+        height: timing_mode.visible_screen_height().into(),
         depth_or_array_layers: 1,
     };
     device.create_texture(&wgpu::TextureDescriptor {
@@ -628,50 +435,6 @@ fn create_texture(
         format: texture_format,
         usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
         view_formats: &[],
-    })
-}
-
-fn create_scaled_texture(
-    device: &wgpu::Device,
-    gpu_render_scale: u32,
-    timing_mode: TimingMode,
-) -> wgpu::Texture {
-    let scaled_texture_size = wgpu::Extent3d {
-        width: gpu_render_scale * u32::from(jgnes_core::SCREEN_WIDTH),
-        height: gpu_render_scale * u32::from(timing_mode.visible_screen_height()),
-        depth_or_array_layers: 1,
-    };
-    device.create_texture(&wgpu::TextureDescriptor {
-        label: Some("scaled_texture"),
-        size: scaled_texture_size,
-        mip_level_count: 1,
-        sample_count: 1,
-        dimension: wgpu::TextureDimension::D2,
-        format: wgpu::TextureFormat::Rgba8Unorm,
-        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::STORAGE_BINDING,
-        view_formats: &[],
-    })
-}
-
-fn create_render_bind_group(
-    device: &wgpu::Device,
-    render_bind_group_layout: &wgpu::BindGroupLayout,
-    texture_view: &wgpu::TextureView,
-    sampler: &wgpu::Sampler,
-) -> wgpu::BindGroup {
-    device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: Some("render_bind_group"),
-        layout: render_bind_group_layout,
-        entries: &[
-            wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::TextureView(texture_view),
-            },
-            wgpu::BindGroupEntry {
-                binding: 1,
-                resource: wgpu::BindingResource::Sampler(sampler),
-            },
-        ],
     })
 }
 
@@ -690,7 +453,7 @@ fn create_sampler(device: &wgpu::Device, filter_mode: GpuFilterMode) -> wgpu::Sa
 }
 
 #[allow(clippy::float_cmp)]
-fn compute_vertex(
+fn compute_vertex_position(
     position: f32,
     window_length: u32,
     display_area_pos: u32,
@@ -709,27 +472,19 @@ fn compute_vertex(
 fn compute_vertices(
     window_width: u32,
     window_height: u32,
-    render_config: &RendererConfig,
-    timing_mode: TimingMode,
+    display_area: DisplayArea,
 ) -> Vec<Vertex2d> {
-    let display_area = crate::determine_display_area(
-        window_width,
-        window_height,
-        render_config.aspect_ratio,
-        render_config.forced_integer_height_scaling,
-        timing_mode,
-    );
     VERTICES
         .into_iter()
         .map(|vertex| Vertex2d {
             position: [
-                compute_vertex(
+                compute_vertex_position(
                     vertex.position[0],
                     window_width,
                     display_area.x,
                     display_area.width,
                 ),
-                compute_vertex(
+                compute_vertex_position(
                     vertex.position[1],
                     window_height,
                     display_area.y,
@@ -739,32 +494,6 @@ fn compute_vertices(
             texture_coords: vertex.texture_coords,
         })
         .collect()
-}
-
-fn cpu_scale_texture(
-    output_buffer: &[u8],
-    scaled_buffer: &mut [u8],
-    cpu_render_scale: u32,
-    timing_mode: TimingMode,
-) {
-    for i in 0..u32::from(timing_mode.visible_screen_height()) {
-        for j in 0..u32::from(jgnes_core::SCREEN_WIDTH) {
-            let from_start = (i * 4 * u32::from(jgnes_core::SCREEN_WIDTH) + j * 4) as usize;
-
-            for ii in 0..cpu_render_scale {
-                for jj in 0..cpu_render_scale {
-                    let to_start = ((cpu_render_scale * i + ii)
-                        * 4
-                        * cpu_render_scale
-                        * u32::from(jgnes_core::SCREEN_WIDTH)
-                        + (cpu_render_scale * j + jj) * 4)
-                        as usize;
-                    scaled_buffer[to_start..to_start + 4]
-                        .copy_from_slice(&output_buffer[from_start..from_start + 4]);
-                }
-            }
-        }
-    }
 }
 
 impl<W: HasRawDisplayHandle + HasRawWindowHandle> Renderer for WgpuRenderer<W> {
@@ -777,12 +506,15 @@ impl<W: HasRawDisplayHandle + HasRawWindowHandle> Renderer for WgpuRenderer<W> {
     ) -> Result<(), Self::Err> {
         self.total_frames += 1;
 
-        if self.render_config.frame_skip.should_skip(self.total_frames) {
+        if self.frame_skip.should_skip(self.total_frames) {
             return Ok(());
         }
 
         self.queue
             .write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&self.vertices));
+
+        self.queue
+            .write_buffer(&self.fs_globals_buffer, 0, &self.fs_globals.to_bytes());
 
         colors::to_rgba(
             frame_buffer,
@@ -792,19 +524,6 @@ impl<W: HasRawDisplayHandle + HasRawWindowHandle> Renderer for WgpuRenderer<W> {
             &mut self.output_buffer,
         );
 
-        let cpu_render_scale = self.render_config.prescaling_mode.cpu_render_scale();
-        let render_buffer = if cpu_render_scale > 1 {
-            cpu_scale_texture(
-                &self.output_buffer,
-                &mut self.cpu_scale_output_buffer,
-                cpu_render_scale,
-                self.timing_mode,
-            );
-            &self.cpu_scale_output_buffer
-        } else {
-            &self.output_buffer
-        };
-
         self.queue.write_texture(
             wgpu::ImageCopyTexture {
                 texture: &self.texture,
@@ -812,19 +531,17 @@ impl<W: HasRawDisplayHandle + HasRawWindowHandle> Renderer for WgpuRenderer<W> {
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
             },
-            render_buffer,
+            &self.output_buffer,
             wgpu::ImageDataLayout {
                 offset: 0,
-                bytes_per_row: Some(4 * cpu_render_scale * u32::from(jgnes_core::SCREEN_WIDTH)),
-                rows_per_image: Some(
-                    cpu_render_scale * u32::from(self.timing_mode.visible_screen_height()),
-                ),
+                bytes_per_row: Some(4 * u32::from(jgnes_core::SCREEN_WIDTH)),
+                rows_per_image: Some(u32::from(self.timing_mode.visible_screen_height())),
             },
             self.texture.size(),
         );
 
         let output = self.surface.get_current_texture()?;
-        let view = output
+        let surface_view = output
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
@@ -834,41 +551,12 @@ impl<W: HasRawDisplayHandle + HasRawWindowHandle> Renderer for WgpuRenderer<W> {
                 label: Some("command_encoder"),
             });
 
-        if let Some((compute_bind_group, compute_pipeline)) = &self.compute_resources {
-            let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-                label: Some("compute_pass"),
-            });
-
-            compute_pass.set_pipeline(compute_pipeline);
-            compute_pass.set_bind_group(0, compute_bind_group, &[]);
-
-            compute_pass.dispatch_workgroups(
-                jgnes_core::SCREEN_WIDTH.into(),
-                self.timing_mode.visible_screen_height().into(),
-                1,
-            );
-        }
-
-        {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("render_pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                        store: true,
-                    },
-                })],
-                depth_stencil_attachment: None,
-            });
-
-            render_pass.set_pipeline(&self.render_pipeline);
-            render_pass.set_bind_group(0, &self.render_bind_group, &[]);
-            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-
-            render_pass.draw(0..VERTICES.len() as u32, 0..1);
-        }
+        self.render_pipeline_state.draw(
+            &mut encoder,
+            &self.vertex_buffer,
+            VERTICES.len() as u32,
+            &surface_view,
+        );
 
         self.queue.submit(iter::once(encoder.finish()));
         output.present();

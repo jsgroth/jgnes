@@ -58,6 +58,7 @@ struct SdlRenderer<'a, T> {
     texture_creator: &'a TextureCreator<T>,
     texture: Texture<'a>,
     config: RendererConfig,
+    frame_skip: FrameSkip,
     total_frames: u64,
     timing_mode: TimingMode,
 }
@@ -78,6 +79,7 @@ impl<'a, T> SdlRenderer<'a, T> {
             texture_creator,
             texture,
             config,
+            frame_skip: FrameSkip::ZERO,
             total_frames: 0,
             timing_mode: TimingMode::Ntsc,
         })
@@ -94,7 +96,7 @@ impl<'a, T> Renderer for SdlRenderer<'a, T> {
     ) -> Result<(), Self::Err> {
         self.total_frames += 1;
 
-        if self.config.frame_skip.should_skip(self.total_frames) {
+        if self.frame_skip.should_skip(self.total_frames) {
             return Ok(());
         }
 
@@ -268,7 +270,7 @@ impl<'a, T> SdlWindowRenderer for SdlRenderer<'a, T> {
     }
 
     fn set_frame_skip(&mut self, frame_skip: FrameSkip) {
-        self.config.frame_skip = frame_skip;
+        self.frame_skip = frame_skip;
     }
 
     fn handle_resize(&mut self) {
@@ -299,12 +301,8 @@ impl SdlWindowRenderer for WgpuRenderer<Window> {
     }
 
     fn reload_config(&mut self, config: &JgnesDynamicConfig) -> Result<(), anyhow::Error> {
-        self.update_filter_mode(config.gpu_filter_mode);
-        self.update_prescaling_mode(config.prescaling_mode);
-        self.update_aspect_ratio(config.aspect_ratio);
-        self.update_overscan(config.overscan);
-        self.update_forced_integer_height_scaling(config.forced_integer_height_scaling);
-        self.update_vsync_mode(config.vsync_mode)?;
+        let renderer_config = config.to_renderer_config(self.wgpu_backend());
+        self.update_render_config(renderer_config)?;
 
         Ok(())
     }
@@ -362,18 +360,7 @@ pub fn run(config: &JgnesNativeConfig) -> anyhow::Result<()> {
 
     let renderer_config = {
         let dynamic_config = dynamic_config.lock().unwrap();
-
-        RendererConfig {
-            vsync_mode: dynamic_config.vsync_mode,
-            wgpu_backend: config.wgpu_backend,
-            gpu_filter_mode: dynamic_config.gpu_filter_mode,
-            prescaling_mode: dynamic_config.prescaling_mode,
-            aspect_ratio: dynamic_config.aspect_ratio,
-            overscan: dynamic_config.overscan,
-            frame_skip: FrameSkip::ZERO,
-            forced_integer_height_scaling: dynamic_config.forced_integer_height_scaling,
-            use_webgl2_limits: false,
-        }
+        dynamic_config.to_renderer_config(config.wgpu_backend)
     };
 
     let audio_queue = audio_subsystem

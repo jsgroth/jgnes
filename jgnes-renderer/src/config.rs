@@ -100,13 +100,19 @@ impl Default for RenderScale {
     }
 }
 
+impl Display for RenderScale {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}x", self.0)
+    }
+}
+
 impl TryFrom<u32> for RenderScale {
     type Error = String;
 
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         match value {
             1..=16 => Ok(Self(value)),
-            _ => Err(format!("Invalid render scale value: {value}")),
+            _ => Err(format!("Invalid render scale value, must be 1-16: {value}")),
         }
     }
 }
@@ -129,43 +135,50 @@ impl GpuFilterMode {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum PrescalingMode {
-    Gpu(RenderScale),
-    Cpu(RenderScale),
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum Shader {
+    None,
+    Prescale(RenderScale),
+    GaussianBlur {
+        prescale_factor: RenderScale,
+        stdev: f64,
+        radius: u32,
+    },
 }
 
-impl PrescalingMode {
-    #[must_use]
-    pub fn gpu_render_scale(self) -> u32 {
-        match self {
-            Self::Gpu(render_scale) => render_scale.get(),
-            Self::Cpu(_) => 1,
-        }
-    }
-
-    #[must_use]
-    pub fn cpu_render_scale(self) -> u32 {
-        match self {
-            Self::Gpu(_) => 1,
-            Self::Cpu(render_scale) => render_scale.get(),
-        }
-    }
-}
-
-impl Default for PrescalingMode {
+impl Default for Shader {
     fn default() -> Self {
-        Self::Gpu(RenderScale::ONE)
+        Self::None
     }
 }
 
-impl Display for PrescalingMode {
+impl Display for Shader {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Gpu(render_scale) => write!(f, "GPU {}x", render_scale.get()),
-            Self::Cpu(render_scale) => write!(f, "CPU {}x", render_scale.get()),
+            Self::None => write!(f, "None"),
+            Self::Prescale(render_scale) => {
+                write!(f, "Prescale {render_scale}")
+            }
+            Self::GaussianBlur {
+                prescale_factor,
+                stdev,
+                radius,
+            } => write!(
+                f,
+                "GaussianBlur[prescale={prescale_factor}, stdev={stdev}, radius={radius}]"
+            ),
         }
     }
+}
+
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, EnumDisplay, EnumFromStr,
+)]
+pub enum Scanlines {
+    #[default]
+    None,
+    Black,
+    Dim,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -180,15 +193,15 @@ impl FrameSkip {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct RendererConfig {
     pub vsync_mode: VSyncMode,
     pub wgpu_backend: WgpuBackend,
     pub gpu_filter_mode: GpuFilterMode,
-    pub prescaling_mode: PrescalingMode,
+    pub shader: Shader,
+    pub scanlines: Scanlines,
     pub aspect_ratio: AspectRatio,
     pub overscan: Overscan,
-    pub frame_skip: FrameSkip,
     pub forced_integer_height_scaling: bool,
     pub use_webgl2_limits: bool,
 }

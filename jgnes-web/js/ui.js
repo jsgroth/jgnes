@@ -41,6 +41,10 @@ export function setConfigDisplayValues(jgnesWebConfig) {
         element.checked = parseInt(element.value) === jgnesWebConfig.render_scale();
     });
 
+    document.querySelectorAll("input[name='scanlines']").forEach((element) => {
+        element.checked = element.value === jgnesWebConfig.scanlines();
+    });
+
     document.getElementById("overscan-left").checked = jgnesWebConfig.overscan_left();
     document.getElementById("overscan-right").checked = jgnesWebConfig.overscan_right();
     document.getElementById("overscan-top").checked = jgnesWebConfig.overscan_top();
@@ -50,6 +54,7 @@ export function setConfigDisplayValues(jgnesWebConfig) {
     document.getElementById("audio-sync-enabled").checked = jgnesWebConfig.audio_sync_enabled();
     document.getElementById("silence-triangle-ultrasonic").checked = jgnesWebConfig.silence_ultrasonic_triangle_output();
 
+    document.getElementById("force-integer-scaling").checked = jgnesWebConfig.get_force_integer_scaling();
     document.getElementById("sprite-limit-disabled").checked = jgnesWebConfig.get_remove_sprite_limit();
 
     let inputConfig = jgnesWebConfig.inputs();

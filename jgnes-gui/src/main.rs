@@ -29,7 +29,7 @@ fn steam_deck_dpi_hack() {
         .properties
         .iter()
         .find_map(|(_, property)| match &property.value {
-            xrandr::PropertyValue::Edid(edid) => Some(edid),
+            xrandr::Value::Edid(edid) => Some(edid),
             _ => None,
         })
     else {

@@ -10,7 +10,7 @@ jgnes-proc-macros = { path = "../jgnes-proc-macros" }
 jgnes-core = { path = "../jgnes-core" }
 jgnes-renderer = { path = "../jgnes-renderer" }
 
-anyhow = "1.0"
+anyhow = "1"
 log = "0.4"
 pollster = "0.3"
 serde = { version = "1", features = ["derive"] }

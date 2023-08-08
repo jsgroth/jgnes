@@ -28,4 +28,4 @@ git = "https://github.com/Rust-SDL2/rust-sdl2.git"
 rev = "819ab438ac971a922d6ee1da558822002d343b4e"
 
 [target.'cfg(target_os = "linux")'.dependencies]
-xrandr = "0.1"
+xrandr = "0.2"

@@ -107,6 +107,12 @@ struct CliArgs {
     #[arg(long = "no-audio-sync", default_value_t = true, action = clap::ArgAction::SetFalse)]
     sync_to_audio: bool,
 
+    /// Disable audio refresh rate adjustment; by default, the audio signal is downsampled so that
+    /// syncing to audio will run the emulator at exactly 60FPS (NTSC) / 50FPS (PAL) instead of the
+    /// NES native refresh rate (~60.1FPS for NTSC, ~50.007FPS for PAL)
+    #[arg(long = "no-audio-refresh-rate-adjustment", default_value_t = true, action = clap::ArgAction::SetFalse)]
+    audio_refresh_rate_adjustment: bool,
+
     /// Silence the triangle wave channel when it is outputting waves at ultrasonic frequencies
     #[arg(long, default_value_t)]
     silence_ultrasonic_triangle_output: bool,
@@ -196,6 +202,7 @@ fn main() -> anyhow::Result<()> {
         remove_sprite_limit: args.remove_sprite_limit,
         pal_black_border: args.pal_black_border,
         sync_to_audio: args.sync_to_audio,
+        audio_refresh_rate_adjustment: args.audio_refresh_rate_adjustment,
         silence_ultrasonic_triangle_output: args.silence_ultrasonic_triangle_output,
         fast_forward_multiplier: args.fast_forward_multiplier,
         rewind_buffer_len: Duration::from_secs(args.rewind_buffer_len_secs),

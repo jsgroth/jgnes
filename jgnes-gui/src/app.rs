@@ -103,6 +103,8 @@ struct AppConfig {
     pal_black_border: bool,
     #[serde(default = "true_fn")]
     sync_to_audio: bool,
+    #[serde(default = "true_fn")]
+    audio_refresh_rate_adjustment: bool,
     #[serde(default)]
     silence_ultrasonic_triangle_output: bool,
     #[serde(default)]
@@ -142,6 +144,7 @@ impl AppConfig {
             remove_sprite_limit: self.remove_sprite_limit,
             pal_black_border: self.pal_black_border,
             sync_to_audio: self.sync_to_audio,
+            audio_refresh_rate_adjustment: self.audio_refresh_rate_adjustment,
             silence_ultrasonic_triangle_output: self.silence_ultrasonic_triangle_output,
             fast_forward_multiplier: self.fast_forward_multiplier,
             rewind_buffer_len: Duration::from_secs(self.rewind_buffer_len_secs),
@@ -1149,6 +1152,12 @@ impl App {
                     &mut self.config.sync_to_audio,
                     "Sync emulation speed to audio",
                 );
+
+                ui.checkbox(
+                    &mut self.config.audio_refresh_rate_adjustment,
+                    "Apply 60Hz refresh rate adjustment",
+                )
+                    .on_hover_text("Adjust audio downsampling rate to time audio to 60FPS instead of ~60.1FPS (NTSC)");
 
                 ui.checkbox(
                     &mut self.config.silence_ultrasonic_triangle_output,

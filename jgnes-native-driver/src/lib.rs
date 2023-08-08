@@ -160,13 +160,21 @@ struct SdlAudioPlayer {
 }
 
 impl SdlAudioPlayer {
-    fn new(audio_queue: AudioQueue<f32>, sync_to_audio: bool) -> Self {
+    fn new(
+        audio_queue: AudioQueue<f32>,
+        sync_to_audio: bool,
+        audio_refresh_rate_adjustment: bool,
+    ) -> Self {
         Self {
             audio_queue,
             sync_to_audio,
             sample_queue: Vec::new(),
             low_pass_filter: LowPassFilter::new(),
-            downsample_counter: DownsampleCounter::new(AUDIO_OUTPUT_FREQUENCY, DISPLAY_RATE),
+            downsample_counter: DownsampleCounter::new(
+                AUDIO_OUTPUT_FREQUENCY,
+                DISPLAY_RATE,
+                audio_refresh_rate_adjustment,
+            ),
             frame_skip: FrameSkip::ZERO,
             total_output_samples: 0,
         }
@@ -374,8 +382,16 @@ pub fn run(config: &JgnesNativeConfig) -> anyhow::Result<()> {
         )
         .map_err(anyhow::Error::msg)?;
     audio_queue.resume();
+
+    let (sync_to_audio, audio_refresh_rate_adjustment) = {
+        let dynamic_config = dynamic_config.lock().unwrap();
+        (
+            dynamic_config.sync_to_audio,
+            dynamic_config.audio_refresh_rate_adjustment,
+        )
+    };
     let audio_player =
-        SdlAudioPlayer::new(audio_queue, dynamic_config.lock().unwrap().sync_to_audio);
+        SdlAudioPlayer::new(audio_queue, sync_to_audio, audio_refresh_rate_adjustment);
 
     let input_poller = SdlInputPoller {
         p1_joypad_state: Rc::default(),
@@ -626,7 +642,11 @@ where
                 let renderer = emulator.get_renderer_mut();
                 renderer.reload_config(dynamic_config)?;
 
-                emulator.get_audio_player_mut().sync_to_audio = dynamic_config.sync_to_audio;
+                let audio_player = emulator.get_audio_player_mut();
+                audio_player.sync_to_audio = dynamic_config.sync_to_audio;
+                audio_player
+                    .downsample_counter
+                    .set_refresh_rate_adjustment(dynamic_config.audio_refresh_rate_adjustment);
 
                 input_handler.reload_input_config(&dynamic_config.input_config);
 

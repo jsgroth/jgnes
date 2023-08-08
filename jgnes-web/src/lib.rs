@@ -209,7 +209,7 @@ impl WebAudioPlayer {
         Self {
             audio_queue,
             low_pass_filter: LowPassFilter::new(),
-            downsample_counter: DownsampleCounter::new(AUDIO_OUTPUT_FREQUENCY, DISPLAY_RATE),
+            downsample_counter: DownsampleCounter::new(AUDIO_OUTPUT_FREQUENCY, DISPLAY_RATE, true),
             audio_enabled,
         }
     }

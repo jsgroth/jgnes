@@ -392,6 +392,7 @@ pub struct JgnesDynamicConfig {
     pub remove_sprite_limit: bool,
     pub pal_black_border: bool,
     pub sync_to_audio: bool,
+    pub audio_refresh_rate_adjustment: bool,
     pub silence_ultrasonic_triangle_output: bool,
     pub fast_forward_multiplier: u8,
     pub rewind_buffer_len: Duration,
@@ -437,6 +438,11 @@ impl Display for JgnesDynamicConfig {
         writeln!(f, "vsync_mode: {}", self.vsync_mode)?;
         writeln!(f, "pal_black_border: {}", self.pal_black_border)?;
         writeln!(f, "sync_to_audio: {}", self.sync_to_audio)?;
+        writeln!(
+            f,
+            "audio_refresh_rate_adjustment: {}",
+            self.audio_refresh_rate_adjustment
+        )?;
         writeln!(
             f,
             "silence_ultrasonic_triangle_output: {}",

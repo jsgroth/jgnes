@@ -22,15 +22,15 @@ fn blur_tap(position: vec2u, shift: i32) -> vec3f {
 }
 
 @fragment
-fn fs_main(@builtin(position) position: vec4f) -> @location(0) vec4f {
-    let position = vec2u(u32(round(position.x - 0.5)), u32(round(position.y - 0.5)));
+fn fs_main(@builtin(position) center_position: vec4f) -> @location(0) vec4f {
+    let tl_position = vec2u(u32(round(center_position.x - 0.5)), u32(round(center_position.y - 0.5)));
     let center = i32(arrayLength(&weights)) / 2;
 
-    var color = weights[center] * textureLoad(texture_in, position, 0).rgb;
+    var color = weights[center] * textureLoad(texture_in, tl_position, 0).rgb;
 
     for (var i = 1; i <= center; i += 1) {
-        color += weights[center - i] * blur_tap(position, -i);
-        color += weights[center + i] * blur_tap(position, i);
+        color += weights[center - i] * blur_tap(tl_position, -i);
+        color += weights[center + i] * blur_tap(tl_position, i);
     }
 
     return vec4f(color, 1.0);

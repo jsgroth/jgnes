@@ -11,7 +11,7 @@ jgnes-core = { path = "../jgnes-core" }
 
 bytemuck = { version = "1", features = ["derive"] }
 log = "0.4"
-serde = { version = "1", features = ["derive"] }
+serde = { workspace = true }
 raw-window-handle = "0.5"
 thiserror = "1"
 wgpu = "0.17"

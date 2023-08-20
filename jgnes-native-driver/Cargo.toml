@@ -13,7 +13,7 @@ jgnes-renderer = { path = "../jgnes-renderer" }
 anyhow = "1"
 log = "0.4"
 pollster = "0.3"
-serde = { version = "1", features = ["derive"] }
+serde = { workspace = true }
 thiserror = "1"
 tinyvec = "1"
 

@@ -11,8 +11,7 @@ members = [
 resolver = "2"
 
 [workspace.dependencies]
-# Pin serde to <= 1.0.171 until/unless serde_derive stops including precompiled binaries
-serde = { version = ">= 1.0.0, <= 1.0.171", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
 
 # This is necessary because the latest published version of rust-sdl2 (0.35.2) uses raw-window-handle 0.4 which is
 # incompatible with wgpu using raw-window-handle 0.5

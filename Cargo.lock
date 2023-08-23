@@ -1756,7 +1756,7 @@ checksum = "af150ab688ff2122fcef229be89cb50dd66af9e01a4ff320cc137eecc9bacc38"
 
 [[package]]
 name = "jgnes-cli"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -1769,7 +1769,7 @@ dependencies = [
 
 [[package]]
 name = "jgnes-core"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "bincode",
  "jgnes-proc-macros",
@@ -1782,7 +1782,7 @@ dependencies = [
 
 [[package]]
 name = "jgnes-gui"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "anyhow",
  "eframe",
@@ -1803,7 +1803,7 @@ dependencies = [
 
 [[package]]
 name = "jgnes-native-driver"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "anyhow",
  "jgnes-core",
@@ -1820,7 +1820,7 @@ dependencies = [
 
 [[package]]
 name = "jgnes-proc-macros"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "chrono",
  "quote",
@@ -1829,7 +1829,7 @@ dependencies = [
 
 [[package]]
 name = "jgnes-renderer"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "bytemuck",
  "jgnes-core",
@@ -1843,7 +1843,7 @@ dependencies = [
 
 [[package]]
 name = "jgnes-web"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "base64",
  "console_error_panic_hook",

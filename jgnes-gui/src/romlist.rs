@@ -81,11 +81,13 @@ pub fn get_rom_list(dir: &str) -> anyhow::Result<Vec<RomMetadata>> {
             Header::parse_from(&mut file)?
         };
 
-        let Some(file_name) = dir_entry.file_name().to_str().map(String::from)
-        else {
+        let Some(file_name) = dir_entry.file_name().to_str().map(String::from) else {
             continue;
         };
-        let Some(file_name_no_ext) = Path::new(&file_name).with_extension("").to_str().map(String::from)
+        let Some(file_name_no_ext) = Path::new(&file_name)
+            .with_extension("")
+            .to_str()
+            .map(String::from)
         else {
             continue;
         };

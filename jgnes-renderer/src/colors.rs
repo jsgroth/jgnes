@@ -152,8 +152,7 @@ pub fn to_rgba(
             .filter(|(j, _)| (left..right).contains(j))
         {
             let color_map_index = color_emphasis_offset + (3 * nes_color) as usize;
-            let [r, g, b] = COLOR_MAPPING[color_map_index..color_map_index + 3]
-            else {
+            let [r, g, b] = COLOR_MAPPING[color_map_index..color_map_index + 3] else {
                 unreachable!("destructuring a slice of size 3 into [a, b, c]")
             };
 

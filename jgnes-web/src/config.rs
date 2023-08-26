@@ -237,7 +237,9 @@ impl JgnesWebConfig {
     }
 
     pub fn set_render_scale(&self, value: u32) {
-        let Ok(render_scale) = RenderScale::try_from(value) else { return };
+        let Ok(render_scale) = RenderScale::try_from(value) else {
+            return;
+        };
         let mut fields = self.fields.borrow_mut();
         fields.render_scale = render_scale;
         fields.save();
@@ -248,7 +250,9 @@ impl JgnesWebConfig {
     }
 
     pub fn set_scanlines(&self, scanlines: &str) {
-        let Ok(scanlines) = scanlines.parse() else { return };
+        let Ok(scanlines) = scanlines.parse() else {
+            return;
+        };
         let mut fields = self.fields.borrow_mut();
         fields.scanlines = scanlines;
         fields.save();

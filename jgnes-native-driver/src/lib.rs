@@ -341,7 +341,10 @@ pub fn run(config: &JgnesNativeConfig) -> anyhow::Result<()> {
         .file_name()
         .and_then(OsStr::to_str)
     else {
-        return Err(anyhow::Error::msg(format!("cannot determine file name of {}", config.nes_file_path)));
+        return Err(anyhow::Error::msg(format!(
+            "cannot determine file name of {}",
+            config.nes_file_path
+        )));
     };
 
     let rom_bytes = fs::read(Path::new(&config.nes_file_path))?;

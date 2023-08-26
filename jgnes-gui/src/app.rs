@@ -700,7 +700,9 @@ impl App {
     }
 
     fn update_running_emulator_config(&mut self) {
-        let Some(running_emulator_state) = &self.state.running_emulator_state else { return };
+        let Some(running_emulator_state) = &self.state.running_emulator_state else {
+            return;
+        };
 
         let dynamic_config = &mut *running_emulator_state
             .shared_config
@@ -1239,7 +1241,9 @@ impl App {
     }
 
     fn render_input_subwindow(&mut self, ctx: &Context) {
-        let Some(InputWindow(player, input_type)) = self.state.open_input_window else { return };
+        let Some(InputWindow(player, input_type)) = self.state.open_input_window else {
+            return;
+        };
 
         let window_title = format!("{player:?} {input_type:?} Configuration");
 
@@ -1373,7 +1377,9 @@ impl App {
     }
 
     fn poll_for_input_thread_result(&mut self) {
-        let Some(waiting_for_input) = self.state.waiting_for_input else { return };
+        let Some(waiting_for_input) = self.state.waiting_for_input else {
+            return;
+        };
 
         if let InputReceiveResult::Received(collect_result) =
             self.state.recv_input_reconfigure_response()
@@ -1407,7 +1413,9 @@ impl App {
     }
 
     fn refresh_rom_list(&mut self) {
-        let Some(rom_search_dir) = &self.config.rom_search_dir else { return };
+        let Some(rom_search_dir) = &self.config.rom_search_dir else {
+            return;
+        };
 
         match romlist::get_rom_list(rom_search_dir) {
             Ok(mut rom_list) => {

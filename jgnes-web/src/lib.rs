@@ -295,7 +295,13 @@ fn set_rom_file_name_text(file_name: &str) {
 }
 
 async fn open_file_in_event_loop(event_loop_proxy: EventLoopProxy<JgnesUserEvent>) {
-    let Some(file) = AsyncFileDialog::new().add_filter("nes", &["nes"]).pick_file().await else { return };
+    let Some(file) = AsyncFileDialog::new()
+        .add_filter("nes", &["nes"])
+        .pick_file()
+        .await
+    else {
+        return;
+    };
 
     let file_bytes = file.read().await;
     let file_name = file.file_name();
@@ -308,7 +314,13 @@ async fn open_file_in_event_loop(event_loop_proxy: EventLoopProxy<JgnesUserEvent
 }
 
 async fn upload_save_file(event_loop_proxy: EventLoopProxy<JgnesUserEvent>, file_name: String) {
-    let Some(save_file) = AsyncFileDialog::new().add_filter("sav", &["sav"]).pick_file().await else { return };
+    let Some(save_file) = AsyncFileDialog::new()
+        .add_filter("sav", &["sav"])
+        .pick_file()
+        .await
+    else {
+        return;
+    };
 
     let save_bytes = save_file.read().await;
 

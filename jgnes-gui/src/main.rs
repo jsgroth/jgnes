@@ -10,8 +10,12 @@ use std::str::FromStr;
 // being completely unusable.
 #[cfg(target_os = "linux")]
 fn steam_deck_dpi_hack() {
-    let Ok(mut xhandle) = xrandr::XHandle::open() else { return };
-    let Ok(monitors) = xhandle.monitors() else { return };
+    let Ok(mut xhandle) = xrandr::XHandle::open() else {
+        return;
+    };
+    let Ok(monitors) = xhandle.monitors() else {
+        return;
+    };
 
     if monitors.len() != 1 {
         return;

@@ -139,11 +139,7 @@ impl GpuFilterMode {
 pub enum Shader {
     None,
     Prescale(RenderScale),
-    GaussianBlur {
-        prescale_factor: RenderScale,
-        stdev: f64,
-        radius: u32,
-    },
+    GaussianBlur { prescale_factor: RenderScale, stdev: f64, radius: u32 },
 }
 
 impl Default for Shader {
@@ -159,11 +155,7 @@ impl Display for Shader {
             Self::Prescale(render_scale) => {
                 write!(f, "Prescale {render_scale}")
             }
-            Self::GaussianBlur {
-                prescale_factor,
-                stdev,
-                radius,
-            } => write!(
+            Self::GaussianBlur { prescale_factor, stdev, radius } => write!(
                 f,
                 "GaussianBlur[prescale={prescale_factor}, stdev={stdev}, radius={radius}]"
             ),

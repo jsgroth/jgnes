@@ -106,16 +106,8 @@ impl<'a> SdlInputHandler<'a> {
         );
 
         self.joystick_input_mapping.clear();
-        populate_map(
-            &mut self.joystick_input_mapping,
-            &input_config.p1.joystick,
-            Player::Player1,
-        );
-        populate_map(
-            &mut self.joystick_input_mapping,
-            &input_config.p2.joystick,
-            Player::Player2,
-        );
+        populate_map(&mut self.joystick_input_mapping, &input_config.p1.joystick, Player::Player1);
+        populate_map(&mut self.joystick_input_mapping, &input_config.p2.joystick, Player::Player2);
 
         self.hotkey_mapping.clear();
         populate_hotkey_map(&mut self.hotkey_mapping, &input_config.hotkeys);
@@ -129,21 +121,13 @@ impl<'a> SdlInputHandler<'a> {
 
     pub(crate) fn handle_event(&mut self, event: &Event) -> Result<(), anyhow::Error> {
         match *event {
-            Event::KeyDown {
-                keycode: Some(keycode),
-                ..
-            } => {
+            Event::KeyDown { keycode: Some(keycode), .. } => {
                 self.update_joypad_state(Input::Keyboard(keycode), true);
             }
-            Event::KeyUp {
-                keycode: Some(keycode),
-                ..
-            } => {
+            Event::KeyUp { keycode: Some(keycode), .. } => {
                 self.update_joypad_state(Input::Keyboard(keycode), false);
             }
-            Event::JoyDeviceAdded {
-                which: device_id, ..
-            } => {
+            Event::JoyDeviceAdded { which: device_id, .. } => {
                 let joystick = self.joystick_subsystem.open(device_id)?;
                 let instance_id = joystick.instance_id();
                 log::info!(
@@ -154,9 +138,7 @@ impl<'a> SdlInputHandler<'a> {
                 self.joysticks.insert(device_id, joystick);
                 self.instance_id_to_device_id.insert(instance_id, device_id);
             }
-            Event::JoyDeviceRemoved {
-                which: instance_id, ..
-            } => {
+            Event::JoyDeviceRemoved { which: instance_id, .. } => {
                 if let Some(device_id) = self.instance_id_to_device_id.remove(&instance_id) {
                     if let Some(removed) = self.joysticks.remove(&device_id) {
                         log::info!(
@@ -166,38 +148,19 @@ impl<'a> SdlInputHandler<'a> {
                     }
                 }
             }
-            Event::JoyButtonDown {
-                which: instance_id,
-                button_idx,
-                ..
-            } => {
+            Event::JoyButtonDown { which: instance_id, button_idx, .. } => {
                 if let Some(&device_id) = self.instance_id_to_device_id.get(&instance_id) {
-                    let input = JoystickInput::Button {
-                        device_id,
-                        button_idx,
-                    };
+                    let input = JoystickInput::Button { device_id, button_idx };
                     self.update_joypad_state(Input::Joystick(input), true);
                 }
             }
-            Event::JoyButtonUp {
-                which: instance_id,
-                button_idx,
-                ..
-            } => {
+            Event::JoyButtonUp { which: instance_id, button_idx, .. } => {
                 if let Some(&device_id) = self.instance_id_to_device_id.get(&instance_id) {
-                    let input = JoystickInput::Button {
-                        device_id,
-                        button_idx,
-                    };
+                    let input = JoystickInput::Button { device_id, button_idx };
                     self.update_joypad_state(Input::Joystick(input), false);
                 }
             }
-            Event::JoyAxisMotion {
-                which: instance_id,
-                axis_idx,
-                value,
-                ..
-            } => {
+            Event::JoyAxisMotion { which: instance_id, axis_idx, value, .. } => {
                 if let Some(&device_id) = self.instance_id_to_device_id.get(&instance_id) {
                     let positive = JoystickInput::Axis {
                         device_id,
@@ -223,27 +186,14 @@ impl<'a> SdlInputHandler<'a> {
                     }
                 }
             }
-            Event::JoyHatMotion {
-                which: instance_id,
-                hat_idx,
-                state,
-                ..
-            } => {
+            Event::JoyHatMotion { which: instance_id, hat_idx, state, .. } => {
                 if let Some(&device_id) = self.instance_id_to_device_id.get(&instance_id) {
                     for direction in HatDirection::ALL {
-                        let input = JoystickInput::Hat {
-                            device_id,
-                            hat_idx,
-                            direction,
-                        };
+                        let input = JoystickInput::Hat { device_id, hat_idx, direction };
                         self.update_joypad_state(Input::Joystick(input), false);
                     }
                     for direction in hat_directions_for(state) {
-                        let input = JoystickInput::Hat {
-                            device_id,
-                            hat_idx,
-                            direction,
-                        };
+                        let input = JoystickInput::Hat { device_id, hat_idx, direction };
                         self.update_joypad_state(Input::Joystick(input), true);
                     }
                 }
@@ -350,9 +300,7 @@ where
     K: Eq + Hash,
     V: Copy,
 {
-    map.entry(key)
-        .and_modify(|buttons| buttons.push(value))
-        .or_insert(vec![value]);
+    map.entry(key).and_modify(|buttons| buttons.push(value)).or_insert(vec![value]);
 }
 
 fn hat_directions_for(state: HatState) -> ArrayVec<[HatDirection; 2]> {
@@ -360,17 +308,11 @@ fn hat_directions_for(state: HatState) -> ArrayVec<[HatDirection; 2]> {
         HatState::Up => [HatDirection::Up].into_iter().collect(),
         HatState::LeftUp => [HatDirection::Left, HatDirection::Up].into_iter().collect(),
         HatState::Left => [HatDirection::Left].into_iter().collect(),
-        HatState::LeftDown => [HatDirection::Left, HatDirection::Down]
-            .into_iter()
-            .collect(),
+        HatState::LeftDown => [HatDirection::Left, HatDirection::Down].into_iter().collect(),
         HatState::Down => [HatDirection::Down].into_iter().collect(),
-        HatState::RightDown => [HatDirection::Right, HatDirection::Down]
-            .into_iter()
-            .collect(),
+        HatState::RightDown => [HatDirection::Right, HatDirection::Down].into_iter().collect(),
         HatState::Right => [HatDirection::Right].into_iter().collect(),
-        HatState::RightUp => [HatDirection::Right, HatDirection::Up]
-            .into_iter()
-            .collect(),
+        HatState::RightUp => [HatDirection::Right, HatDirection::Up].into_iter().collect(),
         HatState::Centered => [].into_iter().collect(),
     }
 }

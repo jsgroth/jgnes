@@ -91,16 +91,11 @@ pub fn sdl_texture_updater(
             visible_screen_height,
         );
 
-        for (i, scanline) in frame_buffer
-            .iter()
-            .enumerate()
-            .filter(|(i, _)| (top..bottom).contains(i))
+        for (i, scanline) in
+            frame_buffer.iter().enumerate().filter(|(i, _)| (top..bottom).contains(i))
         {
-            for (j, nes_color) in scanline
-                .iter()
-                .copied()
-                .enumerate()
-                .filter(|(j, _)| (left..right).contains(j))
+            for (j, nes_color) in
+                scanline.iter().copied().enumerate().filter(|(j, _)| (left..right).contains(j))
             {
                 let color_map_index = color_emphasis_offset + (3 * nes_color) as usize;
                 let start = (i - row_offset) * pitch + 3 * j;
@@ -140,16 +135,11 @@ pub fn to_rgba(
     clear_cols_rgba(right..screen_width, out, pitch, visible_screen_height);
 
     let color_emphasis_offset = get_color_emphasis_offset(color_emphasis) as usize;
-    for (scanline_idx, scanline) in frame_buffer
-        .iter()
-        .enumerate()
-        .filter(|(i, _)| (top..bottom).contains(i))
+    for (scanline_idx, scanline) in
+        frame_buffer.iter().enumerate().filter(|(i, _)| (top..bottom).contains(i))
     {
-        for (color_idx, nes_color) in scanline
-            .iter()
-            .copied()
-            .enumerate()
-            .filter(|(j, _)| (left..right).contains(j))
+        for (color_idx, nes_color) in
+            scanline.iter().copied().enumerate().filter(|(j, _)| (left..right).contains(j))
         {
             let color_map_index = color_emphasis_offset + (3 * nes_color) as usize;
             let [r, g, b] = COLOR_MAPPING[color_map_index..color_map_index + 3] else {
@@ -188,12 +178,7 @@ mod tests {
             to_rgba(
                 &frame_buffer,
                 ColorEmphasis::default(),
-                Overscan {
-                    top: 8,
-                    bottom: 8,
-                    left: 8,
-                    right: 8,
-                },
+                Overscan { top: 8, bottom: 8, left: 8, right: 8 },
                 timing_mode,
                 &mut output_buffer,
             );
@@ -224,12 +209,7 @@ mod tests {
             let updater = sdl_texture_updater(
                 &frame_buffer,
                 ColorEmphasis::default(),
-                Overscan {
-                    top: 8,
-                    bottom: 8,
-                    left: 8,
-                    right: 8,
-                },
+                Overscan { top: 8, bottom: 8, left: 8, right: 8 },
                 timing_mode,
             );
             updater(&mut pixels, pitch);

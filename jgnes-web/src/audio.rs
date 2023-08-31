@@ -57,12 +57,7 @@ impl AudioQueue {
     pub fn from_buffers(header: SharedArrayBuffer, buffer: SharedArrayBuffer) -> Self {
         let header_typed = Uint32Array::new(&header);
         let buffer_typed = Uint32Array::new(&buffer);
-        Self {
-            header,
-            header_typed,
-            buffer,
-            buffer_typed,
-        }
+        Self { header, header_typed, buffer, buffer_typed }
     }
 
     pub fn push_if_space(&self, sample: f32) -> Result<EnqueueResult, JsValue> {
@@ -84,11 +79,8 @@ impl AudioQueue {
         let loaded_start = Atomics::load(&self.header_typed, START_INDEX)? as u32;
         let end = Atomics::load(&self.header_typed, END_INDEX)? as u32;
 
-        let queue_len = if loaded_start <= end {
-            end - loaded_start
-        } else {
-            end + BUFFER_LEN - loaded_start
-        };
+        let queue_len =
+            if loaded_start <= end { end - loaded_start } else { end + BUFFER_LEN - loaded_start };
         let drain_len = cmp::min(queue_len as usize, out.len());
 
         let mut start = loaded_start;
@@ -111,11 +103,7 @@ impl AudioQueue {
         let end = Atomics::load(&self.header_typed, END_INDEX)? as u32;
         let start = Atomics::load(&self.header_typed, START_INDEX)? as u32;
 
-        if start <= end {
-            Ok(end - start)
-        } else {
-            Ok(end + BUFFER_LEN - start)
-        }
+        if start <= end { Ok(end - start) } else { Ok(end + BUFFER_LEN - start) }
     }
 
     fn to_js_value(&self) -> JsValue {
@@ -153,14 +141,13 @@ pub async fn initialize_audio_worklet(
     JsFuture::from(audio_ctx.audio_worklet()?.add_module(&module_url)?).await?;
 
     let mut node_options = AudioWorkletNodeOptions::new();
-    node_options
-        .channel_count_mode(ChannelCountMode::Explicit)
-        .channel_count(1)
-        .processor_options(Some(&Array::of3(
+    node_options.channel_count_mode(ChannelCountMode::Explicit).channel_count(1).processor_options(
+        Some(&Array::of3(
             &wasm_bindgen::module(),
             &wasm_bindgen::memory(),
             &audio_queue.to_js_value(),
-        )));
+        )),
+    );
 
     let worklet_node =
         AudioWorkletNode::new_with_options(audio_ctx, "audio-processor", &node_options)?;

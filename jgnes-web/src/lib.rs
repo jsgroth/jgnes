@@ -141,12 +141,7 @@ impl InputHandler {
 
     fn handle_window_event(&mut self, event: &WindowEvent<'_>, config: &JgnesWebConfig) {
         if let WindowEvent::KeyboardInput {
-            input:
-                KeyboardInput {
-                    virtual_keycode: Some(keycode),
-                    state,
-                    ..
-                },
+            input: KeyboardInput { virtual_keycode: Some(keycode), state, .. },
             ..
         } = event
         {
@@ -164,10 +159,7 @@ impl InputHandler {
                 }
                 InputHandlerState::WaitingForInput(button) => {
                     if *state == ElementState::Pressed {
-                        self.button_mapping
-                            .entry(*keycode)
-                            .or_default()
-                            .push(button);
+                        self.button_mapping.entry(*keycode).or_default().push(button);
                         self.p1_joypad_state.set(JoypadState::new());
                         self.handler_state = InputHandlerState::RunningEmulator;
 
@@ -295,53 +287,30 @@ fn set_rom_file_name_text(file_name: &str) {
 }
 
 async fn open_file_in_event_loop(event_loop_proxy: EventLoopProxy<JgnesUserEvent>) {
-    let Some(file) = AsyncFileDialog::new()
-        .add_filter("nes", &["nes"])
-        .pick_file()
-        .await
-    else {
+    let Some(file) = AsyncFileDialog::new().add_filter("nes", &["nes"]).pick_file().await else {
         return;
     };
 
     let file_bytes = file.read().await;
     let file_name = file.file_name();
-    event_loop_proxy
-        .send_event(JgnesUserEvent::RomFileLoaded {
-            file_bytes,
-            file_name,
-        })
-        .unwrap();
+    event_loop_proxy.send_event(JgnesUserEvent::RomFileLoaded { file_bytes, file_name }).unwrap();
 }
 
 async fn upload_save_file(event_loop_proxy: EventLoopProxy<JgnesUserEvent>, file_name: String) {
-    let Some(save_file) = AsyncFileDialog::new()
-        .add_filter("sav", &["sav"])
-        .pick_file()
-        .await
+    let Some(save_file) = AsyncFileDialog::new().add_filter("sav", &["sav"]).pick_file().await
     else {
         return;
     };
 
     let save_bytes = save_file.read().await;
 
-    event_loop_proxy
-        .send_event(JgnesUserEvent::SaveFileLoaded {
-            save_bytes,
-            file_name,
-        })
-        .unwrap();
+    event_loop_proxy.send_event(JgnesUserEvent::SaveFileLoaded { save_bytes, file_name }).unwrap();
 }
 
 #[derive(Debug, Clone)]
 enum JgnesUserEvent {
-    RomFileLoaded {
-        file_bytes: Vec<u8>,
-        file_name: String,
-    },
-    SaveFileLoaded {
-        save_bytes: Vec<u8>,
-        file_name: String,
-    },
+    RomFileLoaded { file_bytes: Vec<u8>, file_name: String },
+    SaveFileLoaded { save_bytes: Vec<u8>, file_name: String },
 }
 
 #[cfg(feature = "webgl")]
@@ -373,9 +342,7 @@ fn new_renderer_config(fields: &ConfigFields) -> RendererConfig {
 #[wasm_bindgen]
 pub async fn run_emulator(config: JgnesWebConfig) {
     let event_loop = EventLoopBuilder::<JgnesUserEvent>::with_user_event().build();
-    let window = WindowBuilder::new()
-        .build(&event_loop)
-        .expect("Unable to create window");
+    let window = WindowBuilder::new().build(&event_loop).expect("Unable to create window");
 
     window.set_inner_size(LogicalSize::new(878, 672));
 
@@ -401,9 +368,7 @@ pub async fn run_emulator(config: JgnesWebConfig) {
     )
     .unwrap();
     let audio_queue = AudioQueue::new();
-    let _audio_worklet = audio::initialize_audio_worklet(&audio_ctx, &audio_queue)
-        .await
-        .unwrap();
+    let _audio_worklet = audio::initialize_audio_worklet(&audio_ctx, &audio_queue).await.unwrap();
 
     let audio_player = WebAudioPlayer::new(audio_queue, config.fields.borrow().audio_enabled);
     let audio_player = Rc::new(RefCell::new(audio_player));
@@ -437,18 +402,13 @@ fn run_event_loop(
 
     event_loop.run(move |event, _, control_flow| {
         match event {
-            Event::UserEvent(JgnesUserEvent::RomFileLoaded {
-                file_bytes,
-                file_name,
-            }) => {
+            Event::UserEvent(JgnesUserEvent::RomFileLoaded { file_bytes, file_name }) => {
                 let sav_bytes = load_sav_bytes(&file_name);
 
                 let input_poller = WebInputPoller {
                     p1_joypad_state: Rc::clone(&state.input_handler.p1_joypad_state),
                 };
-                let save_writer = WebSaveWriter {
-                    file_name: file_name.clone(),
-                };
+                let save_writer = WebSaveWriter { file_name: file_name.clone() };
 
                 match Emulator::create(EmulatorCreateArgs {
                     rom_bytes: file_bytes,
@@ -478,25 +438,19 @@ fn run_event_loop(
                     }
                 }
             }
-            Event::UserEvent(JgnesUserEvent::SaveFileLoaded {
-                save_bytes,
-                file_name,
-            }) => {
+            Event::UserEvent(JgnesUserEvent::SaveFileLoaded { save_bytes, file_name }) => {
                 let save_bytes_b64 = BASE64_ENGINE.encode(&save_bytes);
                 js::saveToLocalStorage(&file_name, &save_bytes_b64);
 
                 // Hard reset after uploading a save file
-                state.emulator = state
-                    .emulator
-                    .take()
-                    .map(|emulator| emulator.hard_reset(Some(save_bytes)));
+                state.emulator =
+                    state.emulator.take().map(|emulator| emulator.hard_reset(Some(save_bytes)));
 
                 js::focusCanvas();
             }
-            Event::WindowEvent {
-                event: win_event,
-                window_id,
-            } if window_id == state.window_id() => {
+            Event::WindowEvent { event: win_event, window_id }
+                if window_id == state.window_id() =>
+            {
                 state.input_handler.handle_window_event(&win_event, &config);
 
                 match win_event {
@@ -567,9 +521,7 @@ fn run_event_loop(
                     // JgnesWebConfig::restore_defaults updates the actual config values, but
                     // updating the InputConfig does not automatically update the input mappings in
                     // the InputHandler
-                    state
-                        .input_handler
-                        .update_all_mappings(&config.inputs.borrow());
+                    state.input_handler.update_all_mappings(&config.inputs.borrow());
                 }
 
                 if let Some(button) = config.reconfig_input_request.replace(None) {

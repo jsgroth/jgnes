@@ -128,9 +128,7 @@ impl<'a, T> Renderer for SdlRenderer<'a, T> {
             display_area.width,
             display_area.height,
         );
-        self.canvas
-            .copy(&self.texture, None, dst)
-            .map_err(SdlRendererError::msg)?;
+        self.canvas.copy(&self.texture, None, dst).map_err(SdlRendererError::msg)?;
         self.canvas.present();
 
         Ok(())
@@ -196,8 +194,7 @@ impl AudioPlayer for SdlAudioPlayer {
             self.total_output_samples += 1;
 
             if !self.frame_skip.should_skip(self.total_output_samples) {
-                self.sample_queue
-                    .push(self.low_pass_filter.output_sample() as f32);
+                self.sample_queue.push(self.low_pass_filter.output_sample() as f32);
             }
         }
 
@@ -208,9 +205,7 @@ impl AudioPlayer for SdlAudioPlayer {
             }
 
             if self.audio_queue.size() < 8192 {
-                self.audio_queue
-                    .queue_audio(&self.sample_queue)
-                    .map_err(anyhow::Error::msg)?;
+                self.audio_queue.queue_audio(&self.sample_queue).map_err(anyhow::Error::msg)?;
             }
             // If audio sync is disabled, intentionally drop samples while the audio queue is full
             self.sample_queue.clear();
@@ -337,9 +332,7 @@ pub fn run(config: &JgnesNativeConfig) -> anyhow::Result<()> {
         log::info!("Initial dynamic config:\n{dynamic_config}");
     }
 
-    let Some(file_name) = Path::new(&config.nes_file_path)
-        .file_name()
-        .and_then(OsStr::to_str)
+    let Some(file_name) = Path::new(&config.nes_file_path).file_name().and_then(OsStr::to_str)
     else {
         return Err(anyhow::Error::msg(format!(
             "cannot determine file name of {}",
@@ -388,18 +381,13 @@ pub fn run(config: &JgnesNativeConfig) -> anyhow::Result<()> {
 
     let (sync_to_audio, audio_refresh_rate_adjustment) = {
         let dynamic_config = dynamic_config.lock().unwrap();
-        (
-            dynamic_config.sync_to_audio,
-            dynamic_config.audio_refresh_rate_adjustment,
-        )
+        (dynamic_config.sync_to_audio, dynamic_config.audio_refresh_rate_adjustment)
     };
     let audio_player =
         SdlAudioPlayer::new(audio_queue, sync_to_audio, audio_refresh_rate_adjustment);
 
-    let input_poller = SdlInputPoller {
-        p1_joypad_state: Rc::default(),
-        p2_joypad_state: Rc::default(),
-    };
+    let input_poller =
+        SdlInputPoller { p1_joypad_state: Rc::default(), p2_joypad_state: Rc::default() };
     let input_handler = SdlInputHandler::new(
         &joystick_subsystem,
         &dynamic_config.lock().unwrap().input_config,
@@ -409,9 +397,7 @@ pub fn run(config: &JgnesNativeConfig) -> anyhow::Result<()> {
 
     let sav_path = Path::new(&config.nes_file_path).with_extension("sav");
     let sav_bytes = load_sav_file(&sav_path);
-    let save_writer = FsSaveWriter {
-        path: sav_path.clone(),
-    };
+    let save_writer = FsSaveWriter { path: sav_path.clone() };
 
     if sav_bytes.is_some() {
         log::info!("Loaded SRAM from {}", sav_path.display());
@@ -441,13 +427,7 @@ pub fn run(config: &JgnesNativeConfig) -> anyhow::Result<()> {
                 input_poller,
                 save_writer,
             })?;
-            run_emulator(
-                emulator,
-                config,
-                event_pump,
-                input_handler,
-                &save_state_path,
-            )
+            run_emulator(emulator, config, event_pump, input_handler, &save_state_path)
         }
         NativeRenderer::Wgpu => {
             let renderer = pollster::block_on(WgpuRenderer::from_window(
@@ -464,13 +444,7 @@ pub fn run(config: &JgnesNativeConfig) -> anyhow::Result<()> {
                 input_poller,
                 save_writer,
             })?;
-            run_emulator(
-                emulator,
-                config,
-                event_pump,
-                input_handler,
-                &save_state_path,
-            )
+            run_emulator(emulator, config, event_pump, input_handler, &save_state_path)
         }
     }
 }
@@ -670,9 +644,7 @@ where
                 match handle_input_reconfigure(input_type, &mut event_pump, &mut input_handler)? {
                     InputReconfigureResult::Input(input_collect_result) => {
                         log::info!("Sending input collect result {input_collect_result:?}");
-                        input_reconfigure_sender
-                            .send(Some(input_collect_result))
-                            .unwrap();
+                        input_reconfigure_sender.send(Some(input_collect_result)).unwrap();
                     }
                     InputReconfigureResult::Quit => {
                         input_reconfigure_sender.send(None).unwrap();
@@ -704,10 +676,7 @@ where
                         }
                         _ => {}
                     },
-                    Event::KeyDown {
-                        keycode: Some(keycode),
-                        ..
-                    } => {
+                    Event::KeyDown { keycode: Some(keycode), .. } => {
                         for hotkey in input_handler.check_for_hotkeys(keycode) {
                             match hotkey {
                                 Hotkey::Quit => {
@@ -770,10 +739,7 @@ where
                             }
                         }
                     }
-                    Event::KeyUp {
-                        keycode: Some(keycode),
-                        ..
-                    } => {
+                    Event::KeyUp { keycode: Some(keycode), .. } => {
                         for hotkey in input_handler.check_for_hotkeys(keycode) {
                             match hotkey {
                                 Hotkey::FastForward => {
@@ -817,63 +783,43 @@ fn handle_input_reconfigure(
                 Event::Quit { .. } => {
                     return Ok(InputReconfigureResult::Quit);
                 }
-                Event::KeyDown {
-                    keycode: Some(keycode),
-                    ..
-                } if input_type == InputType::Keyboard => {
+                Event::KeyDown { keycode: Some(keycode), .. }
+                    if input_type == InputType::Keyboard =>
+                {
                     return Ok(InputReconfigureResult::Input(InputCollectResult::Keyboard(
                         keycode,
                     )));
                 }
-                Event::JoyButtonDown {
-                    which: instance_id,
-                    button_idx,
-                    ..
-                } if input_type == InputType::Gamepad => {
+                Event::JoyButtonDown { which: instance_id, button_idx, .. }
+                    if input_type == InputType::Gamepad =>
+                {
                     if let Some(device_id) = input_handler.device_id_for(instance_id) {
                         return Ok(InputReconfigureResult::Input(InputCollectResult::Gamepad(
-                            JoystickInput::Button {
-                                device_id,
-                                button_idx,
-                            },
+                            JoystickInput::Button { device_id, button_idx },
                         )));
                     }
                 }
-                Event::JoyAxisMotion {
-                    which: instance_id,
-                    axis_idx,
-                    value,
-                    ..
-                } if input_type == InputType::Gamepad => {
+                Event::JoyAxisMotion { which: instance_id, axis_idx, value, .. }
+                    if input_type == InputType::Gamepad =>
+                {
                     if value.saturating_abs() as u16 >= axis_deadzone {
                         if let Some(device_id) = input_handler.device_id_for(instance_id) {
                             let direction = AxisDirection::from_value(value);
                             return Ok(InputReconfigureResult::Input(InputCollectResult::Gamepad(
-                                JoystickInput::Axis {
-                                    device_id,
-                                    axis_idx,
-                                    direction,
-                                },
+                                JoystickInput::Axis { device_id, axis_idx, direction },
                             )));
                         }
                     }
                 }
-                Event::JoyHatMotion {
-                    which: instance_id,
-                    hat_idx,
-                    state,
-                    ..
-                } if input_type == InputType::Gamepad => {
+                Event::JoyHatMotion { which: instance_id, hat_idx, state, .. }
+                    if input_type == InputType::Gamepad =>
+                {
                     if let (Some(device_id), Some(direction)) = (
                         input_handler.device_id_for(instance_id),
                         HatDirection::from_hat_state(state),
                     ) {
                         return Ok(InputReconfigureResult::Input(InputCollectResult::Gamepad(
-                            JoystickInput::Hat {
-                                device_id,
-                                hat_idx,
-                                direction,
-                            },
+                            JoystickInput::Hat { device_id, hat_idx, direction },
                         )));
                     }
                 }

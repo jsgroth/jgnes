@@ -29,24 +29,18 @@ fn steam_deck_dpi_hack() {
 
     let output = &monitor.outputs[0];
 
-    let Some(edid) = output
-        .properties
-        .iter()
-        .find_map(|(_, property)| match &property.value {
-            xrandr::Value::Edid(edid) => Some(edid),
-            _ => None,
-        })
-    else {
+    let Some(edid) = output.properties.iter().find_map(|(_, property)| match &property.value {
+        xrandr::Value::Edid(edid) => Some(edid),
+        _ => None,
+    }) else {
         return;
     };
 
     // Display name part of the EDID is always here on the Steam Deck: 'ANX7530 U<LF>'
-    if edid[75..87]
-        == [
-            0xFC, 0x00, 0x41, 0x4E, 0x58, 0x37, 0x35, 0x33, 0x30, 0x20, 0x55, 0x0A,
-        ]
-    {
-        log::info!("It looks like this is a Steam Deck; overriding winit scale factor to 1 as otherwise it will default to 4.5");
+    if edid[75..87] == [0xFC, 0x00, 0x41, 0x4E, 0x58, 0x37, 0x35, 0x33, 0x30, 0x20, 0x55, 0x0A] {
+        log::info!(
+            "It looks like this is a Steam Deck; overriding winit scale factor to 1 as otherwise it will default to 4.5"
+        );
         std::env::set_var("WINIT_X11_SCALE_FACTOR", "1");
     }
 }
@@ -66,9 +60,5 @@ fn main() -> eframe::Result<()> {
         ..NativeOptions::default()
     };
 
-    eframe::run_native(
-        "jgnes",
-        options,
-        Box::new(|_cc| Box::new(App::new(config_path))),
-    )
+    eframe::run_native("jgnes", options, Box::new(|_cc| Box::new(App::new(config_path))))
 }

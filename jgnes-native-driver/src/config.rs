@@ -152,43 +152,23 @@ impl HatDirection {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum JoystickInput {
-    Button {
-        device_id: u32,
-        button_idx: u8,
-    },
-    Axis {
-        device_id: u32,
-        axis_idx: u8,
-        direction: AxisDirection,
-    },
-    Hat {
-        device_id: u32,
-        hat_idx: u8,
-        direction: HatDirection,
-    },
+    Button { device_id: u32, button_idx: u8 },
+    Axis { device_id: u32, axis_idx: u8, direction: AxisDirection },
+    Hat { device_id: u32, hat_idx: u8, direction: HatDirection },
 }
 
 impl Display for JoystickInput {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Button {
-                device_id,
-                button_idx,
-            } => write!(f, "Joy {device_id} Button {button_idx}"),
-            Self::Axis {
-                device_id,
-                axis_idx,
-                direction,
-            } => write!(
-                f,
-                "Joy {device_id} Axis {axis_idx} {}",
-                direction.sign_str()
-            ),
-            Self::Hat {
-                device_id,
-                hat_idx,
-                direction,
-            } => write!(f, "Joy {device_id} Hat {hat_idx} {direction}"),
+            Self::Button { device_id, button_idx } => {
+                write!(f, "Joy {device_id} Button {button_idx}")
+            }
+            Self::Axis { device_id, axis_idx, direction } => {
+                write!(f, "Joy {device_id} Axis {axis_idx} {}", direction.sign_str())
+            }
+            Self::Hat { device_id, hat_idx, direction } => {
+                write!(f, "Joy {device_id} Hat {hat_idx} {direction}")
+            }
         }
     }
 }
@@ -258,36 +238,12 @@ impl Display for HotkeyConfig {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         writeln!(f)?;
         writeln!(f, "    Quit: {}", fmt_option(self.quit.as_ref()))?;
-        writeln!(
-            f,
-            "    Toggle Fullscreen: {}",
-            fmt_option(self.toggle_fullscreen.as_ref())
-        )?;
-        writeln!(
-            f,
-            "    Save State: {}",
-            fmt_option(self.save_state.as_ref())
-        )?;
-        writeln!(
-            f,
-            "    Load State: {}",
-            fmt_option(self.load_state.as_ref())
-        )?;
-        writeln!(
-            f,
-            "    Soft Reset: {}",
-            fmt_option(self.soft_reset.as_ref())
-        )?;
-        writeln!(
-            f,
-            "    Hard Reset: {}",
-            fmt_option(self.hard_reset.as_ref())
-        )?;
-        writeln!(
-            f,
-            "    Fast Forward: {}",
-            fmt_option(self.fast_forward.as_ref())
-        )?;
+        writeln!(f, "    Toggle Fullscreen: {}", fmt_option(self.toggle_fullscreen.as_ref()))?;
+        writeln!(f, "    Save State: {}", fmt_option(self.save_state.as_ref()))?;
+        writeln!(f, "    Load State: {}", fmt_option(self.load_state.as_ref()))?;
+        writeln!(f, "    Soft Reset: {}", fmt_option(self.soft_reset.as_ref()))?;
+        writeln!(f, "    Hard Reset: {}", fmt_option(self.hard_reset.as_ref()))?;
+        writeln!(f, "    Fast Forward: {}", fmt_option(self.fast_forward.as_ref()))?;
         write!(f, "    Rewind: {}", fmt_option(self.rewind.as_ref()))?;
 
         Ok(())
@@ -339,11 +295,7 @@ impl Display for InputConfig {
         writeln!(f, "  Player 2: {}", self.p2)?;
         writeln!(f, "  Hotkeys: {}", self.hotkeys)?;
         writeln!(f, "  axis_deadzone: {}", self.axis_deadzone)?;
-        writeln!(
-            f,
-            "  allow_opposite_directions: {}",
-            self.allow_opposite_directions
-        )?;
+        writeln!(f, "  allow_opposite_directions: {}", self.allow_opposite_directions)?;
 
         Ok(())
     }
@@ -364,11 +316,7 @@ pub struct JgnesNativeConfig {
 impl Display for JgnesNativeConfig {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "nes_file_path: {}", self.nes_file_path)?;
-        writeln!(
-            f,
-            "forced_timing_mode: {}",
-            fmt_option(self.forced_timing_mode.as_ref())
-        )?;
+        writeln!(f, "forced_timing_mode: {}", fmt_option(self.forced_timing_mode.as_ref()))?;
         writeln!(f, "window_width: {}", self.window_width)?;
         writeln!(f, "window_height: {}", self.window_height)?;
         writeln!(f, "renderer: {}", self.renderer)?;
@@ -430,34 +378,18 @@ impl Display for JgnesDynamicConfig {
         writeln!(f, "scanlines: {}", self.scanlines)?;
         writeln!(f, "aspect_ratio: {}", self.aspect_ratio)?;
         writeln!(f, "overscan: {}", self.overscan)?;
-        writeln!(
-            f,
-            "forced_integer_height_scaling: {}",
-            self.forced_integer_height_scaling
-        )?;
+        writeln!(f, "forced_integer_height_scaling: {}", self.forced_integer_height_scaling)?;
         writeln!(f, "vsync_mode: {}", self.vsync_mode)?;
         writeln!(f, "pal_black_border: {}", self.pal_black_border)?;
         writeln!(f, "sync_to_audio: {}", self.sync_to_audio)?;
-        writeln!(
-            f,
-            "audio_refresh_rate_adjustment: {}",
-            self.audio_refresh_rate_adjustment
-        )?;
+        writeln!(f, "audio_refresh_rate_adjustment: {}", self.audio_refresh_rate_adjustment)?;
         writeln!(
             f,
             "silence_ultrasonic_triangle_output: {}",
             self.silence_ultrasonic_triangle_output
         )?;
-        writeln!(
-            f,
-            "fast_forward_multiplier: {}",
-            self.fast_forward_multiplier
-        )?;
-        writeln!(
-            f,
-            "rewind_buffer_len_seconds: {}",
-            self.rewind_buffer_len.as_secs()
-        )?;
+        writeln!(f, "fast_forward_multiplier: {}", self.fast_forward_multiplier)?;
+        writeln!(f, "rewind_buffer_len_seconds: {}", self.rewind_buffer_len.as_secs())?;
         writeln!(f, "input_config: {}", self.input_config)?;
 
         Ok(())
@@ -535,8 +467,7 @@ impl JgnesSharedConfig {
     }
 
     pub fn request_input_configure(&self, input_type: InputType) {
-        self.input_reconfigure_signal
-            .store(input_type.to_discriminant(), Ordering::Relaxed);
+        self.input_reconfigure_signal.store(input_type.to_discriminant(), Ordering::Relaxed);
     }
 }
 
@@ -546,9 +477,6 @@ mod tests {
 
     #[test]
     fn no_input_reconfigure_returns_none() {
-        assert_eq!(
-            None,
-            InputType::from_discriminant(JgnesSharedConfig::NO_INPUT_RECONFIGURE)
-        );
+        assert_eq!(None, InputType::from_discriminant(JgnesSharedConfig::NO_INPUT_RECONFIGURE));
     }
 }

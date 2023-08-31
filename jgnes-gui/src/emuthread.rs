@@ -12,10 +12,7 @@ use std::{process, thread};
 
 pub(crate) enum EmuThreadTask {
     RunEmulator(Box<JgnesNativeConfig>),
-    CollectInput {
-        input_type: InputType,
-        axis_deadzone: u16,
-    },
+    CollectInput { input_type: InputType, axis_deadzone: u16 },
 }
 
 #[must_use]
@@ -36,7 +33,9 @@ pub(crate) fn start(
             let task = match task_receiver.recv() {
                 Ok(task) => task,
                 Err(err) => {
-                    log::info!("Emulation thread terminating due to recv error (most likely caused by closing main window): {err}");
+                    log::info!(
+                        "Emulation thread terminating due to recv error (most likely caused by closing main window): {err}"
+                    );
                     return;
                 }
             };
@@ -45,24 +44,27 @@ pub(crate) fn start(
                 EmuThreadTask::RunEmulator(config) => {
                     run_emulator(config, &is_running, &emulation_error);
                 }
-                EmuThreadTask::CollectInput {
-                    input_type,
-                    axis_deadzone,
-                } => match collect_input(input_type, axis_deadzone) {
-                    Ok(collect_result) => {
-                        if let Err(err) = input_sender.send(collect_result) {
-                            log::info!("Emulation thread terminating due to send error (most likely caused by closing main window): {err}");
-                            return;
+                EmuThreadTask::CollectInput { input_type, axis_deadzone } => {
+                    match collect_input(input_type, axis_deadzone) {
+                        Ok(collect_result) => {
+                            if let Err(err) = input_sender.send(collect_result) {
+                                log::info!(
+                                    "Emulation thread terminating due to send error (most likely caused by closing main window): {err}"
+                                );
+                                return;
+                            }
+                        }
+                        Err(err) => {
+                            log::error!("Error collecting controller input: {err}");
+                            if let Err(err) = input_sender.send(None) {
+                                log::info!(
+                                    "Emulation thread terminating due to send error (most likely caused by closing main window): {err}"
+                                );
+                                return;
+                            }
                         }
                     }
-                    Err(err) => {
-                        log::error!("Error collecting controller input: {err}");
-                        if let Err(err) = input_sender.send(None) {
-                            log::info!("Emulation thread terminating due to send error (most likely caused by closing main window): {err}");
-                            return;
-                        }
-                    }
-                },
+                }
             }
         }
     });
@@ -113,31 +115,28 @@ fn collect_input(
                 Event::Quit { .. } => {
                     return Ok(None);
                 }
-                Event::KeyDown {
-                    keycode: Some(keycode),
-                    ..
-                } if input_type == InputType::Keyboard => {
+                Event::KeyDown { keycode: Some(keycode), .. }
+                    if input_type == InputType::Keyboard =>
+                {
                     return Ok(Some(InputCollectResult::Keyboard(keycode)));
                 }
-                Event::JoyDeviceAdded {
-                    which: device_id, ..
-                } if input_type == InputType::Gamepad => {
+                Event::JoyDeviceAdded { which: device_id, .. }
+                    if input_type == InputType::Gamepad =>
+                {
                     let joystick = joystick_subsystem.open(device_id)?;
                     instance_id_to_device_id.insert(joystick.instance_id(), device_id);
                     joysticks.insert(device_id, joystick);
                 }
-                Event::JoyDeviceRemoved {
-                    which: instance_id, ..
-                } if input_type == InputType::Gamepad => {
+                Event::JoyDeviceRemoved { which: instance_id, .. }
+                    if input_type == InputType::Gamepad =>
+                {
                     if let Some(device_id) = instance_id_to_device_id.remove(&instance_id) {
                         joysticks.remove(&device_id);
                     }
                 }
-                Event::JoyButtonDown {
-                    which: instance_id,
-                    button_idx,
-                    ..
-                } if input_type == InputType::Gamepad => {
+                Event::JoyButtonDown { which: instance_id, button_idx, .. }
+                    if input_type == InputType::Gamepad =>
+                {
                     if let Some(&device_id) = instance_id_to_device_id.get(&instance_id) {
                         return Ok(Some(InputCollectResult::Gamepad(JoystickInput::Button {
                             device_id,
@@ -145,12 +144,9 @@ fn collect_input(
                         })));
                     }
                 }
-                Event::JoyAxisMotion {
-                    which: instance_id,
-                    axis_idx,
-                    value,
-                    ..
-                } if input_type == InputType::Gamepad => {
+                Event::JoyAxisMotion { which: instance_id, axis_idx, value, .. }
+                    if input_type == InputType::Gamepad =>
+                {
                     if let Some(&device_id) = instance_id_to_device_id.get(&instance_id) {
                         if value.saturating_abs() as u16 >= axis_deadzone {
                             let direction = AxisDirection::from_value(value);
@@ -162,12 +158,9 @@ fn collect_input(
                         }
                     }
                 }
-                Event::JoyHatMotion {
-                    which: instance_id,
-                    hat_idx,
-                    state,
-                    ..
-                } if input_type == InputType::Gamepad => {
+                Event::JoyHatMotion { which: instance_id, hat_idx, state, .. }
+                    if input_type == InputType::Gamepad =>
+                {
                     if let Some(&device_id) = instance_id_to_device_id.get(&instance_id) {
                         if let Some(direction) = HatDirection::from_hat_state(state) {
                             return Ok(Some(InputCollectResult::Gamepad(JoystickInput::Hat {
@@ -210,9 +203,7 @@ fn fill_with_random_colors(canvas: &mut WindowCanvas) -> Result<(), anyhow::Erro
         })
         .map_err(anyhow::Error::msg)?;
 
-    canvas
-        .copy(&texture, None, None)
-        .map_err(anyhow::Error::msg)?;
+    canvas.copy(&texture, None, None).map_err(anyhow::Error::msg)?;
     canvas.present();
 
     Ok(())

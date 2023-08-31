@@ -31,20 +31,12 @@ impl Header {
         let prg_rom_len_lsb = header[4];
         let chr_rom_len_lsb = header[5];
 
-        let prg_rom_len_msb = if is_nes_2_0_header {
-            header[9] & 0x0F
-        } else {
-            0
-        };
+        let prg_rom_len_msb = if is_nes_2_0_header { header[9] & 0x0F } else { 0 };
 
         let chr_rom_len_msb = if is_nes_2_0_header { header[9] >> 4 } else { 0 };
 
         let mapper_number_lsb = (header[7] & 0xF0) | (header[6] >> 4);
-        let mapper_number_msb = if is_nes_2_0_header {
-            header[8] & 0x0F
-        } else {
-            0
-        };
+        let mapper_number_msb = if is_nes_2_0_header { header[8] & 0x0F } else { 0 };
 
         let prg_rom_len =
             u32::from(u16::from_le_bytes([prg_rom_len_lsb, prg_rom_len_msb])) * 16 * 1024;
@@ -53,12 +45,7 @@ impl Header {
         let mapper_number = u16::from_le_bytes([mapper_number_lsb, mapper_number_msb]);
         let sub_mapper_number = if is_nes_2_0_header { header[8] >> 4 } else { 0 };
 
-        Ok(Self {
-            prg_rom_len,
-            chr_rom_len,
-            mapper_number,
-            sub_mapper_number,
-        })
+        Ok(Self { prg_rom_len, chr_rom_len, mapper_number, sub_mapper_number })
     }
 }
 
@@ -84,10 +71,8 @@ pub fn get_rom_list(dir: &str) -> anyhow::Result<Vec<RomMetadata>> {
         let Some(file_name) = dir_entry.file_name().to_str().map(String::from) else {
             continue;
         };
-        let Some(file_name_no_ext) = Path::new(&file_name)
-            .with_extension("")
-            .to_str()
-            .map(String::from)
+        let Some(file_name_no_ext) =
+            Path::new(&file_name).with_extension("").to_str().map(String::from)
         else {
             continue;
         };

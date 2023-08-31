@@ -212,17 +212,12 @@ impl TextureScalePipeline {
             multiview: None,
         });
 
-        Self {
-            scaled_texture,
-            bind_group,
-            pipeline,
-        }
+        Self { scaled_texture, bind_group, pipeline }
     }
 
     fn draw(&self, encoder: &mut wgpu::CommandEncoder) {
-        let scaled_texture_view = self
-            .scaled_texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
+        let scaled_texture_view =
+            self.scaled_texture.create_view(&wgpu::TextureViewDescriptor::default());
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("texture_scale_render_pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -391,20 +386,14 @@ impl BlurPipeline {
             multiview: None,
         });
 
-        Self {
-            buffer_texture,
-            horizontal_bind_group,
-            vertical_bind_group,
-            pipeline,
-        }
+        Self { buffer_texture, horizontal_bind_group, vertical_bind_group, pipeline }
     }
 
     fn draw(&self, encoder: &mut wgpu::CommandEncoder, scaled_texture: &wgpu::Texture) {
         let scaled_texture_view =
             scaled_texture.create_view(&wgpu::TextureViewDescriptor::default());
-        let buffer_texture_view = self
-            .buffer_texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
+        let buffer_texture_view =
+            self.buffer_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         {
             let mut horizontal_render_pass =
@@ -519,11 +508,7 @@ impl RenderPipeline {
         });
         let pipeline = create_render_pipeline(scanlines, device, &pipeline_layout, output_format);
 
-        Self {
-            bind_group,
-            pipeline_layout,
-            pipeline,
-        }
+        Self { bind_group, pipeline_layout, pipeline }
     }
 
     fn draw(
@@ -578,11 +563,7 @@ impl RenderPipelineState {
             Shader::Prescale(render_scale) if render_scale.get() > 1 => Some(
                 ShaderPipeline::Prescale(TextureScalePipeline::create(device, render_scale, input)),
             ),
-            Shader::GaussianBlur {
-                prescale_factor,
-                stdev,
-                radius,
-            } => {
+            Shader::GaussianBlur { prescale_factor, stdev, radius } => {
                 let texture_scale = TextureScalePipeline::create(device, prescale_factor, input);
                 let blur =
                     BlurPipeline::create(device, &texture_scale.scaled_texture, stdev, radius);
@@ -606,10 +587,7 @@ impl RenderPipelineState {
             scanlines,
         );
 
-        Self {
-            shader_pipeline,
-            render,
-        }
+        Self { shader_pipeline, render }
     }
 
     pub fn recreate_render_pipeline(
@@ -618,12 +596,8 @@ impl RenderPipelineState {
         scanlines: Scanlines,
         output_format: wgpu::TextureFormat,
     ) {
-        self.render.pipeline = create_render_pipeline(
-            scanlines,
-            device,
-            &self.render.pipeline_layout,
-            output_format,
-        );
+        self.render.pipeline =
+            create_render_pipeline(scanlines, device, &self.render.pipeline_layout, output_format);
     }
 
     pub fn draw(
@@ -644,8 +618,7 @@ impl RenderPipelineState {
             None => {}
         }
 
-        self.render
-            .draw(encoder, vertex_buffer, num_vertices, output_view);
+        self.render.draw(encoder, vertex_buffer, num_vertices, output_view);
     }
 }
 
@@ -748,10 +721,7 @@ fn create_render_bind_group(
                 binding: 0,
                 resource: wgpu::BindingResource::TextureView(texture_view),
             },
-            wgpu::BindGroupEntry {
-                binding: 1,
-                resource: wgpu::BindingResource::Sampler(sampler),
-            },
+            wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::Sampler(sampler) },
             wgpu::BindGroupEntry {
                 binding: 2,
                 resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {

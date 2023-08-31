@@ -20,30 +20,12 @@ struct Vertex2d {
 }
 
 const VERTICES: [Vertex2d; 6] = [
-    Vertex2d {
-        position: [-1.0, 1.0],
-        texture_coords: [0.0, 0.0],
-    },
-    Vertex2d {
-        position: [-1.0, -1.0],
-        texture_coords: [0.0, 1.0],
-    },
-    Vertex2d {
-        position: [1.0, -1.0],
-        texture_coords: [1.0, 1.0],
-    },
-    Vertex2d {
-        position: [1.0, -1.0],
-        texture_coords: [1.0, 1.0],
-    },
-    Vertex2d {
-        position: [1.0, 1.0],
-        texture_coords: [1.0, 0.0],
-    },
-    Vertex2d {
-        position: [-1.0, 1.0],
-        texture_coords: [0.0, 0.0],
-    },
+    Vertex2d { position: [-1.0, 1.0], texture_coords: [0.0, 0.0] },
+    Vertex2d { position: [-1.0, -1.0], texture_coords: [0.0, 1.0] },
+    Vertex2d { position: [1.0, -1.0], texture_coords: [1.0, 1.0] },
+    Vertex2d { position: [1.0, -1.0], texture_coords: [1.0, 1.0] },
+    Vertex2d { position: [1.0, 1.0], texture_coords: [1.0, 0.0] },
+    Vertex2d { position: [-1.0, 1.0], texture_coords: [0.0, 0.0] },
 ];
 
 impl Vertex2d {
@@ -151,10 +133,7 @@ where
             .await
             .ok_or_else(|| WgpuRendererError::msg("Unable to obtain wgpu adapter"))?;
 
-        log::info!(
-            "Using GPU adapter with backend {:?}",
-            adapter.get_info().backend
-        );
+        log::info!("Using GPU adapter with backend {:?}", adapter.get_info().backend);
 
         let (device, queue) = adapter
             .request_device(
@@ -186,10 +165,7 @@ where
 
         let desired_present_mode = render_config.vsync_mode.to_present_mode();
 
-        if !surface_capabilities
-            .present_modes
-            .contains(&desired_present_mode)
-        {
+        if !surface_capabilities.present_modes.contains(&desired_present_mode) {
             return Err(WgpuRendererError::msg(unsupported_vsync_mode_error(
                 render_config.vsync_mode,
                 &surface_capabilities.present_modes,
@@ -384,11 +360,7 @@ where
         }
 
         let present_mode = vsync_mode.to_present_mode();
-        if !self
-            .surface_capabilities
-            .present_modes
-            .contains(&present_mode)
-        {
+        if !self.surface_capabilities.present_modes.contains(&present_mode) {
             return Err(WgpuRendererError::msg(unsupported_vsync_mode_error(
                 vsync_mode,
                 &self.surface_capabilities.present_modes,
@@ -510,11 +482,9 @@ impl<W: HasRawDisplayHandle + HasRawWindowHandle> Renderer for WgpuRenderer<W> {
             return Ok(());
         }
 
-        self.queue
-            .write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&self.vertices));
+        self.queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&self.vertices));
 
-        self.queue
-            .write_buffer(&self.fs_globals_buffer, 0, &self.fs_globals.to_bytes());
+        self.queue.write_buffer(&self.fs_globals_buffer, 0, &self.fs_globals.to_bytes());
 
         colors::to_rgba(
             frame_buffer,
@@ -541,15 +511,11 @@ impl<W: HasRawDisplayHandle + HasRawWindowHandle> Renderer for WgpuRenderer<W> {
         );
 
         let output = self.surface.get_current_texture()?;
-        let surface_view = output
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
+        let surface_view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("command_encoder"),
-            });
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("command_encoder"),
+        });
 
         self.render_pipeline_state.draw(
             &mut encoder,

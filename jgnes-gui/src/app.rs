@@ -258,8 +258,7 @@ impl<'a> InputButton<'a> {
 
     fn ui(self, ui: &mut Ui) {
         if self.button.ui(ui).clicked() {
-            self.app_state
-                .send_input_configure_request(self.input_type, self.axis_deadzone);
+            self.app_state.send_input_configure_request(self.input_type, self.axis_deadzone);
             self.app_state.waiting_for_input =
                 Some(WaitingForInput::NesButton(self.player, self.nes_button));
         }
@@ -304,8 +303,7 @@ impl<'a> HotkeyButton<'a> {
         }
         if response.clicked() {
             self.app_state.waiting_for_input = Some(WaitingForInput::Hotkey(self.hotkey));
-            self.app_state
-                .send_input_configure_request(InputType::Keyboard, self.axis_deadzone);
+            self.app_state.send_input_configure_request(InputType::Keyboard, self.axis_deadzone);
         }
     }
 }
@@ -538,14 +536,9 @@ impl AppState {
     }
 
     fn send_input_configure_request(&self, input_type: InputType, axis_deadzone: u16) {
-        match (
-            self.emulator_is_running.load(Ordering::Relaxed),
-            &self.running_emulator_state,
-        ) {
+        match (self.emulator_is_running.load(Ordering::Relaxed), &self.running_emulator_state) {
             (true, Some(running_emulator_state)) => {
-                running_emulator_state
-                    .shared_config
-                    .request_input_configure(input_type);
+                running_emulator_state.shared_config.request_input_configure(input_type);
             }
             (true, None) => {
                 // ???
@@ -553,10 +546,7 @@ impl AppState {
             }
             (false, _) => {
                 self.thread_task_sender
-                    .send(EmuThreadTask::CollectInput {
-                        input_type,
-                        axis_deadzone,
-                    })
+                    .send(EmuThreadTask::CollectInput { input_type, axis_deadzone })
                     .expect("Sending collect input task should not fail");
             }
         }
@@ -575,10 +565,7 @@ impl AppState {
         self.thread_input_receiver
             .recv_timeout(Duration::from_millis(1))
             .ok()
-            .map_or(
-                InputReceiveResult::NotReceived,
-                InputReceiveResult::Received,
-            )
+            .map_or(InputReceiveResult::NotReceived, InputReceiveResult::Received)
     }
 }
 
@@ -597,13 +584,7 @@ impl<'a, T: FromStr + PartialOrd> NumericTextInput<'a, T> {
         invalid: &'a mut bool,
         allowed_values: RangeInclusive<T>,
     ) -> Self {
-        Self {
-            text,
-            config_value,
-            invalid,
-            allowed_values,
-            desired_width: None,
-        }
+        Self { text, config_value, invalid, allowed_values, desired_width: None }
     }
 
     fn desired_width(mut self, desired_width: f32) -> Self {
@@ -657,11 +638,7 @@ impl App {
 
         let state = AppState::new(&config);
 
-        let mut app = Self {
-            config_path,
-            config,
-            state,
-        };
+        let mut app = Self { config_path, config, state };
         app.refresh_rom_list();
         app
     }
@@ -704,11 +681,8 @@ impl App {
             return;
         };
 
-        let dynamic_config = &mut *running_emulator_state
-            .shared_config
-            .get_dynamic_config()
-            .lock()
-            .unwrap();
+        let dynamic_config =
+            &mut *running_emulator_state.shared_config.get_dynamic_config().lock().unwrap();
 
         *dynamic_config = self.config.to_jgnes_dynamic_config();
 
@@ -807,10 +781,9 @@ impl App {
 
     fn render_general_settings_window(&mut self, ctx: &Context) {
         let mut general_settings_open = true;
-        Window::new("General Settings")
-            .resizable(false)
-            .open(&mut general_settings_open)
-            .show(ctx, |ui| {
+        Window::new("General Settings").resizable(false).open(&mut general_settings_open).show(
+            ctx,
+            |ui| {
                 ui.horizontal(|ui| {
                     let button_text = self.config.rom_search_dir.as_deref().unwrap_or("<None>");
                     if ui.button(button_text).clicked() {
@@ -861,7 +834,8 @@ impl App {
                         .on_disabled_hover_text(disabled_hover_text);
                     });
                 });
-            });
+            },
+        );
         if !general_settings_open {
             self.state.open_window = None;
         }
@@ -1248,10 +1222,9 @@ impl App {
         let window_title = format!("{player:?} {input_type:?} Configuration");
 
         let mut input_subwindow_open = true;
-        Window::new(&window_title)
-            .resizable(false)
-            .open(&mut input_subwindow_open)
-            .show(ctx, |ui| {
+        Window::new(&window_title).resizable(false).open(&mut input_subwindow_open).show(
+            ctx,
+            |ui| {
                 ui.set_enabled(self.state.waiting_for_input.is_none());
 
                 Grid::new(format!("{player:?}_{input_type:?}")).show(ui, |ui| {
@@ -1281,7 +1254,8 @@ impl App {
                         ui.end_row();
                     }
                 });
-            });
+            },
+        );
         if !input_subwindow_open {
             self.state.open_input_window = None;
         }
@@ -1289,10 +1263,9 @@ impl App {
 
     fn render_hotkey_settings_window(&mut self, ctx: &Context) {
         let mut hotkey_settings_open = true;
-        Window::new("Hotkey Settings")
-            .resizable(false)
-            .open(&mut hotkey_settings_open)
-            .show(ctx, |ui| {
+        Window::new("Hotkey Settings").resizable(false).open(&mut hotkey_settings_open).show(
+            ctx,
+            |ui| {
                 Grid::new("hotkey_settings_grid").show(ui, |ui| {
                     for &hotkey in Hotkey::ALL {
                         ui.label(format!("{}:", hotkey.label()));
@@ -1342,7 +1315,8 @@ impl App {
                         "Rewind buffer length must be a non-negative integer",
                     );
                 }
-            });
+            },
+        );
         if !hotkey_settings_open {
             self.state.open_window = None;
         }
@@ -1350,27 +1324,24 @@ impl App {
 
     fn render_about_window(&mut self, ctx: &Context) {
         let mut about_open = true;
-        Window::new("About")
-            .resizable(false)
-            .open(&mut about_open)
-            .show(ctx, |ui| {
-                ui.heading("jgnes");
+        Window::new("About").resizable(false).open(&mut about_open).show(ctx, |ui| {
+            ui.heading("jgnes");
 
-                ui.add_space(10.0);
+            ui.add_space(10.0);
 
-                ui.label(format!("Version: {}", env!("CARGO_PKG_VERSION")));
+            ui.label(format!("Version: {}", env!("CARGO_PKG_VERSION")));
 
-                ui.add_space(15.0);
+            ui.add_space(15.0);
 
-                ui.label("Copyright © 2023 James Groth");
+            ui.label("Copyright © 2023 James Groth");
 
-                ui.add_space(15.0);
+            ui.add_space(15.0);
 
-                ui.horizontal(|ui| {
-                    ui.label("Source code:");
-                    ui.hyperlink("https://github.com/jsgroth/jgnes");
-                });
+            ui.horizontal(|ui| {
+                ui.label("Source code:");
+                ui.hyperlink("https://github.com/jsgroth/jgnes");
             });
+        });
         if !about_open {
             self.state.open_window = None;
         }
@@ -1536,20 +1507,17 @@ impl eframe::App for App {
 
         if self.state.error_window_open {
             let mut error_open = true;
-            Window::new("Error")
-                .resizable(false)
-                .open(&mut error_open)
-                .show(ctx, |ui| {
-                    ui.colored_label(
-                        Color32::RED,
-                        self.state
-                            .emulation_error
-                            .lock()
-                            .unwrap()
-                            .as_ref()
-                            .map_or(String::new(), anyhow::Error::to_string),
-                    );
-                });
+            Window::new("Error").resizable(false).open(&mut error_open).show(ctx, |ui| {
+                ui.colored_label(
+                    Color32::RED,
+                    self.state
+                        .emulation_error
+                        .lock()
+                        .unwrap()
+                        .as_ref()
+                        .map_or(String::new(), anyhow::Error::to_string),
+                );
+            });
             if !error_open {
                 self.state.error_window_open = false;
                 *self.state.emulation_error.lock().unwrap() = None;

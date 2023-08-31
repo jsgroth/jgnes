@@ -263,10 +263,7 @@ impl JgnesWebConfig {
     }
 
     pub fn set_overscan_left(&self, value: bool) {
-        let overscan = Overscan {
-            left: overscan_value(value),
-            ..self.fields.borrow().overscan
-        };
+        let overscan = Overscan { left: overscan_value(value), ..self.fields.borrow().overscan };
         self.set_overscan(overscan);
     }
 
@@ -275,10 +272,7 @@ impl JgnesWebConfig {
     }
 
     pub fn set_overscan_right(&self, value: bool) {
-        let overscan = Overscan {
-            right: overscan_value(value),
-            ..self.fields.borrow().overscan
-        };
+        let overscan = Overscan { right: overscan_value(value), ..self.fields.borrow().overscan };
         self.set_overscan(overscan);
     }
 
@@ -287,10 +281,7 @@ impl JgnesWebConfig {
     }
 
     pub fn set_overscan_top(&self, value: bool) {
-        let overscan = Overscan {
-            top: overscan_value(value),
-            ..self.fields.borrow().overscan
-        };
+        let overscan = Overscan { top: overscan_value(value), ..self.fields.borrow().overscan };
         self.set_overscan(overscan);
     }
 
@@ -299,10 +290,7 @@ impl JgnesWebConfig {
     }
 
     pub fn set_overscan_bottom(&self, value: bool) {
-        let overscan = Overscan {
-            bottom: overscan_value(value),
-            ..self.fields.borrow().overscan
-        };
+        let overscan = Overscan { bottom: overscan_value(value), ..self.fields.borrow().overscan };
         self.set_overscan(overscan);
     }
 
@@ -425,9 +413,5 @@ impl Default for JgnesWebConfig {
 }
 
 fn overscan_value(value: bool) -> u8 {
-    if value {
-        8
-    } else {
-        0
-    }
+    if value { 8 } else { 0 }
 }

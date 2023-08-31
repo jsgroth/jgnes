@@ -24,11 +24,13 @@ jobs:
       with:
         toolchain: stable
 
+    - name: Add nightly toolchain
+      run: |
+        rustup toolchain add $JGNES_WEB_TOOLCHAIN --component rust-src --component clippy --component rustfmt
+
     - name: Check formatting
-      uses: actions-rs/cargo@v1
-      with:
-        command: fmt
-        args: --check
+      run: |
+        cargo +$JGNES_WEB_TOOLCHAIN fmt --check
 
     - name: Install libsdl2 and libgtk-3
       run: |
@@ -55,10 +57,6 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: test
-
-    - name: Add nightly toolchain
-      run: |
-        rustup toolchain add $JGNES_WEB_TOOLCHAIN --component rust-src --component clippy
 
     - name: Install wasm-pack
       uses: actions-rs/cargo@v1

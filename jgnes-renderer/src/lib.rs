@@ -25,12 +25,9 @@ pub fn determine_display_area(
     timing_mode: TimingMode,
 ) -> DisplayArea {
     match aspect_ratio {
-        AspectRatio::Stretched => DisplayArea {
-            x: 0,
-            y: 0,
-            width: window_width,
-            height: window_height,
-        },
+        AspectRatio::Stretched => {
+            DisplayArea { x: 0, y: 0, width: window_width, height: window_height }
+        }
         AspectRatio::Ntsc
         | AspectRatio::Pal
         | AspectRatio::SquarePixels
@@ -49,10 +46,8 @@ pub fn determine_display_area(
                 window_width,
                 (f64::from(window_height) * width_to_height_ratio).round() as u32,
             );
-            let height = cmp::min(
-                window_height,
-                (f64::from(width) / width_to_height_ratio).round() as u32,
-            );
+            let height =
+                cmp::min(window_height, (f64::from(width) / width_to_height_ratio).round() as u32);
             let (width, height) =
                 if forced_integer_height_scaling && height >= visible_screen_height {
                     let height = visible_screen_height * (height / visible_screen_height);

@@ -107,6 +107,14 @@ struct CliArgs {
     #[arg(long = "no-audio-sync", default_value_t = true, action = clap::ArgAction::SetFalse)]
     sync_to_audio: bool,
 
+    /// Internal audio buffer size in samples
+    #[arg(long, default_value_t = 800)]
+    internal_audio_buffer_size: u32,
+
+    /// Audio sync threshold in bytes
+    #[arg(long, default_value_t = 4096)]
+    audio_sync_threshold: u32,
+
     /// Disable audio refresh rate adjustment; by default, the audio signal is downsampled so that
     /// syncing to audio will run the emulator at exactly 60FPS (NTSC) / 50FPS (PAL) instead of the
     /// NES native refresh rate (~60.1FPS for NTSC, ~50.007FPS for PAL)
@@ -202,6 +210,8 @@ fn main() -> anyhow::Result<()> {
         remove_sprite_limit: args.remove_sprite_limit,
         pal_black_border: args.pal_black_border,
         sync_to_audio: args.sync_to_audio,
+        internal_audio_buffer_size: args.internal_audio_buffer_size,
+        audio_sync_threshold: args.audio_sync_threshold,
         audio_refresh_rate_adjustment: args.audio_refresh_rate_adjustment,
         silence_ultrasonic_triangle_output: args.silence_ultrasonic_triangle_output,
         fast_forward_multiplier: args.fast_forward_multiplier,

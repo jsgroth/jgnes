@@ -47,6 +47,14 @@ fn default_blur_radius() -> u32 {
     16
 }
 
+fn default_audio_buffer_size() -> u32 {
+    800
+}
+
+fn default_audio_sync_threshold() -> u32 {
+    4096
+}
+
 fn default_ff_multiplier() -> u8 {
     2
 }
@@ -103,6 +111,10 @@ struct AppConfig {
     pal_black_border: bool,
     #[serde(default = "true_fn")]
     sync_to_audio: bool,
+    #[serde(default = "default_audio_buffer_size")]
+    internal_audio_buffer_size: u32,
+    #[serde(default = "default_audio_sync_threshold")]
+    audio_sync_threshold: u32,
     #[serde(default = "true_fn")]
     audio_refresh_rate_adjustment: bool,
     #[serde(default)]
@@ -144,6 +156,8 @@ impl AppConfig {
             remove_sprite_limit: self.remove_sprite_limit,
             pal_black_border: self.pal_black_border,
             sync_to_audio: self.sync_to_audio,
+            internal_audio_buffer_size: self.internal_audio_buffer_size,
+            audio_sync_threshold: self.audio_sync_threshold,
             audio_refresh_rate_adjustment: self.audio_refresh_rate_adjustment,
             silence_ultrasonic_triangle_output: self.silence_ultrasonic_triangle_output,
             fast_forward_multiplier: self.fast_forward_multiplier,
@@ -454,6 +468,10 @@ struct AppState {
     window_width_invalid: bool,
     window_height_text: String,
     window_height_invalid: bool,
+    audio_buffer_size_text: String,
+    audio_buffer_size_invalid: bool,
+    audio_sync_threshold_text: String,
+    audio_sync_threshold_invalid: bool,
     shader: ShaderState,
     overscan: OverscanState,
     input: InputState,
@@ -506,6 +524,10 @@ impl AppState {
             window_width_invalid: false,
             window_height_text: config.window_height.to_string(),
             window_height_invalid: false,
+            audio_buffer_size_text: config.internal_audio_buffer_size.to_string(),
+            audio_buffer_size_invalid: false,
+            audio_sync_threshold_text: config.audio_sync_threshold.to_string(),
+            audio_sync_threshold_invalid: false,
             shader: shader_state,
             overscan: overscan_state,
             input: input_state,
@@ -1140,6 +1162,26 @@ impl App {
                     "Silence triangle wave channel at ultrasonic frequencies",
                 )
                 .on_hover_text("This is less accurate but can reduce audio popping in some games");
+
+                ui.horizontal(|ui| {
+                    NumericTextInput::new(&mut self.state.audio_buffer_size_text, &mut self.config.internal_audio_buffer_size, &mut self.state.audio_buffer_size_invalid, 0..=u32::MAX)
+                        .desired_width(50.0)
+                        .ui(ui);
+                    ui.label("Internal audio buffer size in samples");
+                });
+                if self.state.audio_buffer_size_invalid {
+                    ui.colored_label(Color32::RED, "Audio buffer size must be a non-negative integer");
+                }
+
+                ui.horizontal(|ui| {
+                    NumericTextInput::new(&mut self.state.audio_sync_threshold_text, &mut self.config.audio_sync_threshold, &mut self.state.audio_sync_threshold_invalid, 0..=u32::MAX)
+                        .desired_width(50.0)
+                        .ui(ui);
+                    ui.label("Audio sync threshold in bytes");
+                });
+                if self.state.audio_sync_threshold_invalid {
+                    ui.colored_label(Color32::RED, "Audio sync threshold must be a non-negative integer");
+                }
             });
         if !audio_settings_open {
             self.state.open_window = None;

@@ -150,6 +150,8 @@ impl<'a, T> Renderer for SdlRenderer<'a, T> {
 struct SdlAudioPlayer {
     audio_queue: AudioQueue<f32>,
     sync_to_audio: bool,
+    internal_buffer_size: u32,
+    audio_sync_threshold: u32,
     sample_queue: Vec<f32>,
     low_pass_filter: LowPassFilter,
     downsample_counter: DownsampleCounter,
@@ -161,11 +163,15 @@ impl SdlAudioPlayer {
     fn new(
         audio_queue: AudioQueue<f32>,
         sync_to_audio: bool,
+        internal_buffer_size: u32,
+        audio_sync_threshold: u32,
         audio_refresh_rate_adjustment: bool,
     ) -> Self {
         Self {
             audio_queue,
             sync_to_audio,
+            internal_buffer_size,
+            audio_sync_threshold,
             sample_queue: Vec::new(),
             low_pass_filter: LowPassFilter::new(),
             downsample_counter: DownsampleCounter::new(
@@ -182,7 +188,6 @@ impl SdlAudioPlayer {
 const AUDIO_OUTPUT_FREQUENCY: f64 = 48000.0;
 const DEVICE_BUFFER_SIZE: u16 = 64;
 const DISPLAY_RATE: f64 = 60.0;
-const SAMPLES_PER_FRAME: usize = 800;
 
 impl AudioPlayer for SdlAudioPlayer {
     type Err = anyhow::Error;
@@ -198,13 +203,13 @@ impl AudioPlayer for SdlAudioPlayer {
             }
         }
 
-        if self.sample_queue.len() >= SAMPLES_PER_FRAME {
+        if self.sample_queue.len() >= self.internal_buffer_size as usize {
             // 1024 samples * 4 bytes per sample
-            while self.sync_to_audio && self.audio_queue.size() >= 4096 {
+            while self.sync_to_audio && self.audio_queue.size() >= self.audio_sync_threshold {
                 sleep(Duration::from_micros(250));
             }
 
-            if self.audio_queue.size() < 8192 {
+            if self.audio_queue.size() < 4 * self.audio_sync_threshold {
                 self.audio_queue.queue_audio(&self.sample_queue).map_err(anyhow::Error::msg)?;
             }
             // If audio sync is disabled, intentionally drop samples while the audio queue is full
@@ -379,12 +384,16 @@ pub fn run(config: &JgnesNativeConfig) -> anyhow::Result<()> {
         .map_err(anyhow::Error::msg)?;
     audio_queue.resume();
 
-    let (sync_to_audio, audio_refresh_rate_adjustment) = {
+    let audio_player = {
         let dynamic_config = dynamic_config.lock().unwrap();
-        (dynamic_config.sync_to_audio, dynamic_config.audio_refresh_rate_adjustment)
+        SdlAudioPlayer::new(
+            audio_queue,
+            dynamic_config.sync_to_audio,
+            dynamic_config.internal_audio_buffer_size,
+            dynamic_config.audio_sync_threshold,
+            dynamic_config.audio_refresh_rate_adjustment,
+        )
     };
-    let audio_player =
-        SdlAudioPlayer::new(audio_queue, sync_to_audio, audio_refresh_rate_adjustment);
 
     let input_poller =
         SdlInputPoller { p1_joypad_state: Rc::default(), p2_joypad_state: Rc::default() };
@@ -621,6 +630,8 @@ where
 
                 let audio_player = emulator.get_audio_player_mut();
                 audio_player.sync_to_audio = dynamic_config.sync_to_audio;
+                audio_player.internal_buffer_size = dynamic_config.internal_audio_buffer_size;
+                audio_player.audio_sync_threshold = dynamic_config.audio_sync_threshold;
                 audio_player
                     .downsample_counter
                     .set_refresh_rate_adjustment(dynamic_config.audio_refresh_rate_adjustment);

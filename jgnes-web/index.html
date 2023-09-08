@@ -255,6 +255,10 @@
                 });
             });
 
+            /**
+             * @param id {string}
+             * @param setter {(checked: boolean) => any}
+             */
             function initCheckboxElement(id, setter) {
                 let element = document.getElementById(id);
                 element.addEventListener("click", (event) => {

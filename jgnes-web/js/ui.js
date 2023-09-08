@@ -1,9 +1,17 @@
 // Miscellaneous UI functions called from Rust
 
+/**
+ * @param key {string}
+ * @returns {string}
+ */
 export function loadFromLocalStorage(key) {
     return localStorage.getItem(key);
 }
 
+/**
+ * @param key {string}
+ * @param value {string}
+ */
 export function saveToLocalStorage(key, value) {
     localStorage.setItem(key, value);
 }
@@ -14,6 +22,10 @@ export function initComplete() {
     document.getElementById("loading-text").remove();
 }
 
+/**
+ * @param buttonName {string}
+ * @param buttonText {string}
+ */
 function setInputButtonText(buttonName, buttonText) {
     let buttonId = {
         "Up": "up-key",
@@ -28,6 +40,9 @@ function setInputButtonText(buttonName, buttonText) {
     document.getElementById(buttonId).value = buttonText;
 }
 
+/**
+ * @param jgnesWebConfig {JgnesWebConfig}
+ */
 export function setConfigDisplayValues(jgnesWebConfig) {
     document.querySelectorAll("input[name='aspect-ratio']").forEach((element) => {
         element.checked = element.value === jgnesWebConfig.aspect_ratio();
@@ -68,6 +83,10 @@ export function setConfigDisplayValues(jgnesWebConfig) {
     setInputButtonText("Select", inputConfig.select());
 }
 
+/**
+ * @param buttonName {string}
+ * @param buttonText {string}
+ */
 export function afterInputReconfigure(buttonName, buttonText) {
     document.querySelectorAll("input.input-config").forEach((element) => {
         element.disabled = false;
@@ -83,12 +102,18 @@ export function focusCanvas() {
     document.querySelector("canvas").focus();
 }
 
+/**
+ * @param enabled {boolean}
+ */
 export function setSaveButtonsEnabled(enabled) {
     document.querySelectorAll("input.save-button").forEach((element) => {
         element.disabled = !enabled;
     });
 }
 
+/**
+ * @param visible {boolean}
+ */
 export function setCursorVisible(visible) {
     let canvas = document.querySelector("canvas");
     if (visible) {

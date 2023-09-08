@@ -2,7 +2,7 @@
 
 /**
  * @param key {string}
- * @returns {string}
+ * @returns {string | null}
  */
 export function loadFromLocalStorage(key) {
     return localStorage.getItem(key);

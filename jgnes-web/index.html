@@ -193,10 +193,13 @@
                         <legend>Other</legend>
 
                         <input type="checkbox" id="force-integer-scaling" name="force-integer-scaling">
-                        <label for="force-integer-scaling">Force integer height scaling (for fullscreen)</label>
+                        <label for="force-integer-scaling">Force integer height scaling</label>
 
                         <input type="checkbox" id="sprite-limit-disabled" name="sprite-limit-disabled">
-                        <label for="sprite-limit-disabled">Eliminate sprite flickering (can cause bugs)</label>
+                        <label for="sprite-limit-disabled">Eliminate sprite flickering</label>
+
+                        <input type="checkbox" id="frame-time-sync" name="frame-time-sync">
+                        <label for="frame-time-sync">Sync based on frame times</label>
                     </fieldset>
                     <fieldset id="input-config">
                         <legend>Input keys</legend>
@@ -280,6 +283,7 @@
 
             initCheckboxElement("force-integer-scaling", (value) => config.set_force_integer_scaling(value));
             initCheckboxElement("sprite-limit-disabled", (value) => config.set_remove_sprite_limit(value));
+            initCheckboxElement("frame-time-sync", (value) => config.set_frame_time_sync(value));
 
             document.querySelectorAll("input.input-config").forEach((element) => {
                 element.addEventListener("click", (event) => {

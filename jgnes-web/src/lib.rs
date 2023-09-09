@@ -397,6 +397,11 @@ fn run_event_loop(
 ) -> ! {
     let event_loop_proxy = event_loop.create_proxy();
 
+    let performance = web_sys::window()
+        .and_then(|window| window.performance())
+        .expect("Unable to get window.performance");
+    let mut next_frame_time = performance.now();
+
     // Used in white noise generator because rendering 60FPS is a bit much visually
     let mut odd_frame = false;
 
@@ -539,7 +544,23 @@ fn run_event_loop(
                     let audio_queue_len = state.audio_player.borrow().audio_queue.len().unwrap();
                     let should_wait_for_audio =
                         audio_sync_enabled && audio_queue_len > AUDIO_QUEUE_THRESHOLD;
-                    if !should_wait_for_audio {
+
+                    let frame_time_sync = state.current_config.frame_time_sync;
+                    let now = performance.now();
+                    let should_wait_for_frame_time = frame_time_sync && now < next_frame_time;
+
+                    if !should_wait_for_audio && !should_wait_for_frame_time {
+                        let fps = state.emulator.as_ref().map_or(60.0, |emulator| {
+                            match emulator.timing_mode() {
+                                TimingMode::Ntsc => 60.0,
+                                TimingMode::Pal => 50.0,
+                            }
+                        });
+
+                        while now >= next_frame_time {
+                            next_frame_time += 1000.0 / fps;
+                        }
+
                         match &mut state.emulator {
                             Some(emulator) => {
                                 let emulator_config = EmulatorConfig {

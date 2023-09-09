@@ -36,6 +36,8 @@ pub(crate) struct ConfigFields {
     pub(crate) audio_sync_enabled: bool,
     #[serde(default)]
     pub(crate) silence_ultrasonic_triangle_output: bool,
+    #[serde(default)]
+    pub(crate) frame_time_sync: bool,
 }
 
 impl ConfigFields {
@@ -341,6 +343,16 @@ impl JgnesWebConfig {
     pub fn set_silence_ultrasonic_triangle_output(&self, value: bool) {
         let mut fields = self.fields.borrow_mut();
         fields.silence_ultrasonic_triangle_output = value;
+        fields.save();
+    }
+
+    pub fn frame_time_sync(&self) -> bool {
+        self.fields.borrow().frame_time_sync
+    }
+
+    pub fn set_frame_time_sync(&self, value: bool) {
+        let mut fields = self.fields.borrow_mut();
+        fields.frame_time_sync = value;
         fields.save();
     }
 

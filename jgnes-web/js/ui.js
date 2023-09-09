@@ -71,6 +71,7 @@ export function setConfigDisplayValues(jgnesWebConfig) {
 
     document.getElementById("force-integer-scaling").checked = jgnesWebConfig.get_force_integer_scaling();
     document.getElementById("sprite-limit-disabled").checked = jgnesWebConfig.get_remove_sprite_limit();
+    document.getElementById("frame-time-sync").checked = jgnesWebConfig.frame_time_sync();
 
     let inputConfig = jgnesWebConfig.inputs();
     setInputButtonText("Up", inputConfig.up());

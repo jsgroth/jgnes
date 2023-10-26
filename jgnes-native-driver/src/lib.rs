@@ -360,6 +360,7 @@ pub fn run(config: &JgnesNativeConfig) -> anyhow::Result<()> {
         config.window_height,
     );
     window_builder.resizable();
+    window_builder.metal_view();
 
     if config.launch_fullscreen {
         window_builder.fullscreen_desktop();

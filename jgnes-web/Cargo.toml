@@ -48,3 +48,6 @@ features = [
     "AudioDestinationNode",
     "Performance",
 ]
+
+[lints]
+workspace = true

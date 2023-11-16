@@ -24,3 +24,6 @@ toml = "0.7"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 xrandr = "0.2"
+
+[lints]
+workspace = true

@@ -41,16 +41,10 @@ jobs:
       with:
         command: build
 
-    - name: Install cranky
-      uses: actions-rs/cargo@v1
-      with:
-        command: install
-        args: cargo-cranky
-
     - name: Check Clippy warnings
       uses: actions-rs/cargo@v1
       with:
-        command: cranky
+        command: clippy
         args: -- -D warnings
 
     - name: Run tests
@@ -70,7 +64,7 @@ jobs:
 
     - name: Check warnings for web
       run: |
-        cd jgnes-web && cargo +$JGNES_WEB_TOOLCHAIN cranky --target wasm32-unknown-unknown -- -D warnings
+        cd jgnes-web && cargo +$JGNES_WEB_TOOLCHAIN clippy --target wasm32-unknown-unknown -- -D warnings
   linux-release:
     runs-on: ubuntu-latest
 

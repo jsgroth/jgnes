@@ -15,3 +15,6 @@ serde = { workspace = true }
 raw-window-handle = "0.5"
 thiserror = "1"
 wgpu = "0.17"
+
+[lints]
+workspace = true

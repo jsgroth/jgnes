@@ -1,6 +1,6 @@
 # jgnes
 
-A cross-platform NES emulator. Has a native frontend built using SDL2 as well as a web frontend that compiles to WASM and runs in the browser.
+A cross-platform NES emulator. Has a native frontend built using SDL2 as well as a [web frontend](https://jsgroth.dev/jgnes/) that compiles to WASM and runs in the browser.
 
 ## Feature Status
 

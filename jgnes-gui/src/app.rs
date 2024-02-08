@@ -5,7 +5,7 @@ use eframe::Frame;
 use egui::panel::TopBottomSide;
 use egui::{
     menu, Align, Button, CentralPanel, Color32, Context, Grid, Key, KeyboardShortcut, Layout,
-    Modifiers, TextEdit, TopBottomPanel, Ui, Vec2, Widget, Window,
+    Modifiers, TextEdit, TopBottomPanel, Ui, Vec2, ViewportCommand, Widget, Window,
 };
 use egui_extras::{Column, TableBuilder};
 use jgnes_core::TimingMode;
@@ -240,17 +240,22 @@ struct InputState {
     rewind_buffer_len_invalid: bool,
 }
 
-struct InputButton<'a> {
-    button: Button,
+struct InputButton<'app, 'button> {
+    button: Button<'button>,
     player: Player,
     input_type: InputType,
     nes_button: NesButton,
     axis_deadzone: u16,
-    app_state: &'a mut AppState,
+    app_state: &'app mut AppState,
 }
 
-impl<'a> InputButton<'a> {
-    fn new(player: Player, input_type: InputType, nes_button: NesButton, app: &'a mut App) -> Self {
+impl<'app, 'button> InputButton<'app, 'button> {
+    fn new(
+        player: Player,
+        input_type: InputType,
+        nes_button: NesButton,
+        app: &'app mut App,
+    ) -> Self {
         let current_input_str = match input_type {
             InputType::Keyboard => get_keyboard_field(&mut app.config.input, player, nes_button)
                 .as_ref()
@@ -279,16 +284,16 @@ impl<'a> InputButton<'a> {
     }
 }
 
-struct HotkeyButton<'a> {
-    button: Button,
+struct HotkeyButton<'app, 'button> {
+    button: Button<'button>,
     hotkey: Hotkey,
     axis_deadzone: u16,
     on_disabled_hover_text: Option<String>,
-    app_state: &'a mut AppState,
+    app_state: &'app mut AppState,
 }
 
-impl<'a> HotkeyButton<'a> {
-    fn new(hotkey: Hotkey, app: &'a mut App) -> Self {
+impl<'app, 'button> HotkeyButton<'app, 'button> {
+    fn new(hotkey: Hotkey, app: &'app mut App) -> Self {
         let current_value = match hotkey {
             Hotkey::Quit => app.config.input.hotkeys.quit.as_ref(),
             Hotkey::ToggleFullscreen => app.config.input.hotkeys.toggle_fullscreen.as_ref(),
@@ -1446,7 +1451,7 @@ fn load_config(path: &PathBuf) -> Result<AppConfig, anyhow::Error> {
 }
 
 impl eframe::App for App {
-    fn update(&mut self, ctx: &Context, frame: &mut Frame) {
+    fn update(&mut self, ctx: &Context, _frame: &mut Frame) {
         let prev_config = self.config.clone();
 
         self.poll_for_input_thread_result();
@@ -1462,7 +1467,7 @@ impl eframe::App for App {
 
         let quit_shortcut = KeyboardShortcut::new(Modifiers::CTRL, Key::Q);
         if ctx.input_mut(|input| input.consume_shortcut(&quit_shortcut)) {
-            frame.close();
+            ctx.send_viewport_cmd(ViewportCommand::Close);
         }
 
         TopBottomPanel::new(TopBottomSide::Top, "top_bottom_panel").show(ctx, |ui| {
@@ -1481,7 +1486,7 @@ impl eframe::App for App {
                         .shortcut_text(ctx.format_shortcut(&quit_shortcut))
                         .ui(ui);
                     if quit_button.clicked() {
-                        frame.close();
+                        ctx.send_viewport_cmd(ViewportCommand::Close);
                     }
                 });
 

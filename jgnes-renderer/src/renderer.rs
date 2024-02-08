@@ -115,7 +115,9 @@ where
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: render_config.wgpu_backend.to_wgpu_backends(),
+            flags: wgpu::InstanceFlags::default(),
             dx12_shader_compiler: wgpu::Dx12Compiler::default(),
+            gles_minor_version: wgpu::Gles3MinorVersion::default(),
         });
 
         // SAFETY: The surface must not outlive the window it was created from.

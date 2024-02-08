@@ -225,10 +225,12 @@ impl TextureScalePipeline {
                 resolve_target: None,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                    store: true,
+                    store: wgpu::StoreOp::Store,
                 },
             })],
             depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
         });
 
         render_pass.set_bind_group(0, &self.bind_group, &[]);
@@ -403,11 +405,13 @@ impl BlurPipeline {
                         view: &buffer_texture_view,
                         ops: wgpu::Operations {
                             load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                            store: true,
+                            store: wgpu::StoreOp::Store,
                         },
                         resolve_target: None,
                     })],
                     depth_stencil_attachment: None,
+                    timestamp_writes: None,
+                    occlusion_query_set: None,
                 });
 
             horizontal_render_pass.set_bind_group(0, &self.horizontal_bind_group, &[]);
@@ -423,11 +427,13 @@ impl BlurPipeline {
                     view: &scaled_texture_view,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                        store: true,
+                        store: wgpu::StoreOp::Store,
                     },
                     resolve_target: None,
                 })],
                 depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
             });
 
             vertical_render_pass.set_bind_group(0, &self.vertical_bind_group, &[]);
@@ -525,10 +531,12 @@ impl RenderPipeline {
                 resolve_target: None,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                    store: true,
+                    store: wgpu::StoreOp::Store,
                 },
             })],
             depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
         });
 
         render_pass.set_pipeline(&self.pipeline);

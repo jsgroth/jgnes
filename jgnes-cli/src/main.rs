@@ -36,6 +36,7 @@ enum ShaderType {
     GaussianBlur,
 }
 
+#[allow(clippy::doc_markdown)]
 #[derive(Parser)]
 struct CliArgs {
     /// Path to iNES / NES 2.0 ROM file

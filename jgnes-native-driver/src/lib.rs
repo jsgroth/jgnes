@@ -672,22 +672,23 @@ where
                     Event::Quit { .. } => {
                         return Ok(());
                     }
-                    Event::Window { win_event, .. } => match win_event {
-                        WindowEvent::FocusGained
-                        | WindowEvent::FocusLost
-                        | WindowEvent::TakeFocus
-                        | WindowEvent::SizeChanged(..)
-                        | WindowEvent::Resized(..)
-                        | WindowEvent::Moved(..)
-                        | WindowEvent::DisplayChanged(..)
-                        | WindowEvent::Minimized
-                        | WindowEvent::Maximized
-                        | WindowEvent::Restored
-                        | WindowEvent::Shown => {
-                            emulator.get_renderer_mut().handle_resize();
-                        }
-                        _ => {}
-                    },
+                    Event::Window {
+                        win_event:
+                            WindowEvent::FocusGained
+                            | WindowEvent::FocusLost
+                            | WindowEvent::TakeFocus
+                            | WindowEvent::SizeChanged(..)
+                            | WindowEvent::Resized(..)
+                            | WindowEvent::Moved(..)
+                            | WindowEvent::DisplayChanged(..)
+                            | WindowEvent::Minimized
+                            | WindowEvent::Maximized
+                            | WindowEvent::Restored
+                            | WindowEvent::Shown,
+                        ..
+                    } => {
+                        emulator.get_renderer_mut().handle_resize();
+                    }
                     Event::KeyDown { keycode: Some(keycode), .. } => {
                         for hotkey in input_handler.check_for_hotkeys(keycode) {
                             match hotkey {

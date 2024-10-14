@@ -1,4 +1,4 @@
-use super::{hash_map, run_test, ExpectedState};
+use super::{ExpectedState, hash_map, run_test};
 
 #[test]
 fn lda_immediate() {

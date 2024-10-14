@@ -2,10 +2,10 @@ use crate::{
     AxisDirection, HatDirection, HotkeyConfig, InputConfig, InputConfigBase, JoystickInput,
 };
 use jgnes_core::JoypadState;
+use sdl2::JoystickSubsystem;
 use sdl2::event::Event;
 use sdl2::joystick::{HatState, Joystick};
 use sdl2::keyboard::Keycode;
-use sdl2::JoystickSubsystem;
 use std::cell::Cell;
 use std::collections::HashMap;
 use std::hash::Hash;

@@ -18,13 +18,13 @@ pub mod pulse;
 mod triangle;
 pub mod units;
 
+use crate::EmulatorConfig;
 use crate::apu::dmc::DeltaModulationChannel;
 use crate::apu::noise::NoiseChannel;
 use crate::apu::pulse::{PulseChannel, SweepStatus};
 use crate::apu::triangle::TriangleChannel;
 use crate::bus::{CpuBus, IoRegister, IrqSource, TimingMode};
 use crate::num::GetBit;
-use crate::EmulatorConfig;
 use bincode::{Decode, Encode};
 use std::ops::Range;
 use std::sync::OnceLock;

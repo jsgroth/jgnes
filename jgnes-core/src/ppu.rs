@@ -7,9 +7,9 @@
 //! PAL is (mostly) the same except the vertical blanking period lasts for 70 scanlines instead of 20,
 //! for a total of 312 scanlines.
 
+use crate::EmulatorConfig;
 use crate::bus::{PpuBus, PpuRegisters, PpuTrackedRegister, PpuWriteToggle, TimingMode};
 use crate::num::GetBit;
-use crate::EmulatorConfig;
 use bincode::{Decode, Encode};
 use std::ops::RangeInclusive;
 

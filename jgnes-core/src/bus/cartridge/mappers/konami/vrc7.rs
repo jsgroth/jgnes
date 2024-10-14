@@ -11,7 +11,7 @@
 use crate::bus;
 use crate::bus::cartridge::mappers::konami::irq::VrcIrqCounter;
 use crate::bus::cartridge::mappers::{
-    konami, BankSizeKb, ChrType, NametableMirroring, PpuMapResult,
+    BankSizeKb, ChrType, NametableMirroring, PpuMapResult, konami,
 };
 use crate::bus::cartridge::{HasBasicPpuMapping, MapperImpl};
 use crate::num::GetBit;
@@ -55,12 +55,10 @@ const ROM_PATCHES: [[u8; 8]; 15] = [
 ];
 
 // Tables from https://www.smspower.org/Development/YM2413ReverseEngineeringNotes2015-03-20
-const ENVELOPE_INCREMENT_TABLES: [[u8; 8]; 4] = [
-    [0, 1, 0, 1, 0, 1, 0, 1],
-    [0, 1, 0, 1, 1, 1, 0, 1],
-    [0, 1, 1, 1, 0, 1, 1, 1],
-    [0, 1, 1, 1, 1, 1, 1, 1],
-];
+const ENVELOPE_INCREMENT_TABLES: [[u8; 8]; 4] =
+    [[0, 1, 0, 1, 0, 1, 0, 1], [0, 1, 0, 1, 1, 1, 0, 1], [0, 1, 1, 1, 0, 1, 1, 1], [
+        0, 1, 1, 1, 1, 1, 1, 1,
+    ]];
 
 // Numbers are multiplied by 2 here - need to divide by 2 after multiplying
 const MULTIPLIER_TABLE: [u32; 16] = [1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 20, 24, 24, 30, 30];

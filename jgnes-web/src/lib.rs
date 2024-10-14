@@ -6,8 +6,8 @@ mod js;
 
 use crate::audio::{AudioQueue, EnqueueResult};
 use crate::config::{ConfigFields, InputConfig};
-use base64::engine::GeneralPurpose;
 use base64::Engine;
+use base64::engine::GeneralPurpose;
 use config::JgnesWebConfig;
 use jgnes_core::audio::{DownsampleAction, DownsampleCounter, LowPassFilter};
 use jgnes_core::{
@@ -15,8 +15,8 @@ use jgnes_core::{
     JoypadState, Renderer, SaveWriter, TickEffect, TimingMode,
 };
 use jgnes_proc_macros::EnumDisplay;
-use jgnes_renderer::config::{RendererConfig, Shader, VSyncMode, WgpuBackend};
 use jgnes_renderer::WgpuRenderer;
+use jgnes_renderer::config::{RendererConfig, Shader, VSyncMode, WgpuBackend};
 use js_sys::Promise;
 use rfd::AsyncFileDialog;
 use std::array;

@@ -1,6 +1,6 @@
 use crate::apu::ApuState;
 use crate::bus::cartridge::CartridgeFileError;
-use crate::bus::{cartridge, Bus, PpuBus, TimingMode};
+use crate::bus::{Bus, PpuBus, TimingMode, cartridge};
 use crate::cpu::{CpuRegisters, CpuState};
 use crate::input::JoypadState;
 use crate::ppu::{FrameBuffer, PpuState};

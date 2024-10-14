@@ -5,7 +5,7 @@ mod shaders;
 
 use crate::config::{FrameSkip, GpuFilterMode, RendererConfig, Scanlines, VSyncMode, WgpuBackend};
 use crate::renderer::shaders::{FragmentGlobals, RenderPipelineState};
-use crate::{colors, DisplayArea};
+use crate::{DisplayArea, colors};
 use jgnes_core::{ColorEmphasis, FrameBuffer, Renderer, TimingMode};
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 use std::{iter, mem};

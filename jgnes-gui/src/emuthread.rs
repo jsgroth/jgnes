@@ -7,7 +7,7 @@ use sdl2::render::WindowCanvas;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, Sender};
-use std::sync::{mpsc, Arc, Mutex};
+use std::sync::{Arc, Mutex, mpsc};
 use std::{process, thread};
 
 pub(crate) enum EmuThreadTask {

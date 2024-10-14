@@ -7,8 +7,8 @@
 //! * NAMCOT-3453 (iNES mapper 154)
 
 use crate::bus;
-use crate::bus::cartridge::mappers::{BankSizeKb, ChrType, NametableMirroring, PpuMapResult};
 use crate::bus::cartridge::MapperImpl;
+use crate::bus::cartridge::mappers::{BankSizeKb, ChrType, NametableMirroring, PpuMapResult};
 use crate::num::GetBit;
 use bincode::{Decode, Encode};
 

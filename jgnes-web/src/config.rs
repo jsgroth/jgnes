@@ -1,4 +1,4 @@
-use crate::{js, NesButton};
+use crate::{NesButton, js};
 use jgnes_renderer::config::{AspectRatio, GpuFilterMode, Overscan, RenderScale, Scanlines};
 use serde::{Deserialize, Serialize};
 use std::cell::{Cell, RefCell};

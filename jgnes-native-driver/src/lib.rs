@@ -7,13 +7,13 @@ use jgnes_core::{
     EmulatorCreateArgs, FrameBuffer, InputPoller, JoypadState, Renderer, SaveWriter, TickEffect,
     TimingMode,
 };
+use sdl2::EventPump;
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
 use sdl2::event::{Event, EventType, WindowEvent};
 use sdl2::pixels::{Color, PixelFormatEnum};
 use sdl2::rect::Rect;
 use sdl2::render::{Texture, TextureCreator, TextureValueError, WindowCanvas};
 use sdl2::video::{FullscreenType, Window};
-use sdl2::EventPump;
 use std::cell::Cell;
 use std::collections::VecDeque;
 use std::ffi::OsStr;
@@ -32,7 +32,7 @@ pub use crate::config::{
 };
 use crate::input::{Hotkey, SdlInputHandler};
 use jgnes_renderer::config::{FrameSkip, RendererConfig, VSyncMode};
-use jgnes_renderer::{colors, WgpuRenderer};
+use jgnes_renderer::{WgpuRenderer, colors};
 
 const SDL_PIXEL_FORMAT: PixelFormatEnum = PixelFormatEnum::RGB24;
 
@@ -374,14 +374,11 @@ pub fn run(config: &JgnesNativeConfig) -> anyhow::Result<()> {
     };
 
     let audio_queue = audio_subsystem
-        .open_queue(
-            None,
-            &AudioSpecDesired {
-                freq: Some(AUDIO_OUTPUT_FREQUENCY as i32),
-                channels: Some(1),
-                samples: Some(DEVICE_BUFFER_SIZE),
-            },
-        )
+        .open_queue(None, &AudioSpecDesired {
+            freq: Some(AUDIO_OUTPUT_FREQUENCY as i32),
+            channels: Some(1),
+            samples: Some(DEVICE_BUFFER_SIZE),
+        })
         .map_err(anyhow::Error::msg)?;
     audio_queue.resume();
 

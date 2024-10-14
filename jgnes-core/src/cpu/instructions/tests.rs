@@ -1,6 +1,6 @@
 mod load;
 
-use crate::bus::{cartridge, Bus};
+use crate::bus::{Bus, cartridge};
 use crate::cpu;
 use crate::cpu::{CpuRegisters, CpuState, StatusReadContext};
 use std::collections::HashMap;

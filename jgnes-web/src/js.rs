@@ -1,6 +1,6 @@
 use crate::config::JgnesWebConfig;
-use base64::engine::general_purpose;
 use base64::Engine;
+use base64::engine::general_purpose;
 use jgnes_proc_macros::build_time_pretty_str;
 use js_sys::Uint8Array;
 use wasm_bindgen::prelude::*;

@@ -1,6 +1,6 @@
+use crate::DisplayArea;
 use crate::config::{RenderScale, Scanlines, Shader};
 use crate::renderer::Vertex2d;
-use crate::DisplayArea;
 use jgnes_core::TimingMode;
 use wgpu::util::DeviceExt;
 

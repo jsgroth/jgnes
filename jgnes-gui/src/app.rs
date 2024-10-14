@@ -4,8 +4,8 @@ use crate::{emuthread, romlist};
 use eframe::Frame;
 use egui::panel::TopBottomSide;
 use egui::{
-    menu, Align, Button, CentralPanel, Color32, Context, Grid, Key, KeyboardShortcut, Layout,
-    Modifiers, TextEdit, TopBottomPanel, Ui, Vec2, ViewportCommand, Widget, Window,
+    Align, Button, CentralPanel, Color32, Context, Grid, Key, KeyboardShortcut, Layout, Modifiers,
+    TextEdit, TopBottomPanel, Ui, Vec2, ViewportCommand, Widget, Window, menu,
 };
 use egui_extras::{Column, TableBuilder};
 use jgnes_core::TimingMode;

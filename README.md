@@ -1,5 +1,11 @@
 # jgnes
 
+**Note: This emulator has been largely obsoleted by the NES core in [my multi-system emulator](https://github.com/jsgroth/jgenesis), but this emulator does still support a few features that one does not:**
+* A configurable Gaussian blur filter, which is not accurate to any TV but does smooth out the image with some "fancy" blur
+* The entirety of the web frontend; jgenesis has a web frontend, but it doesn't support NES and there's no support for input configuration
+
+---
+
 A cross-platform NES emulator. Has a native frontend built using SDL2 as well as a [web frontend](https://jsgroth.dev/jgnes/) that compiles to WASM and runs in the browser.
 
 ## Feature Status

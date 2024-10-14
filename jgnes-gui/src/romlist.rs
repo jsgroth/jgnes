@@ -64,7 +64,7 @@ pub fn get_rom_list(dir: &str) -> anyhow::Result<Vec<RomMetadata>> {
         }
 
         let header = {
-            let mut file = File::open(&dir_entry.path())?;
+            let mut file = File::open(dir_entry.path())?;
             Header::parse_from(&mut file)?
         };
 

@@ -64,6 +64,7 @@ jobs:
 
     - name: Check warnings for web
       run: |
+        RUSTFLAGS='--cfg getrandom_backend="wasm_js"' \
         cd jgnes-web && cargo +$JGNES_WEB_TOOLCHAIN clippy --target wasm32-unknown-unknown -- -D warnings
   linux-release:
     runs-on: ubuntu-latest

@@ -7,8 +7,8 @@ use crate::config::{FrameSkip, GpuFilterMode, RendererConfig, Scanlines, VSyncMo
 use crate::renderer::shaders::{FragmentGlobals, RenderPipelineState};
 use crate::{DisplayArea, colors};
 use jgnes_core::{ColorEmphasis, FrameBuffer, Renderer, TimingMode};
-use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
-use std::{iter, mem};
+use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
+use std::iter;
 use thiserror::Error;
 use wgpu::util::DeviceExt;
 
@@ -34,7 +34,7 @@ impl Vertex2d {
 
     fn descriptor() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
-            array_stride: mem::size_of::<Vertex2d>() as wgpu::BufferAddress,
+            array_stride: size_of::<Vertex2d>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
             attributes: &Self::LAYOUT_ATTRIBUTES,
         }
@@ -53,6 +53,8 @@ pub enum WgpuRendererError {
         #[from]
         source: wgpu::RequestDeviceError,
     },
+    #[error("Error creating wgpu surface from window: {0}")]
+    Handle(#[from] raw_window_handle::HandleError),
     #[error("Error retrieving wgpu output surface: {source}")]
     OutputSurface {
         #[from]
@@ -76,7 +78,7 @@ pub struct WgpuRenderer<W> {
     output_buffer: Vec<u8>,
     device: wgpu::Device,
     queue: wgpu::Queue,
-    surface: wgpu::Surface,
+    surface: wgpu::Surface<'static>,
     surface_capabilities: wgpu::SurfaceCapabilities,
     surface_config: wgpu::SurfaceConfiguration,
     texture: wgpu::Texture,
@@ -96,7 +98,7 @@ pub struct WgpuRenderer<W> {
 
 impl<W> WgpuRenderer<W>
 where
-    W: HasRawWindowHandle + HasRawDisplayHandle,
+    W: HasWindowHandle + HasDisplayHandle,
 {
     /// Create a new wgpu renderer which will output to the given window.
     ///
@@ -124,7 +126,9 @@ where
         // The surface and window are both owned by WgpuRenderer, and the window field is declared
         // after the surface field, so the surface will always be dropped before the window is
         // dropped.
-        let surface = unsafe { instance.create_surface(&window) }?;
+        let surface = unsafe {
+            instance.create_surface_unsafe(wgpu::SurfaceTargetUnsafe::from_window(&window)?)
+        }?;
 
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
@@ -141,12 +145,13 @@ where
             .request_device(
                 &wgpu::DeviceDescriptor {
                     label: Some("device"),
-                    features: wgpu::Features::empty(),
-                    limits: if render_config.use_webgl2_limits {
+                    required_features: wgpu::Features::empty(),
+                    required_limits: if render_config.use_webgl2_limits {
                         wgpu::Limits::downlevel_webgl2_defaults()
                     } else {
                         wgpu::Limits::default()
                     },
+                    memory_hints: wgpu::MemoryHints::default(),
                 },
                 None,
             )
@@ -180,6 +185,7 @@ where
             width: window_width,
             height: window_height,
             present_mode: desired_present_mode,
+            desired_maximum_frame_latency: 2,
             alpha_mode: surface_capabilities.alpha_modes[0],
             view_formats: vec![],
         };
@@ -470,7 +476,7 @@ fn compute_vertices(
         .collect()
 }
 
-impl<W: HasRawDisplayHandle + HasRawWindowHandle> Renderer for WgpuRenderer<W> {
+impl<W: HasDisplayHandle + HasWindowHandle> Renderer for WgpuRenderer<W> {
     type Err = WgpuRendererError;
 
     fn render_frame(

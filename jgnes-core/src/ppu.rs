@@ -11,6 +11,7 @@ use crate::EmulatorConfig;
 use crate::bus::{PpuBus, PpuRegisters, PpuTrackedRegister, PpuWriteToggle, TimingMode};
 use crate::num::GetBit;
 use bincode::{Decode, Encode};
+use std::array;
 use std::ops::RangeInclusive;
 
 pub const SCREEN_WIDTH: u16 = 256;
@@ -275,7 +276,7 @@ struct SpriteData {
 #[derive(Debug, Clone, Encode, Decode)]
 pub struct PpuState {
     timing_mode: TimingMode,
-    frame_buffer: FrameBuffer,
+    frame_buffer: Box<FrameBuffer>,
     registers: InternalRegisters,
     bg_buffers: BgBuffers,
     sprite_buffers: SpriteBuffers,
@@ -291,7 +292,7 @@ impl PpuState {
     pub fn new(timing_mode: TimingMode) -> Self {
         Self {
             timing_mode,
-            frame_buffer: [[0; SCREEN_WIDTH as usize]; SCREEN_HEIGHT as usize],
+            frame_buffer: Box::new(array::from_fn(|_| array::from_fn(|_| 0))),
             registers: InternalRegisters::new(),
             bg_buffers: BgBuffers::new(),
             sprite_buffers: SpriteBuffers::new(),

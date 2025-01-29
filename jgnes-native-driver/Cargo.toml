@@ -12,14 +12,14 @@ jgnes-renderer = { path = "../jgnes-renderer" }
 
 anyhow = "1"
 log = "0.4"
-pollster = "0.3"
+pollster = "0.4"
 sdl2 = { workspace = true }
 serde = { workspace = true }
-thiserror = "1"
+thiserror = "2"
 tinyvec = "1"
 
 [target.'cfg(target_os = "windows")'.dependencies]
-windows = { version = "0.48", features = ["Win32_Media"] }
+windows = { version = "0.59", features = ["Win32_Media"] }
 
 [lints]
 workspace = true

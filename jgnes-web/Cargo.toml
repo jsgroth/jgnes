@@ -17,20 +17,21 @@ jgnes-proc-macros = { path = "../jgnes-proc-macros" }
 jgnes-core = { path = "../jgnes-core" }
 jgnes-renderer = { path = "../jgnes-renderer" }
 
-base64 = "0.21"
+base64 = "0.22"
 console_error_panic_hook = "0.1"
 console_log = "1"
-getrandom = { version = "0.2", features = ["js"] }
+getrandom = { version = "0.3", features = ["wasm_js"] }
 js-sys = "0.3"
 log = "0.4"
-rand = "0.8"
-rfd = "0.13"
+rand = "0.9"
+rfd = "0.15"
 serde = { workspace = true }
 serde_json = "1"
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
+web-time = "1"
 wgpu = { workspace = true }
-winit = { version = "0.28", features = ["serde"] }
+winit = { version = "0.30", features = ["serde"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies.web-sys]
 version = "0.3"

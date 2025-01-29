@@ -249,7 +249,7 @@ struct InputButton<'app, 'button> {
     app_state: &'app mut AppState,
 }
 
-impl<'app, 'button> InputButton<'app, 'button> {
+impl<'app> InputButton<'app, '_> {
     fn new(
         player: Player,
         input_type: InputType,
@@ -292,7 +292,7 @@ struct HotkeyButton<'app, 'button> {
     app_state: &'app mut AppState,
 }
 
-impl<'app, 'button> HotkeyButton<'app, 'button> {
+impl<'app> HotkeyButton<'app, '_> {
     fn new(hotkey: Hotkey, app: &'app mut App) -> Self {
         let current_value = match hotkey {
             Hotkey::Quit => app.config.input.hotkeys.quit.as_ref(),
@@ -718,91 +718,91 @@ impl App {
 
     fn render_central_panel(&mut self, ctx: &Context) {
         CentralPanel::default().show(ctx, |ui| {
-            ui.set_enabled(!self.state.is_any_window_open());
-
-            match &self.config.rom_search_dir {
-                Some(_) => {
-                    TableBuilder::new(ui)
-                        .auto_shrink([false; 2])
-                        .striped(true)
-                        .cell_layout(Layout::left_to_right(Align::Center))
-                        .column(Column::auto().at_most(300.0))
-                        .columns(Column::auto(), 3)
-                        .column(Column::remainder())
-                        .header(30.0, |mut row| {
-                            row.col(|ui| {
-                                ui.vertical_centered(|ui| {
-                                    ui.heading("Name");
-                                });
-                            });
-                            row.col(|ui| {
-                                ui.vertical_centered(|ui| {
-                                    ui.heading("Board");
-                                });
-                            });
-                            row.col(|ui| {
-                                ui.vertical_centered(|ui| {
-                                    ui.heading("PRG ROM");
-                                });
-                            });
-                            row.col(|ui| {
-                                ui.vertical_centered(|ui| {
-                                    ui.heading("CHR ROM");
-                                });
-                            });
-
-                            // Blank column to make the stripes extend to the right
-                            row.col(|_ui| {});
-                        })
-                        .body(|mut body| {
-                            for metadata in self.state.rom_list.clone() {
-                                body.row(40.0, |mut row| {
-                                    row.col(|ui| {
-                                        let button = Button::new(&metadata.file_name_no_ext)
-                                            .min_size(Vec2::new(300.0, 30.0))
-                                            .wrap(true);
-                                        if button.ui(ui).clicked() {
-                                            self.state.stop_emulator_if_running();
-                                            self.launch_emulator(&metadata.full_path);
-                                        }
+            ui.add_enabled_ui(!self.state.is_any_window_open(), |ui| {
+                match &self.config.rom_search_dir {
+                    Some(_) => {
+                        TableBuilder::new(ui)
+                            .auto_shrink([false; 2])
+                            .striped(true)
+                            .cell_layout(Layout::left_to_right(Align::Center))
+                            .column(Column::auto().at_most(300.0))
+                            .columns(Column::auto(), 3)
+                            .column(Column::remainder())
+                            .header(30.0, |mut row| {
+                                row.col(|ui| {
+                                    ui.vertical_centered(|ui| {
+                                        ui.heading("Name");
                                     });
-
-                                    row.col(|ui| {
-                                        ui.centered_and_justified(|ui| {
-                                            ui.label(&metadata.mapper_name);
-                                        });
+                                });
+                                row.col(|ui| {
+                                    ui.vertical_centered(|ui| {
+                                        ui.heading("Board");
                                     });
-
-                                    row.col(|ui| {
-                                        ui.centered_and_justified(|ui| {
-                                            let size_kb = metadata.prg_rom_len / 1024;
-                                            ui.label(format!("{size_kb}KB"));
-                                        });
+                                });
+                                row.col(|ui| {
+                                    ui.vertical_centered(|ui| {
+                                        ui.heading("PRG ROM");
                                     });
+                                });
+                                row.col(|ui| {
+                                    ui.vertical_centered(|ui| {
+                                        ui.heading("CHR ROM");
+                                    });
+                                });
 
-                                    row.col(|ui| {
-                                        ui.centered_and_justified(|ui| {
-                                            let size_kb = metadata.chr_rom_len / 1024;
-                                            if size_kb > 0 {
-                                                ui.label(format!("{size_kb}KB"));
-                                            } else {
-                                                ui.label("None (RAM)");
+                                // Blank column to make the stripes extend to the right
+                                row.col(|_ui| {});
+                            })
+                            .body(|mut body| {
+                                for metadata in self.state.rom_list.clone() {
+                                    body.row(40.0, |mut row| {
+                                        row.col(|ui| {
+                                            let button = Button::new(&metadata.file_name_no_ext)
+                                                .min_size(Vec2::new(300.0, 30.0))
+                                                .wrap();
+                                            if button.ui(ui).clicked() {
+                                                self.state.stop_emulator_if_running();
+                                                self.launch_emulator(&metadata.full_path);
                                             }
                                         });
-                                    });
 
-                                    // Blank column to make the stripes extend to the right
-                                    row.col(|_ui| {});
-                                });
-                            }
+                                        row.col(|ui| {
+                                            ui.centered_and_justified(|ui| {
+                                                ui.label(&metadata.mapper_name);
+                                            });
+                                        });
+
+                                        row.col(|ui| {
+                                            ui.centered_and_justified(|ui| {
+                                                let size_kb = metadata.prg_rom_len / 1024;
+                                                ui.label(format!("{size_kb}KB"));
+                                            });
+                                        });
+
+                                        row.col(|ui| {
+                                            ui.centered_and_justified(|ui| {
+                                                let size_kb = metadata.chr_rom_len / 1024;
+                                                if size_kb > 0 {
+                                                    ui.label(format!("{size_kb}KB"));
+                                                } else {
+                                                    ui.label("None (RAM)");
+                                                }
+                                            });
+                                        });
+
+                                        // Blank column to make the stripes extend to the right
+                                        row.col(|_ui| {});
+                                    });
+                                }
+                            });
+                    }
+                    None => {
+                        ui.centered_and_justified(|ui| {
+                            ui.label("Configure a ROM search directory to see ROM list here");
                         });
+                    }
                 }
-                None => {
-                    ui.centered_and_justified(|ui| {
-                        ui.label("Configure a ROM search directory to see ROM list here");
-                    });
-                }
-            }
+            });
         });
     }
 
@@ -833,33 +833,36 @@ impl App {
                 .on_hover_text("Eliminates sprite flickering but can cause bugs");
 
                 ui.group(|ui| {
-                    ui.set_enabled(!self.state.emulator_is_running.load(Ordering::Relaxed));
+                    ui.add_enabled_ui(
+                        !self.state.emulator_is_running.load(Ordering::Relaxed),
+                        |ui| {
+                            let disabled_hover_text =
+                                "Cannot change forced timing mode while emulator is running";
 
-                    let disabled_hover_text =
-                        "Cannot change forced timing mode while emulator is running";
+                            ui.label("Forced timing mode")
+                                .on_hover_text("If set, ignore timing mode in cartridge header")
+                                .on_disabled_hover_text(disabled_hover_text);
 
-                    ui.label("Forced timing mode")
-                        .on_hover_text("If set, ignore timing mode in cartridge header")
-                        .on_disabled_hover_text(disabled_hover_text);
+                            ui.horizontal(|ui| {
+                                ui.radio_value(&mut self.config.forced_timing_mode, None, "None")
+                                    .on_disabled_hover_text(disabled_hover_text);
 
-                    ui.horizontal(|ui| {
-                        ui.radio_value(&mut self.config.forced_timing_mode, None, "None")
-                            .on_disabled_hover_text(disabled_hover_text);
+                                ui.radio_value(
+                                    &mut self.config.forced_timing_mode,
+                                    Some(TimingMode::Ntsc),
+                                    "NTSC",
+                                )
+                                .on_disabled_hover_text(disabled_hover_text);
 
-                        ui.radio_value(
-                            &mut self.config.forced_timing_mode,
-                            Some(TimingMode::Ntsc),
-                            "NTSC",
-                        )
-                        .on_disabled_hover_text(disabled_hover_text);
-
-                        ui.radio_value(
-                            &mut self.config.forced_timing_mode,
-                            Some(TimingMode::Pal),
-                            "PAL",
-                        )
-                        .on_disabled_hover_text(disabled_hover_text);
-                    });
+                                ui.radio_value(
+                                    &mut self.config.forced_timing_mode,
+                                    Some(TimingMode::Pal),
+                                    "PAL",
+                                )
+                                .on_disabled_hover_text(disabled_hover_text);
+                            });
+                        },
+                    );
                 });
             },
         );
@@ -907,122 +910,123 @@ impl App {
                 }
 
                 ui.group(|ui| {
-                    ui.set_enabled(!self.state.emulator_is_running.load(Ordering::Relaxed));
-
-                    ui.label("Renderer");
-                    ui.horizontal(|ui| {
-                        ui.radio_value(&mut self.config.renderer, NativeRenderer::Wgpu, "wgpu")
-                            .on_disabled_hover_text("Cannot change renderer while emulator is running");
-                        ui.radio_value(&mut self.config.renderer, NativeRenderer::Sdl2, "SDL2")
-                            .on_disabled_hover_text("Cannot change renderer while emulator is running");
+                    ui.add_enabled_ui(!self.state.emulator_is_running.load(Ordering::Relaxed), |ui| {
+                        ui.label("Renderer");
+                        ui.horizontal(|ui| {
+                            ui.radio_value(&mut self.config.renderer, NativeRenderer::Wgpu, "wgpu")
+                                .on_disabled_hover_text("Cannot change renderer while emulator is running");
+                            ui.radio_value(&mut self.config.renderer, NativeRenderer::Sdl2, "SDL2")
+                                .on_disabled_hover_text("Cannot change renderer while emulator is running");
+                        });
                     });
                 });
 
                 ui.group(|ui| {
-                    ui.set_enabled(!self.state.emulator_is_running.load(Ordering::Relaxed) && self.config.renderer == NativeRenderer::Wgpu);
+                    ui.add_enabled_ui(!self.state.emulator_is_running.load(Ordering::Relaxed) && self.config.renderer == NativeRenderer::Wgpu, |ui| {
+                        let disabled_text = match self.config.renderer {
+                            NativeRenderer::Sdl2 => "Not applicable to SDL2 renderer",
+                            NativeRenderer::Wgpu => "Cannot change wgpu backend while emulator is running"
+                        };
 
-                    let disabled_text = match self.config.renderer {
-                        NativeRenderer::Sdl2 => "Not applicable to SDL2 renderer",
-                        NativeRenderer::Wgpu => "Cannot change wgpu backend while emulator is running"
-                    };
-
-                    ui.label("wgpu backend");
-                    ui.horizontal(|ui| {
-                        ui.radio_value(&mut self.config.wgpu_backend, WgpuBackend::Auto, "Auto")
-                            .on_disabled_hover_text(disabled_text);
-                        ui.radio_value(&mut self.config.wgpu_backend, WgpuBackend::Vulkan, "Vulkan")
-                            .on_disabled_hover_text(disabled_text);
-                        ui.radio_value(&mut self.config.wgpu_backend, WgpuBackend::Direct3d12, "Direct3D 12")
-                            .on_disabled_hover_text(disabled_text);
-                        ui.radio_value(&mut self.config.wgpu_backend, WgpuBackend::OpenGl, "OpenGL")
-                            .on_disabled_hover_text(disabled_text);
+                        ui.label("wgpu backend");
+                        ui.horizontal(|ui| {
+                            ui.radio_value(&mut self.config.wgpu_backend, WgpuBackend::Auto, "Auto")
+                                .on_disabled_hover_text(disabled_text);
+                            ui.radio_value(&mut self.config.wgpu_backend, WgpuBackend::Vulkan, "Vulkan")
+                                .on_disabled_hover_text(disabled_text);
+                            ui.radio_value(&mut self.config.wgpu_backend, WgpuBackend::Direct3d12, "Direct3D 12")
+                                .on_disabled_hover_text(disabled_text);
+                            ui.radio_value(&mut self.config.wgpu_backend, WgpuBackend::OpenGl, "OpenGL")
+                                .on_disabled_hover_text(disabled_text);
+                        });
                     });
                 });
 
                 ui.group(|ui| {
                     ui.label("VSync mode");
 
-                    ui.set_enabled(self.config.renderer == NativeRenderer::Wgpu || !self.state.emulator_is_running.load(Ordering::Relaxed));
+                    ui.add_enabled_ui(self.config.renderer == NativeRenderer::Wgpu || !self.state.emulator_is_running.load(Ordering::Relaxed), |ui| {
+                        ui.horizontal(|ui| {
+                            ui.radio_value(&mut self.config.vsync_mode, VSyncMode::Enabled, "Enabled")
+                                .on_disabled_hover_text("SDL2 renderer cannot change VSync mode while running");
+                            ui.radio_value(&mut self.config.vsync_mode, VSyncMode::Disabled, "Disabled")
+                                .on_disabled_hover_text("SDL2 renderer cannot change VSync mode while running");
 
-                    ui.horizontal(|ui| {
-                        ui.radio_value(&mut self.config.vsync_mode, VSyncMode::Enabled, "Enabled")
-                            .on_disabled_hover_text("SDL2 renderer cannot change VSync mode while running");
-                        ui.radio_value(&mut self.config.vsync_mode, VSyncMode::Disabled, "Disabled")
-                            .on_disabled_hover_text("SDL2 renderer cannot change VSync mode while running");
-
-                        ui.set_enabled(self.config.renderer == NativeRenderer::Wgpu);
-                        ui.radio_value(&mut self.config.vsync_mode, VSyncMode::Fast, "Fast")
-                            .on_disabled_hover_text("Fast VSync is only supported with the wgpu renderer");
+                            ui.add_enabled_ui(self.config.renderer == NativeRenderer::Wgpu, |ui| {
+                                ui.radio_value(&mut self.config.vsync_mode, VSyncMode::Fast, "Fast")
+                                    .on_disabled_hover_text("Fast VSync is only supported with the wgpu renderer");
+                            });
+                        });
                     });
                 });
 
                 ui.group(|ui| {
-                    ui.set_enabled(self.config.renderer == NativeRenderer::Wgpu);
-
-                    let disabled_hover_text = "Only nearest neighbor sampling is supported with SDL2 renderer";
-                    ui.label("Image filtering")
-                        .on_disabled_hover_text(disabled_hover_text);
-                    ui.horizontal(|ui| {
-                        ui.radio_value(&mut self.config.gpu_filter_mode, GpuFilterMode::NearestNeighbor, "Nearest neighbor")
+                    ui.add_enabled_ui(self.config.renderer == NativeRenderer::Wgpu, |ui| {
+                        let disabled_hover_text = "Only nearest neighbor sampling is supported with SDL2 renderer";
+                        ui.label("Image filtering")
                             .on_disabled_hover_text(disabled_hover_text);
-                        ui.radio_value(&mut self.config.gpu_filter_mode, GpuFilterMode::LinearInterpolation, "Linear interpolation")
-                            .on_disabled_hover_text(disabled_hover_text);
+                        ui.horizontal(|ui| {
+                            ui.radio_value(&mut self.config.gpu_filter_mode, GpuFilterMode::NearestNeighbor, "Nearest neighbor")
+                                .on_disabled_hover_text(disabled_hover_text);
+                            ui.radio_value(&mut self.config.gpu_filter_mode, GpuFilterMode::LinearInterpolation, "Linear interpolation")
+                                .on_disabled_hover_text(disabled_hover_text);
+                        });
                     });
                 });
 
                 ui.group(|ui| {
-                    ui.set_enabled(self.config.renderer == NativeRenderer::Wgpu);
-
-                    let disabled_hover_text = "Shaders are not supported with SDL2 renderer";
-                    ui.label("Shader").on_disabled_hover_text(disabled_hover_text);
-                    ui.horizontal(|ui| {
-                        ui.radio_value(&mut self.config.shader_type, ShaderType::None, "None").on_disabled_hover_text(disabled_hover_text);
-                        ui.radio_value(&mut self.config.shader_type, ShaderType::Prescale, "Prescale").on_disabled_hover_text(disabled_hover_text);
-                        ui.radio_value(&mut self.config.shader_type, ShaderType::GaussianBlur, "Gaussian blur").on_disabled_hover_text(disabled_hover_text);
+                    ui.add_enabled_ui(self.config.renderer == NativeRenderer::Wgpu, |ui| {
+                        let disabled_hover_text = "Shaders are not supported with SDL2 renderer";
+                        ui.label("Shader").on_disabled_hover_text(disabled_hover_text);
+                        ui.horizontal(|ui| {
+                            ui.radio_value(&mut self.config.shader_type, ShaderType::None, "None").on_disabled_hover_text(disabled_hover_text);
+                            ui.radio_value(&mut self.config.shader_type, ShaderType::Prescale, "Prescale").on_disabled_hover_text(disabled_hover_text);
+                            ui.radio_value(&mut self.config.shader_type, ShaderType::GaussianBlur, "Gaussian blur").on_disabled_hover_text(disabled_hover_text);
+                        });
                     });
                 });
 
                 ui.horizontal(|ui| {
-                    ui.set_enabled(self.config.renderer == NativeRenderer::Wgpu && [ShaderType::Prescale, ShaderType::GaussianBlur].contains(&self.config.shader_type));
-
-                    if !TextEdit::singleline(&mut self.state.shader.render_scale_text).desired_width(30.0).ui(ui).has_focus() {
-                        match RenderScale::try_from(self.state.shader.render_scale_text.parse::<u32>().unwrap_or(0)) {
-                            Ok(render_scale) => {
-                                self.state.shader.render_scale_invalid = false;
-                                self.config.render_scale = render_scale;
-                            }
-                            Err(_) => {
-                                self.state.shader.render_scale_invalid = true;
-                            }
-                        }
-                    }
-                    ui.label("Prescale factor")
-                        .on_hover_text("The image will be integer upscaled by this factor before filtering");
-
-                    ui.set_enabled(self.config.shader_type == ShaderType::GaussianBlur);
-
-                    if !TextEdit::singleline(&mut self.state.shader.blur_stdev_text).desired_width(30.0).ui(ui).has_focus() {
-                        match self.state.shader.blur_stdev_text.parse::<f64>() {
-                            Ok(blur_stdev) if !blur_stdev.is_nan() && !blur_stdev.is_sign_negative() => {
-                                self.state.shader.blur_stdev_invalid = false;
-                                self.config.blur_stdev = blur_stdev;
-                            }
-                            _ => {
-                                self.state.shader.blur_stdev_invalid = true;
+                    ui.add_enabled_ui(self.config.renderer == NativeRenderer::Wgpu && [ShaderType::Prescale, ShaderType::GaussianBlur].contains(&self.config.shader_type), |ui| {
+                        if !TextEdit::singleline(&mut self.state.shader.render_scale_text).desired_width(30.0).ui(ui).has_focus() {
+                            match RenderScale::try_from(self.state.shader.render_scale_text.parse::<u32>().unwrap_or(0)) {
+                                Ok(render_scale) => {
+                                    self.state.shader.render_scale_invalid = false;
+                                    self.config.render_scale = render_scale;
+                                }
+                                Err(_) => {
+                                    self.state.shader.render_scale_invalid = true;
+                                }
                             }
                         }
-                    }
-                    ui.label("Blur stdev");
+                        ui.label("Prescale factor")
+                            .on_hover_text("The image will be integer upscaled by this factor before filtering");
 
-                    NumericTextInput::new(
-                        &mut self.state.shader.blur_radius_text,
-                        &mut self.config.blur_radius,
-                        &mut self.state.shader.blur_radius_invalid,
-                        1..=u32::MAX,
-                    )
-                        .desired_width(30.0)
-                        .ui(ui);
-                    ui.label("Blur radius");
+                        ui.add_enabled_ui(self.config.shader_type == ShaderType::GaussianBlur, |ui| {
+                            if !TextEdit::singleline(&mut self.state.shader.blur_stdev_text).desired_width(30.0).ui(ui).has_focus() {
+                                match self.state.shader.blur_stdev_text.parse::<f64>() {
+                                    Ok(blur_stdev) if !blur_stdev.is_nan() && !blur_stdev.is_sign_negative() => {
+                                        self.state.shader.blur_stdev_invalid = false;
+                                        self.config.blur_stdev = blur_stdev;
+                                    }
+                                    _ => {
+                                        self.state.shader.blur_stdev_invalid = true;
+                                    }
+                                }
+                            }
+                            ui.label("Blur stdev");
+
+                            NumericTextInput::new(
+                                &mut self.state.shader.blur_radius_text,
+                                &mut self.config.blur_radius,
+                                &mut self.state.shader.blur_radius_invalid,
+                                1..=u32::MAX,
+                            )
+                                .desired_width(30.0)
+                                .ui(ui);
+                            ui.label("Blur radius");
+                        });
+                    });
                 });
 
                 if self.state.shader.render_scale_invalid {
@@ -1036,21 +1040,21 @@ impl App {
                 }
 
                 ui.group(|ui| {
-                    ui.set_enabled(self.config.renderer == NativeRenderer::Wgpu);
+                    ui.add_enabled_ui(self.config.renderer == NativeRenderer::Wgpu, |ui| {
+                        let scanlines_hover_text = "Works best with integer height scaling";
+                        let disabled_hover_text = "Scanlines are not supported with SDL2 renderer";
 
-                    let scanlines_hover_text = "Works best with integer height scaling";
-                    let disabled_hover_text = "Scanlines are not supported with SDL2 renderer";
-
-                    ui.label("Scanlines").on_disabled_hover_text(disabled_hover_text);
-                    ui.horizontal(|ui| {
-                        ui.radio_value(&mut self.config.scanlines, Scanlines::None, "None")
-                            .on_disabled_hover_text(disabled_hover_text);
-                        ui.radio_value(&mut self.config.scanlines, Scanlines::Dim, "Dim")
-                            .on_hover_text(scanlines_hover_text)
-                            .on_disabled_hover_text(disabled_hover_text);
-                        ui.radio_value(&mut self.config.scanlines, Scanlines::Black, "Black")
-                            .on_hover_text(scanlines_hover_text)
-                            .on_disabled_hover_text(disabled_hover_text);
+                        ui.label("Scanlines").on_disabled_hover_text(disabled_hover_text);
+                        ui.horizontal(|ui| {
+                            ui.radio_value(&mut self.config.scanlines, Scanlines::None, "None")
+                                .on_disabled_hover_text(disabled_hover_text);
+                            ui.radio_value(&mut self.config.scanlines, Scanlines::Dim, "Dim")
+                                .on_hover_text(scanlines_hover_text)
+                                .on_disabled_hover_text(disabled_hover_text);
+                            ui.radio_value(&mut self.config.scanlines, Scanlines::Black, "Black")
+                                .on_hover_text(scanlines_hover_text)
+                                .on_disabled_hover_text(disabled_hover_text);
+                        });
                     });
                 });
 
@@ -1071,10 +1075,11 @@ impl App {
                 });
 
                 ui.with_layout(Layout::top_down(Align::LEFT), |ui| {
-                    ui.set_enabled(self.config.aspect_ratio != AspectRatio::Stretched);
-                    ui.checkbox(&mut self.config.forced_integer_height_scaling, "Forced integer scaling for height")
-                        .on_hover_text("Image height will always be the highest possible integer multiple of native (224px)")
-                        .on_disabled_hover_text("This option is not available in stretched image mode");
+                    ui.add_enabled_ui(self.config.aspect_ratio != AspectRatio::Stretched, |ui| {
+                        ui.checkbox(&mut self.config.forced_integer_height_scaling, "Forced integer scaling for height")
+                            .on_hover_text("Image height will always be the highest possible integer multiple of native (224px)")
+                            .on_disabled_hover_text("This option is not available in stretched image mode");
+                    });
                 });
 
                 ui.checkbox(&mut self.config.pal_black_border, "Emulate PAL black border")
@@ -1197,59 +1202,59 @@ impl App {
             .resizable(false)
             .open(&mut input_settings_open)
             .show(ctx, |ui| {
-                ui.set_enabled(self.state.open_input_window.is_none() && self.state.waiting_for_input.is_none());
+                ui.add_enabled_ui(self.state.open_input_window.is_none() && self.state.waiting_for_input.is_none(), |ui| {
+                    ui.horizontal(|ui| {
+                        if ui.button("P1 Keyboard Input").clicked() {
+                            self.state.open_input_window = Some(InputWindow(Player::P1, InputType::Keyboard));
+                        }
 
-                ui.horizontal(|ui| {
-                    if ui.button("P1 Keyboard Input").clicked() {
-                        self.state.open_input_window = Some(InputWindow(Player::P1, InputType::Keyboard));
-                    }
+                        ui.add_space(20.0);
+
+                        if ui.button("P1 Gamepad Input").clicked() {
+                            self.state.open_input_window = Some(InputWindow(Player::P1, InputType::Gamepad));
+                        }
+                    });
+
+                    ui.add_space(10.0);
+
+                    ui.horizontal(|ui| {
+                        if ui.button("P2 Keyboard Input").clicked() {
+                            self.state.open_input_window = Some(InputWindow(Player::P2, InputType::Keyboard));
+                        }
+
+                        ui.add_space(20.0);
+
+                        if ui.button("P2 Gamepad Input").clicked() {
+                            self.state.open_input_window = Some(InputWindow(Player::P2, InputType::Gamepad));
+                        }
+                    });
 
                     ui.add_space(20.0);
 
-                    if ui.button("P1 Gamepad Input").clicked() {
-                        self.state.open_input_window = Some(InputWindow(Player::P1, InputType::Gamepad));
-                    }
-                });
-
-                ui.add_space(10.0);
-
-                ui.horizontal(|ui| {
-                    if ui.button("P2 Keyboard Input").clicked() {
-                        self.state.open_input_window = Some(InputWindow(Player::P2, InputType::Keyboard));
-                    }
-
-                    ui.add_space(20.0);
-
-                    if ui.button("P2 Gamepad Input").clicked() {
-                        self.state.open_input_window = Some(InputWindow(Player::P2, InputType::Gamepad));
-                    }
-                });
-
-                ui.add_space(20.0);
-
-                ui.checkbox(
-                    &mut self.config.input.allow_opposite_directions,
-                    "Allow simultaneous opposing directional inputs (left+right / up+down)",
-                )
-                    .on_hover_text("Some games exhibit severe glitches when opposing directions are pressed simultaneously");
-
-                ui.horizontal(|ui| {
-                    NumericTextInput::new(
-                        &mut self.state.input.axis_deadzone_text,
-                        &mut self.config.input.axis_deadzone,
-                        &mut self.state.input.axis_deadzone_invalid,
-                        0..=i16::MAX as u16,
+                    ui.checkbox(
+                        &mut self.config.input.allow_opposite_directions,
+                        "Allow simultaneous opposing directional inputs (left+right / up+down)",
                     )
-                    .desired_width(55.0)
-                    .ui(ui);
-                    ui.label("Joystick axis deadzone (0-32767)");
+                        .on_hover_text("Some games exhibit severe glitches when opposing directions are pressed simultaneously");
+
+                    ui.horizontal(|ui| {
+                        NumericTextInput::new(
+                            &mut self.state.input.axis_deadzone_text,
+                            &mut self.config.input.axis_deadzone,
+                            &mut self.state.input.axis_deadzone_invalid,
+                            0..=i16::MAX as u16,
+                        )
+                            .desired_width(55.0)
+                            .ui(ui);
+                        ui.label("Joystick axis deadzone (0-32767)");
+                    });
+                    if self.state.input.axis_deadzone_invalid {
+                        ui.colored_label(
+                            Color32::RED,
+                            "Axis deadzone must be an integer between 0 and 32767",
+                        );
+                    }
                 });
-                if self.state.input.axis_deadzone_invalid {
-                    ui.colored_label(
-                        Color32::RED,
-                        "Axis deadzone must be an integer between 0 and 32767",
-                    );
-                }
             });
         if !input_settings_open {
             self.state.open_window = None;
@@ -1270,34 +1275,34 @@ impl App {
         Window::new(&window_title).resizable(false).open(&mut input_subwindow_open).show(
             ctx,
             |ui| {
-                ui.set_enabled(self.state.waiting_for_input.is_none());
+                ui.add_enabled_ui(self.state.waiting_for_input.is_none(), |ui| {
+                    Grid::new(format!("{player:?}_{input_type:?}")).show(ui, |ui| {
+                        for nes_button in NesButton::ALL {
+                            ui.label(format!("{nes_button:?}:"));
+                            InputButton::new(player, input_type, nes_button, self).ui(ui);
 
-                Grid::new(format!("{player:?}_{input_type:?}")).show(ui, |ui| {
-                    for nes_button in NesButton::ALL {
-                        ui.label(format!("{nes_button:?}:"));
-                        InputButton::new(player, input_type, nes_button, self).ui(ui);
-
-                        if ui.button("Clear").clicked() {
-                            match input_type {
-                                InputType::Keyboard => {
-                                    *get_keyboard_field(
-                                        &mut self.config.input,
-                                        player,
-                                        nes_button,
-                                    ) = None;
-                                }
-                                InputType::Gamepad => {
-                                    *get_joystick_field(
-                                        &mut self.config.input,
-                                        player,
-                                        nes_button,
-                                    ) = None;
+                            if ui.button("Clear").clicked() {
+                                match input_type {
+                                    InputType::Keyboard => {
+                                        *get_keyboard_field(
+                                            &mut self.config.input,
+                                            player,
+                                            nes_button,
+                                        ) = None;
+                                    }
+                                    InputType::Gamepad => {
+                                        *get_joystick_field(
+                                            &mut self.config.input,
+                                            player,
+                                            nes_button,
+                                        ) = None;
+                                    }
                                 }
                             }
-                        }
 
-                        ui.end_row();
-                    }
+                            ui.end_row();
+                        }
+                    });
                 });
             },
         );
@@ -1471,57 +1476,58 @@ impl eframe::App for App {
         }
 
         TopBottomPanel::new(TopBottomSide::Top, "top_bottom_panel").show(ctx, |ui| {
-            ui.set_enabled(!self.state.is_any_window_open());
-            menu::bar(ui, |ui| {
-                ui.menu_button("File", |ui| {
-                    let open_button = Button::new("Open")
-                        .shortcut_text(ctx.format_shortcut(&open_shortcut))
-                        .ui(ui);
-                    if open_button.clicked() {
-                        self.handle_open();
-                        ui.close_menu();
-                    }
+            ui.add_enabled_ui(!self.state.is_any_window_open(), |ui| {
+                menu::bar(ui, |ui| {
+                    ui.menu_button("File", |ui| {
+                        let open_button = Button::new("Open")
+                            .shortcut_text(ctx.format_shortcut(&open_shortcut))
+                            .ui(ui);
+                        if open_button.clicked() {
+                            self.handle_open();
+                            ui.close_menu();
+                        }
 
-                    let quit_button = Button::new("Quit")
-                        .shortcut_text(ctx.format_shortcut(&quit_shortcut))
-                        .ui(ui);
-                    if quit_button.clicked() {
-                        ctx.send_viewport_cmd(ViewportCommand::Close);
-                    }
-                });
+                        let quit_button = Button::new("Quit")
+                            .shortcut_text(ctx.format_shortcut(&quit_shortcut))
+                            .ui(ui);
+                        if quit_button.clicked() {
+                            ctx.send_viewport_cmd(ViewportCommand::Close);
+                        }
+                    });
 
-                ui.menu_button("Settings", |ui| {
-                    if ui.button("General").clicked() {
-                        self.state.open_window = Some(OpenWindow::GeneralSettings);
-                        ui.close_menu();
-                    }
+                    ui.menu_button("Settings", |ui| {
+                        if ui.button("General").clicked() {
+                            self.state.open_window = Some(OpenWindow::GeneralSettings);
+                            ui.close_menu();
+                        }
 
-                    if ui.button("Video").clicked() {
-                        self.state.open_window = Some(OpenWindow::VideoSettings);
-                        ui.close_menu();
-                    }
+                        if ui.button("Video").clicked() {
+                            self.state.open_window = Some(OpenWindow::VideoSettings);
+                            ui.close_menu();
+                        }
 
-                    if ui.button("Audio").clicked() {
-                        self.state.open_window = Some(OpenWindow::AudioSettings);
-                        ui.close_menu();
-                    }
+                        if ui.button("Audio").clicked() {
+                            self.state.open_window = Some(OpenWindow::AudioSettings);
+                            ui.close_menu();
+                        }
 
-                    if ui.button("Input").clicked() {
-                        self.state.open_window = Some(OpenWindow::InputSettings);
-                        ui.close_menu();
-                    }
+                        if ui.button("Input").clicked() {
+                            self.state.open_window = Some(OpenWindow::InputSettings);
+                            ui.close_menu();
+                        }
 
-                    if ui.button("Hotkeys").clicked() {
-                        self.state.open_window = Some(OpenWindow::HotkeySettings);
-                        ui.close_menu();
-                    }
-                });
+                        if ui.button("Hotkeys").clicked() {
+                            self.state.open_window = Some(OpenWindow::HotkeySettings);
+                            ui.close_menu();
+                        }
+                    });
 
-                ui.menu_button("Help", |ui| {
-                    if ui.button("About").clicked() {
-                        self.state.open_window = Some(OpenWindow::About);
-                        ui.close_menu();
-                    }
+                    ui.menu_button("Help", |ui| {
+                        if ui.button("About").clicked() {
+                            self.state.open_window = Some(OpenWindow::About);
+                            ui.close_menu();
+                        }
+                    });
                 });
             });
         });

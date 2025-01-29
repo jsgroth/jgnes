@@ -86,7 +86,7 @@ impl<'a, T> SdlRenderer<'a, T> {
     }
 }
 
-impl<'a, T> Renderer for SdlRenderer<'a, T> {
+impl<T> Renderer for SdlRenderer<'_, T> {
     type Err = SdlRendererError;
 
     fn render_frame(
@@ -272,7 +272,7 @@ trait SdlWindowRenderer {
     fn reload_config(&mut self, config: &JgnesDynamicConfig) -> Result<(), anyhow::Error>;
 }
 
-impl<'a, T> SdlWindowRenderer for SdlRenderer<'a, T> {
+impl<T> SdlWindowRenderer for SdlRenderer<'_, T> {
     fn window_mut(&mut self) -> &mut Window {
         self.canvas.window_mut()
     }

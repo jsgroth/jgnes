@@ -11,9 +11,9 @@ members = [
 resolver = "2"
 
 [workspace.dependencies]
-sdl2 = { version = "0.36", features = ["raw-window-handle"] }
+sdl2 = { version = "0.37", features = ["raw-window-handle"] }
 serde = { version = "1", features = ["derive"] }
-wgpu = "0.18"
+wgpu = "23"
 
 [profile.dev]
 opt-level = 1

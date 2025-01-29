@@ -182,7 +182,8 @@ impl TextureScalePipeline {
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &vertex_shader,
-                entry_point: "vs_main",
+                entry_point: "vs_main".into(),
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
                 buffers: &[],
             },
             primitive: wgpu::PrimitiveState {
@@ -202,7 +203,8 @@ impl TextureScalePipeline {
             },
             fragment: Some(wgpu::FragmentState {
                 module: &prescale_shader,
-                entry_point: "fs_main",
+                entry_point: "fs_main".into(),
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: scaled_texture.format(),
                     blend: Some(wgpu::BlendState::REPLACE),
@@ -210,6 +212,7 @@ impl TextureScalePipeline {
                 })],
             }),
             multiview: None,
+            cache: None,
         });
 
         Self { scaled_texture, bind_group, pipeline }
@@ -358,7 +361,8 @@ impl BlurPipeline {
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &vertex_shader,
-                entry_point: "vs_main",
+                entry_point: "vs_main".into(),
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
                 buffers: &[],
             },
             primitive: wgpu::PrimitiveState {
@@ -378,7 +382,8 @@ impl BlurPipeline {
             },
             fragment: Some(wgpu::FragmentState {
                 module: &blur_shader,
-                entry_point: "fs_main",
+                entry_point: "fs_main".into(),
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: input.format(),
                     blend: Some(wgpu::BlendState::REPLACE),
@@ -386,6 +391,7 @@ impl BlurPipeline {
                 })],
             }),
             multiview: None,
+            cache: None,
         });
 
         Self { buffer_texture, horizontal_bind_group, vertical_bind_group, pipeline }
@@ -649,7 +655,8 @@ fn create_render_pipeline(
         layout: Some(render_pipeline_layout),
         vertex: wgpu::VertexState {
             module: &shader_module,
-            entry_point: "vs_main",
+            entry_point: "vs_main".into(),
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
             buffers: &[Vertex2d::descriptor()],
         },
         primitive: wgpu::PrimitiveState {
@@ -669,7 +676,8 @@ fn create_render_pipeline(
         },
         fragment: Some(wgpu::FragmentState {
             module: &shader_module,
-            entry_point: fs_main,
+            entry_point: fs_main.into(),
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
             targets: &[Some(wgpu::ColorTargetState {
                 format: surface_format,
                 blend: Some(wgpu::BlendState::REPLACE),
@@ -677,6 +685,7 @@ fn create_render_pipeline(
             })],
         }),
         multiview: None,
+        cache: None,
     })
 }
 

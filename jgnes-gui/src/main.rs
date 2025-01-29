@@ -60,5 +60,5 @@ fn main() -> eframe::Result<()> {
         ..NativeOptions::default()
     };
 
-    eframe::run_native("jgnes", options, Box::new(|_cc| Box::new(App::new(config_path))))
+    eframe::run_native("jgnes", options, Box::new(|_cc| Ok(Box::new(App::new(config_path)))))
 }

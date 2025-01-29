@@ -10,10 +10,9 @@ jgnes-proc-macros = { path = "../jgnes-proc-macros" }
 
 bincode = { version = "2.0.0-rc.3", features = ["serde"] }
 log = "0.4"
-rand = "0.8"
+rand = "0.9"
 serde = { workspace = true }
-thiserror = "1"
-tinyvec = { version = "1", features = ["serde"] }
+thiserror = "2"
 
 [lints]
 workspace = true

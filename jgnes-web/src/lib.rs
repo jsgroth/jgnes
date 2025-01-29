@@ -23,17 +23,18 @@ use std::array;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::time::Duration;
 use wasm_bindgen::prelude::*;
 use web_sys::{AudioContext, AudioContextOptions};
-use winit::dpi::{LogicalSize, PhysicalSize};
-use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
-use winit::event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopProxy};
+use winit::event::{ElementState, Event, KeyEvent, WindowEvent};
+use winit::event_loop::{ControlFlow, EventLoop, EventLoopProxy};
+use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::platform::web::WindowExtWebSys;
-use winit::window::{Fullscreen, Window, WindowBuilder, WindowId};
+use winit::window::{Fullscreen, Window, WindowAttributes, WindowId};
 
 const BASE64_ENGINE: GeneralPurpose = base64::engine::general_purpose::STANDARD;
 
-const FULLSCREEN_KEY: VirtualKeyCode = VirtualKeyCode::F8;
+const FULLSCREEN_KEY: KeyCode = KeyCode::F8;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumDisplay)]
 #[wasm_bindgen]
@@ -51,11 +52,6 @@ pub enum NesButton {
 fn alert_and_panic(s: &str) -> ! {
     js::alert(s);
     panic!("{s}")
-}
-
-fn window_size(window: &Window) -> (u32, u32) {
-    let PhysicalSize { width, height } = window.inner_size();
-    (width, height)
 }
 
 struct WebSaveWriter {
@@ -80,14 +76,14 @@ enum InputHandlerState {
 }
 
 struct InputHandler {
-    button_mapping: HashMap<VirtualKeyCode, Vec<NesButton>>,
+    button_mapping: HashMap<KeyCode, Vec<NesButton>>,
     p1_joypad_state: Rc<Cell<JoypadState>>,
     handler_state: InputHandlerState,
 }
 
 impl InputHandler {
-    fn input_mapping_for(config: &InputConfig) -> HashMap<VirtualKeyCode, Vec<NesButton>> {
-        let mut mapping: HashMap<VirtualKeyCode, Vec<NesButton>> = HashMap::new();
+    fn input_mapping_for(config: &InputConfig) -> HashMap<KeyCode, Vec<NesButton>> {
+        let mut mapping: HashMap<KeyCode, Vec<NesButton>> = HashMap::new();
         for (button, keycode) in [
             (NesButton::Up, config.up),
             (NesButton::Left, config.left),
@@ -139,9 +135,9 @@ impl InputHandler {
         self.button_mapping.retain(|_, buttons| !buttons.is_empty());
     }
 
-    fn handle_window_event(&mut self, event: &WindowEvent<'_>, config: &JgnesWebConfig) {
+    fn handle_window_event(&mut self, event: &WindowEvent, config: &JgnesWebConfig) {
         if let WindowEvent::KeyboardInput {
-            input: KeyboardInput { virtual_keycode: Some(keycode), state, .. },
+            event: KeyEvent { physical_key: PhysicalKey::Code(keycode), state, .. },
             ..
         } = event
         {
@@ -338,35 +334,41 @@ fn new_renderer_config(fields: &ConfigFields) -> RendererConfig {
     }
 }
 
+const CANVAS_WIDTH: u32 = 878;
+const CANVAS_HEIGHT: u32 = 672;
+
 #[allow(clippy::missing_panics_doc)]
 #[wasm_bindgen]
 pub async fn run_emulator(config: JgnesWebConfig) {
-    let event_loop = EventLoopBuilder::<JgnesUserEvent>::with_user_event().build();
-    let window = WindowBuilder::new().build(&event_loop).expect("Unable to create window");
+    let event_loop = EventLoop::<JgnesUserEvent>::with_user_event()
+        .build()
+        .expect("Failed to create winit event loop");
 
-    window.set_inner_size(LogicalSize::new(878, 672));
+    #[allow(deprecated)]
+    let window =
+        event_loop.create_window(WindowAttributes::default()).expect("Unable to create window");
 
     web_sys::window()
         .and_then(|win| win.document())
         .and_then(|doc| {
             let dst = doc.get_element_by_id("jgnes-wasm")?;
-            let canvas = web_sys::Element::from(window.canvas());
+            let canvas = web_sys::Element::from(window.canvas()?);
             dst.append_child(&canvas).ok()?;
             Some(())
         })
         .expect("Couldn't append canvas to document body");
 
     let renderer_config = new_renderer_config(&config.fields.borrow());
-    let renderer = WgpuRenderer::from_window(window, window_size, renderer_config)
-        .await
-        .map_err(|err| alert_and_panic(&err.to_string()))
-        .unwrap();
+    let renderer =
+        WgpuRenderer::from_window(window, |_| (CANVAS_WIDTH, CANVAS_HEIGHT), renderer_config)
+            .await
+            .map_err(|err| alert_and_panic(&err.to_string()))
+            .unwrap();
     let renderer = Rc::new(RefCell::new(renderer));
 
-    let audio_ctx = AudioContext::new_with_context_options(
-        AudioContextOptions::new().sample_rate(AUDIO_OUTPUT_FREQUENCY as f32),
-    )
-    .unwrap();
+    let audio_ctx_options = AudioContextOptions::new();
+    audio_ctx_options.set_sample_rate(AUDIO_OUTPUT_FREQUENCY as f32);
+    let audio_ctx = AudioContext::new_with_context_options(&audio_ctx_options).unwrap();
     let audio_queue = AudioQueue::new();
     let _audio_worklet = audio::initialize_audio_worklet(&audio_ctx, &audio_queue).await.unwrap();
 
@@ -390,11 +392,7 @@ pub async fn run_emulator(config: JgnesWebConfig) {
     run_event_loop(event_loop, config, state);
 }
 
-fn run_event_loop(
-    event_loop: EventLoop<JgnesUserEvent>,
-    config: JgnesWebConfig,
-    mut state: State,
-) -> ! {
+fn run_event_loop(event_loop: EventLoop<JgnesUserEvent>, config: JgnesWebConfig, mut state: State) {
     let event_loop_proxy = event_loop.create_proxy();
 
     let performance = web_sys::window()
@@ -405,203 +403,225 @@ fn run_event_loop(
     // Used in white noise generator because rendering 60FPS is a bit much visually
     let mut odd_frame = false;
 
-    event_loop.run(move |event, _, control_flow| {
-        match event {
-            Event::UserEvent(JgnesUserEvent::RomFileLoaded { file_bytes, file_name }) => {
-                let sav_bytes = load_sav_bytes(&file_name);
+    #[allow(deprecated)]
+    event_loop
+        .run(move |event, elwt| {
+            match event {
+                Event::UserEvent(JgnesUserEvent::RomFileLoaded { file_bytes, file_name }) => {
+                    let sav_bytes = load_sav_bytes(&file_name);
 
-                let input_poller = WebInputPoller {
-                    p1_joypad_state: Rc::clone(&state.input_handler.p1_joypad_state),
-                };
-                let save_writer = WebSaveWriter { file_name: file_name.clone() };
+                    let input_poller = WebInputPoller {
+                        p1_joypad_state: Rc::clone(&state.input_handler.p1_joypad_state),
+                    };
+                    let save_writer = WebSaveWriter { file_name: file_name.clone() };
 
-                match Emulator::create(EmulatorCreateArgs {
-                    rom_bytes: file_bytes,
-                    sav_bytes,
-                    forced_timing_mode: None,
-                    renderer: Rc::clone(&state.renderer),
-                    audio_player: Rc::clone(&state.audio_player),
-                    input_poller,
-                    save_writer,
-                }) {
-                    Ok(emulator) => {
-                        if !state.user_interacted {
-                            state.user_interacted = true;
+                    match Emulator::create(EmulatorCreateArgs {
+                        rom_bytes: file_bytes,
+                        sav_bytes,
+                        forced_timing_mode: None,
+                        renderer: Rc::clone(&state.renderer),
+                        audio_player: Rc::clone(&state.audio_player),
+                        input_poller,
+                        save_writer,
+                    }) {
+                        Ok(emulator) => {
+                            if !state.user_interacted {
+                                state.user_interacted = true;
 
-                            let _: Promise = state.audio_ctx.resume().unwrap();
-                        }
-
-                        set_rom_file_name_text(&file_name);
-                        *config.current_filename.borrow_mut() = file_name;
-                        js::setSaveButtonsEnabled(emulator.has_persistent_ram());
-                        js::focusCanvas();
-                        state.emulator = Some(emulator);
-                    }
-                    Err(err) => {
-                        js::alert(&format!("Error initializing emulator: {err}"));
-                        log::error!("Error initializing emulator: {err}");
-                    }
-                }
-            }
-            Event::UserEvent(JgnesUserEvent::SaveFileLoaded { save_bytes, file_name }) => {
-                let save_bytes_b64 = BASE64_ENGINE.encode(&save_bytes);
-                js::saveToLocalStorage(&file_name, &save_bytes_b64);
-
-                // Hard reset after uploading a save file
-                state.emulator =
-                    state.emulator.take().map(|emulator| emulator.hard_reset(Some(save_bytes)));
-
-                js::focusCanvas();
-            }
-            Event::WindowEvent { event: win_event, window_id }
-                if window_id == state.window_id() =>
-            {
-                state.input_handler.handle_window_event(&win_event, &config);
-
-                match win_event {
-                    WindowEvent::KeyboardInput {
-                        input:
-                            KeyboardInput {
-                                virtual_keycode: Some(FULLSCREEN_KEY),
-                                state: ElementState::Pressed,
-                                ..
-                            },
-                        ..
-                    } => {
-                        let mut renderer = state.renderer.borrow_mut();
-                        let window = renderer.window_mut();
-
-                        let new_fullscreen = match window.fullscreen() {
-                            None => Some(Fullscreen::Borderless(None)),
-                            Some(_) => None,
-                        };
-                        window.set_fullscreen(new_fullscreen);
-                    }
-                    WindowEvent::Resized(_) => {
-                        let mut renderer = state.renderer.borrow_mut();
-                        renderer.reconfigure_surface();
-
-                        // Show cursor over canvas only when not in fullscreen mode
-                        js::setCursorVisible(renderer.window().fullscreen().is_none());
-                    }
-                    WindowEvent::CloseRequested => {
-                        *control_flow = ControlFlow::Exit;
-                    }
-                    _ => {}
-                }
-            }
-            Event::MainEventsCleared => {
-                if state.current_config != *config.fields.borrow() {
-                    state.current_config = config.fields.borrow().clone();
-
-                    state
-                        .renderer
-                        .borrow_mut()
-                        .update_render_config(new_renderer_config(&state.current_config))
-                        .expect("Failed to update wgpu renderer config");
-                    state.audio_player.borrow_mut().audio_enabled =
-                        state.current_config.audio_enabled;
-                }
-
-                if config.open_file_requested.replace(false) {
-                    wasm_bindgen_futures::spawn_local(open_file_in_event_loop(
-                        event_loop_proxy.clone(),
-                    ));
-                }
-
-                if config.reset_requested.replace(false) {
-                    if let Some(emulator) = &mut state.emulator {
-                        emulator.soft_reset();
-                    }
-                }
-
-                if config.upload_save_file_requested.replace(false) {
-                    wasm_bindgen_futures::spawn_local(upload_save_file(
-                        event_loop_proxy.clone(),
-                        config.current_filename(),
-                    ));
-                }
-
-                if config.restore_defaults_requested.replace(false) {
-                    // JgnesWebConfig::restore_defaults updates the actual config values, but
-                    // updating the InputConfig does not automatically update the input mappings in
-                    // the InputHandler
-                    state.input_handler.update_all_mappings(&config.inputs.borrow());
-                }
-
-                if let Some(button) = config.reconfig_input_request.replace(None) {
-                    state.input_handler.remove_mapping_for_button(button);
-                    state.input_handler.handler_state = InputHandlerState::WaitingForInput(button);
-                }
-
-                // Don't tick the emulator while waiting for input configuration
-                if !matches!(
-                    state.input_handler.handler_state,
-                    InputHandlerState::WaitingForInput(_)
-                ) {
-                    // If audio sync is enabled, only run the emulator if the audio queue isn't filling up
-                    let audio_sync_enabled = state.current_config.audio_sync_enabled;
-                    let audio_queue_len = state.audio_player.borrow().audio_queue.len().unwrap();
-                    let should_wait_for_audio =
-                        audio_sync_enabled && audio_queue_len > AUDIO_QUEUE_THRESHOLD;
-
-                    let frame_time_sync = state.current_config.frame_time_sync;
-                    let now = performance.now();
-                    let should_wait_for_frame_time = frame_time_sync && now < next_frame_time;
-
-                    if !should_wait_for_audio && !should_wait_for_frame_time {
-                        let fps = state.emulator.as_ref().map_or(60.0, |emulator| {
-                            match emulator.timing_mode() {
-                                TimingMode::Ntsc => 60.0,
-                                TimingMode::Pal => 50.0,
+                                let _: Promise = state.audio_ctx.resume().unwrap();
                             }
-                        });
 
-                        while now >= next_frame_time {
-                            next_frame_time += 1000.0 / fps;
+                            set_rom_file_name_text(&file_name);
+                            *config.current_filename.borrow_mut() = file_name;
+                            js::setSaveButtonsEnabled(emulator.has_persistent_ram());
+                            js::focusCanvas();
+                            state.emulator = Some(emulator);
                         }
+                        Err(err) => {
+                            js::alert(&format!("Error initializing emulator: {err}"));
+                            log::error!("Error initializing emulator: {err}");
+                        }
+                    }
+                }
+                Event::UserEvent(JgnesUserEvent::SaveFileLoaded { save_bytes, file_name }) => {
+                    let save_bytes_b64 = BASE64_ENGINE.encode(&save_bytes);
+                    js::saveToLocalStorage(&file_name, &save_bytes_b64);
 
-                        match &mut state.emulator {
-                            Some(emulator) => {
-                                let emulator_config = EmulatorConfig {
-                                    remove_sprite_limit: state.current_config.remove_sprite_limit,
-                                    pal_black_border: false,
-                                    silence_ultrasonic_triangle_output: state
-                                        .current_config
-                                        .silence_ultrasonic_triangle_output,
-                                };
+                    // Hard reset after uploading a save file
+                    state.emulator =
+                        state.emulator.take().map(|emulator| emulator.hard_reset(Some(save_bytes)));
 
-                                // Tick the emulator until it renders the next frame
-                                loop {
-                                    match emulator.tick(&emulator_config) {
-                                        Ok(TickEffect::None) => {}
-                                        Ok(TickEffect::FrameRendered) => {
-                                            break;
-                                        }
-                                        Err(err) => {
-                                            // Assume emulator is now invalid
-                                            state.emulator = None;
-                                            js::alert(&format!(
-                                                "Emulator terminated with error: {err:?}"
-                                            ));
-                                            break;
+                    js::focusCanvas();
+                }
+                Event::WindowEvent { event: win_event, window_id }
+                    if window_id == state.window_id() =>
+                {
+                    state.input_handler.handle_window_event(&win_event, &config);
+
+                    match win_event {
+                        WindowEvent::KeyboardInput {
+                            event:
+                                KeyEvent {
+                                    physical_key: PhysicalKey::Code(FULLSCREEN_KEY),
+                                    state: ElementState::Pressed,
+                                    ..
+                                },
+                            ..
+                        } => {
+                            let mut renderer = state.renderer.borrow_mut();
+                            let window = renderer.window_mut();
+
+                            let new_fullscreen = match window.fullscreen() {
+                                None => Some(Fullscreen::Borderless(None)),
+                                Some(_) => None,
+                            };
+                            window.set_fullscreen(new_fullscreen);
+                        }
+                        WindowEvent::Resized(_) => {
+                            let mut renderer = state.renderer.borrow_mut();
+                            renderer.reconfigure_surface();
+
+                            // Show cursor over canvas only when not in fullscreen mode
+                            js::setCursorVisible(renderer.window().fullscreen().is_none());
+                        }
+                        WindowEvent::CloseRequested => {
+                            elwt.exit();
+                        }
+                        _ => {}
+                    }
+                }
+                Event::AboutToWait => {
+                    if state.current_config != *config.fields.borrow() {
+                        state.current_config = config.fields.borrow().clone();
+
+                        state
+                            .renderer
+                            .borrow_mut()
+                            .update_render_config(new_renderer_config(&state.current_config))
+                            .expect("Failed to update wgpu renderer config");
+                        state.audio_player.borrow_mut().audio_enabled =
+                            state.current_config.audio_enabled;
+                    }
+
+                    if config.open_file_requested.replace(false) {
+                        wasm_bindgen_futures::spawn_local(open_file_in_event_loop(
+                            event_loop_proxy.clone(),
+                        ));
+                    }
+
+                    if config.reset_requested.replace(false) {
+                        if let Some(emulator) = &mut state.emulator {
+                            emulator.soft_reset();
+                        }
+                    }
+
+                    if config.upload_save_file_requested.replace(false) {
+                        wasm_bindgen_futures::spawn_local(upload_save_file(
+                            event_loop_proxy.clone(),
+                            config.current_filename(),
+                        ));
+                    }
+
+                    if config.restore_defaults_requested.replace(false) {
+                        // JgnesWebConfig::restore_defaults updates the actual config values, but
+                        // updating the InputConfig does not automatically update the input mappings in
+                        // the InputHandler
+                        state.input_handler.update_all_mappings(&config.inputs.borrow());
+                    }
+
+                    if let Some(button) = config.reconfig_input_request.replace(None) {
+                        state.input_handler.remove_mapping_for_button(button);
+                        state.input_handler.handler_state =
+                            InputHandlerState::WaitingForInput(button);
+                    }
+
+                    // Don't tick the emulator while waiting for input configuration
+                    if !matches!(
+                        state.input_handler.handler_state,
+                        InputHandlerState::WaitingForInput(_)
+                    ) {
+                        // If audio sync is enabled, only run the emulator if the audio queue isn't filling up
+                        let audio_sync_enabled = state.current_config.audio_sync_enabled;
+                        let audio_queue_len =
+                            state.audio_player.borrow().audio_queue.len().unwrap();
+                        let should_wait_for_audio =
+                            audio_sync_enabled && audio_queue_len > AUDIO_QUEUE_THRESHOLD;
+
+                        let frame_time_sync = state.current_config.frame_time_sync;
+                        let now = performance.now();
+                        let should_wait_for_frame_time = frame_time_sync && now < next_frame_time;
+
+                        if !should_wait_for_audio && !should_wait_for_frame_time {
+                            elwt.set_control_flow(ControlFlow::Poll);
+
+                            let fps =
+                                state.emulator.as_ref().map_or(60.0, |emulator| {
+                                    match emulator.timing_mode() {
+                                        TimingMode::Ntsc => 60.0,
+                                        TimingMode::Pal => 50.0,
+                                    }
+                                });
+
+                            while now >= next_frame_time {
+                                next_frame_time += 1000.0 / fps;
+                            }
+
+                            match &mut state.emulator {
+                                Some(emulator) => {
+                                    let emulator_config = EmulatorConfig {
+                                        remove_sprite_limit: state
+                                            .current_config
+                                            .remove_sprite_limit,
+                                        pal_black_border: false,
+                                        silence_ultrasonic_triangle_output: state
+                                            .current_config
+                                            .silence_ultrasonic_triangle_output,
+                                    };
+
+                                    // Tick the emulator until it renders the next frame
+                                    loop {
+                                        match emulator.tick(&emulator_config) {
+                                            Ok(TickEffect::None) => {}
+                                            Ok(TickEffect::FrameRendered) => {
+                                                elwt.set_control_flow(ControlFlow::WaitUntil(
+                                                    web_time::Instant::now()
+                                                        + Duration::from_millis(1),
+                                                ));
+                                                break;
+                                            }
+                                            Err(err) => {
+                                                // Assume emulator is now invalid
+                                                state.emulator = None;
+                                                js::alert(&format!(
+                                                    "Emulator terminated with error: {err:?}"
+                                                ));
+                                                break;
+                                            }
                                         }
                                     }
                                 }
-                            }
-                            None => {
-                                odd_frame = !odd_frame;
-                                if odd_frame {
-                                    render_white_noise(&mut *state.renderer.borrow_mut()).unwrap();
+                                None => {
+                                    odd_frame = !odd_frame;
+                                    if odd_frame {
+                                        render_white_noise(&mut *state.renderer.borrow_mut())
+                                            .unwrap();
+                                        elwt.set_control_flow(ControlFlow::WaitUntil(
+                                            web_time::Instant::now() + Duration::from_millis(1),
+                                        ));
+                                    }
                                 }
                             }
+                        } else {
+                            elwt.set_control_flow(ControlFlow::WaitUntil(
+                                web_time::Instant::now() + Duration::from_millis(1),
+                            ));
                         }
                     }
                 }
+                _ => {}
             }
-            _ => {}
-        }
-    })
+        })
+        .unwrap();
 }
 
 fn render_white_noise<R: Renderer>(renderer: &mut R) -> Result<(), R::Err> {

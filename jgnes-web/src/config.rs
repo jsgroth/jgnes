@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
-use winit::event::VirtualKeyCode;
+use winit::keyboard::KeyCode;
 
 fn default_render_scale() -> RenderScale {
     RenderScale::ONE
@@ -72,20 +72,20 @@ fn save_to_local_storage<S: Serialize>(key: &str, value: &S) {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[wasm_bindgen]
 pub struct InputConfig {
-    pub(crate) up: VirtualKeyCode,
-    pub(crate) left: VirtualKeyCode,
-    pub(crate) right: VirtualKeyCode,
-    pub(crate) down: VirtualKeyCode,
-    pub(crate) a: VirtualKeyCode,
-    pub(crate) b: VirtualKeyCode,
-    pub(crate) start: VirtualKeyCode,
-    pub(crate) select: VirtualKeyCode,
+    pub(crate) up: KeyCode,
+    pub(crate) left: KeyCode,
+    pub(crate) right: KeyCode,
+    pub(crate) down: KeyCode,
+    pub(crate) a: KeyCode,
+    pub(crate) b: KeyCode,
+    pub(crate) start: KeyCode,
+    pub(crate) select: KeyCode,
 }
 
 impl InputConfig {
     const LOCAL_STORAGE_KEY: &'static str = "__inputs";
 
-    pub fn set_key(&mut self, button: NesButton, keycode: VirtualKeyCode) {
+    pub fn set_key(&mut self, button: NesButton, keycode: KeyCode) {
         let field = match button {
             NesButton::Up => &mut self.up,
             NesButton::Left => &mut self.left,
@@ -140,14 +140,14 @@ impl InputConfig {
 impl Default for InputConfig {
     fn default() -> Self {
         Self {
-            up: VirtualKeyCode::Up,
-            left: VirtualKeyCode::Left,
-            right: VirtualKeyCode::Right,
-            down: VirtualKeyCode::Down,
-            a: VirtualKeyCode::Z,
-            b: VirtualKeyCode::X,
-            start: VirtualKeyCode::Return,
-            select: VirtualKeyCode::RShift,
+            up: KeyCode::ArrowUp,
+            left: KeyCode::ArrowLeft,
+            right: KeyCode::ArrowRight,
+            down: KeyCode::ArrowDown,
+            a: KeyCode::KeyZ,
+            b: KeyCode::KeyX,
+            start: KeyCode::Enter,
+            select: KeyCode::ShiftRight,
         }
     }
 }

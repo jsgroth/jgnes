@@ -17,6 +17,6 @@ else
     echo "Compiling for WebGL2 backend"
 fi
 
-RUSTFLAGS="$RUSTFLAGS -C target-feature=+atomics,+bulk-memory,+mutable-globals" \
+RUSTFLAGS="$RUSTFLAGS --cfg getrandom_backend=\"wasm_js\" -C target-feature=+atomics,+bulk-memory,+mutable-globals" \
 rustup run $toolchain \
 wasm-pack build --target web . "$@" -- $cargo_args -Z build-std=panic_abort,std

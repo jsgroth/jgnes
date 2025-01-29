@@ -692,7 +692,7 @@ impl Bus {
 /// A view of the bus containing methods that are appropriate for use by the CPU and APU.
 pub struct CpuBus<'a>(&'a mut Bus);
 
-impl<'a> CpuBus<'a> {
+impl CpuBus<'_> {
     pub fn read_address(&mut self, address: u16) -> u8 {
         match address {
             address @ CPU_RAM_START..=CPU_RAM_END => {
@@ -880,7 +880,7 @@ impl<'a> CpuBus<'a> {
 /// A view of the bus containing methods that are appropriate for use by the PPU.
 pub struct PpuBus<'a>(&'a mut Bus);
 
-impl<'a> PpuBus<'a> {
+impl PpuBus<'_> {
     pub fn read_address(&mut self, address: u16) -> u8 {
         // PPU bus only has 14-bit addressing
         let address = address & 0x3FFF;

@@ -26,6 +26,7 @@ use crate::apu::triangle::TriangleChannel;
 use crate::bus::{CpuBus, IoRegister, IrqSource, TimingMode};
 use crate::num::GetBit;
 use bincode::{Decode, Encode};
+use std::array;
 use std::ops::Range;
 use std::sync::OnceLock;
 
@@ -336,7 +337,8 @@ pub fn mix_pulse_samples(pulse1_sample: u8, pulse2_sample: u8) -> f64 {
 fn mix_tnd_samples(triangle_sample: u8, noise_sample: u8, dmc_sample: u8) -> f64 {
     static TND_AUDIO_LOOKUP_TABLE: OnceLock<Box<[[[f64; 16]; 16]; 128]>> = OnceLock::new();
     let lookup_table = TND_AUDIO_LOOKUP_TABLE.get_or_init(|| {
-        let mut lookup_table = Box::new([[[0.0; 16]; 16]; 128]);
+        let mut lookup_table =
+            Box::new(array::from_fn(|_| array::from_fn(|_| array::from_fn(|_| 0.0))));
 
         for (dmc_sample, dmc_row) in lookup_table.iter_mut().enumerate() {
             for (triangle_sample, triangle_row) in dmc_row.iter_mut().enumerate() {
